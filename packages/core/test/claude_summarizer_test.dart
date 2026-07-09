@@ -75,6 +75,22 @@ void main() {
     );
   });
 
+  test('large stdin to a process that never reads it does not crash',
+      () async {
+    // stdin を読まずに即終了するプロセス → broken pipe を握りつぶして
+    // exitCode ベースのエラーになることを検証
+    final path = await writeFakeClaude('exit 3');
+    final summarizer = ClaudeSummarizer(claudePath: path);
+    final bigInput = 'x' * (256 * 1024);
+
+    await expectLater(
+      summarizer
+          .summarizeTranscript(bigInput, workingDirectory: tempDir.path)
+          .timeout(const Duration(seconds: 30)),
+      throwsA(isA<SummarizeException>()),
+    );
+  });
+
   test('missing executable throws SummarizeException', () async {
     final summarizer =
         ClaudeSummarizer(claudePath: '${tempDir.path}/no-such-claude');

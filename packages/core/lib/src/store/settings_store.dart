@@ -44,13 +44,24 @@ class Settings {
 
   factory Settings.fromJson(Map<String, Object?> json) {
     const defaults = Settings();
+    // 型が想定と違っても落とさず、その項目だけデフォルトに戻す
+    String str(String key, String fallback) {
+      final value = json[key];
+      return value is String ? value : fallback;
+    }
+
+    int integer(String key, int fallback) {
+      final value = json[key];
+      return value is num ? value.toInt() : fallback;
+    }
+
     return Settings(
-      terminalApp: json['terminalApp'] as String? ?? defaults.terminalApp,
+      terminalApp: str('terminalApp', defaults.terminalApp),
       recentSessionLimit:
-          json['recentSessionLimit'] as int? ?? defaults.recentSessionLimit,
-      claudePath: json['claudePath'] as String? ?? defaults.claudePath,
+          integer('recentSessionLimit', defaults.recentSessionLimit),
+      claudePath: str('claudePath', defaults.claudePath),
       summaryRallyCount:
-          json['summaryRallyCount'] as int? ?? defaults.summaryRallyCount,
+          integer('summaryRallyCount', defaults.summaryRallyCount),
     );
   }
 }

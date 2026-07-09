@@ -28,6 +28,13 @@ void main() {
       expect(title.length, 50);
       expect(title, 'あ' * 50);
     });
+
+    test('does not split surrogate pairs when truncating', () {
+      // 絵文字（サロゲートペア）が 50 文字境界をまたいでも壊れない
+      final long = '😀' * 80;
+      final title = build(lastPrompt: long).displayTitle;
+      expect(title, '😀' * 50);
+    });
   });
 
   group('parseTags', () {

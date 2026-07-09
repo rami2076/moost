@@ -17,12 +17,9 @@ class JsonFileStore {
     if (!await file.exists()) {
       return null;
     }
-    final String content;
-    try {
-      content = await file.readAsString();
-    } on FileSystemException {
-      return null;
-    }
+    // 読み取りエラー（権限等）はここで握りつぶさない。null を返すと
+    // 呼び出し側が「空のストア」とみなして上書き保存し、既存データを失う
+    final content = await file.readAsString();
     try {
       final decoded = jsonDecode(content);
       if (decoded is Map<String, Object?>) {

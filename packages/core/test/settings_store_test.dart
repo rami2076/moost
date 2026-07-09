@@ -48,4 +48,16 @@ void main() {
     expect(settings.terminalApp, 'iTerm2');
     expect(settings.recentSessionLimit, 20);
   });
+
+  test('wrong value types fall back to defaults without crashing', () async {
+    final file = File('${tempDir.path}/v1/settings.json');
+    await file.parent.create(recursive: true);
+    await file.writeAsString(
+        '{"schemaVersion":1,"recentSessionLimit":50.0,"terminalApp":123}');
+
+    final settings = await store.load();
+    // double は int に変換され、型違いはデフォルトに戻る
+    expect(settings.recentSessionLimit, 50);
+    expect(settings.terminalApp, 'Terminal.app');
+  });
 }

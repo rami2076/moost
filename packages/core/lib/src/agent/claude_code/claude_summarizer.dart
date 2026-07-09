@@ -81,10 +81,17 @@ class ClaudeSummarizer {
       throw SummarizeException('failed to start claude: ${e.message}');
     }
 
-    if (stdinText != null) {
-      process.stdin.write(stdinText);
+    // プロセスが stdin を読まずに終了した場合の broken pipe を許容する
+    // （エラーは exitCode / stderr 側で検知する）
+    try {
+      if (stdinText != null) {
+        process.stdin.write(stdinText);
+      }
+      await process.stdin.close();
+      await process.stdin.done;
+    } on Object {
+      // ignore: broken pipe when the process exits early
     }
-    await process.stdin.close();
 
     // exitCode を待つ前に両ストリームを EOF まで読み切る
     final stdoutFuture = process.stdout.transform(utf8.decoder).join();

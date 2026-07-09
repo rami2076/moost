@@ -28,10 +28,12 @@ class RecentSession {
     if (title != null && title.isNotEmpty) {
       return title;
     }
-    if (lastPrompt.length <= _fallbackTitleLength) {
+    // substring はサロゲートペア（絵文字等）を分断するため runes で切る
+    final runes = lastPrompt.runes;
+    if (runes.length <= _fallbackTitleLength) {
       return lastPrompt;
     }
-    return lastPrompt.substring(0, _fallbackTitleLength);
+    return String.fromCharCodes(runes.take(_fallbackTitleLength));
   }
 
   RecentSession withAiTitle(String? aiTitle) => RecentSession(

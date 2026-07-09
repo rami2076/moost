@@ -47,12 +47,11 @@ class ClaudeCodeAdapter implements AgentAdapter {
   @override
   Future<List<RecentSession>> recentSessions({int limit = 20}) async {
     final sessions = await _historyReader.recentSessions(limit: limit);
-    final withTitles = <RecentSession>[];
-    for (final session in sessions) {
+    // ai-title 取得はセッションごとに独立したファイル走査なので並列に行う
+    return Future.wait(sessions.map((session) async {
       final aiTitle = await _aiTitleReader.latestAiTitle(session.sessionId);
-      withTitles.add(session.withAiTitle(aiTitle));
-    }
-    return withTitles;
+      return session.withAiTitle(aiTitle);
+    }));
   }
 
   @override

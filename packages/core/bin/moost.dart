@@ -173,5 +173,9 @@ String _formatDate(DateTime dt) {
 }
 
 Future<void> main(List<String> args) async {
-  exit(await run(args));
+  final code = await run(args);
+  // exit() はバッファされた出力を捨てることがあるため先に flush する
+  await stdout.flush();
+  await stderr.flush();
+  exit(code);
 }

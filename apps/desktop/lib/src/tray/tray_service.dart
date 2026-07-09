@@ -57,8 +57,26 @@ class TrayService with TrayListener, WindowListener {
     await windowManager.hide();
   }
 
-  Future<void> _toggleWindow() async {
+  /// blur で隠した直後のトレイクリックを「隠す」として扱うためのガード。
+  /// （トレイクリック時、先に blur → hide が走ると isVisible が false になり
+  /// トグルが再表示してしまうため）
+  DateTime? _hiddenByBlurAt;
+
+  @override
+  void onWindowBlur() async {
+    // アプリ外を触ったら隠れる（ポップオーバー挙動。design.md 6 章）
     if (await windowManager.isVisible()) {
+      _hiddenByBlurAt = DateTime.now();
+      await windowManager.hide();
+    }
+  }
+
+  Future<void> _toggleWindow() async {
+    final hiddenJustNow = _hiddenByBlurAt != null &&
+        DateTime.now().difference(_hiddenByBlurAt!) <
+            const Duration(milliseconds: 400);
+    if (hiddenJustNow || await windowManager.isVisible()) {
+      _hiddenByBlurAt = null;
       await windowManager.hide();
     } else {
       await showWindow();

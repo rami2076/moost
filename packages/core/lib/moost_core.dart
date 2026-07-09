@@ -11,6 +11,7 @@ export 'src/agent/claude_code/transcript_extractor.dart';
 export 'src/model/memo.dart';
 export 'src/model/recent_session.dart';
 export 'src/shell_escape.dart';
+export 'src/summary_cache.dart';
 export 'src/store/json_file_store.dart';
 export 'src/store/memo_store.dart';
 export 'src/store/settings_store.dart';

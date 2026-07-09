@@ -71,4 +71,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String sessionIdLabel(String id) {
     return 'Session ID: $id';
   }
+
+  @override
+  String get sessionDetailTitle => 'Session Detail';
+
+  @override
+  String get back => 'Back';
+
+  @override
+  String get summaryScopeRecent => 'Recent';
+
+  @override
+  String get summaryScopeFull => 'Whole session';
+
+  @override
+  String get summaryRalliesLabel => 'Rallies';
+
+  @override
+  String get runSummary => 'Summarize with Claude';
+
+  @override
+  String get summaryNotice =>
+      'Runs claude -p (model: Haiku) and consumes your usage quota.';
+
+  @override
+  String get summaryRunning => 'Summarizing…';
+
+  @override
+  String summaryFailed(String error) {
+    return 'Summarize failed: $error';
+  }
+
+  @override
+  String get registerMemo => 'Register memo';
+
+  @override
+  String get lastPromptLabel => 'Last prompt';
 }

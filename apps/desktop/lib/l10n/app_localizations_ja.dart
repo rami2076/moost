@@ -71,4 +71,39 @@ class AppLocalizationsJa extends AppLocalizations {
   String sessionIdLabel(String id) {
     return 'セッションID: $id';
   }
+
+  @override
+  String get sessionDetailTitle => 'セッション詳細';
+
+  @override
+  String get back => '戻る';
+
+  @override
+  String get summaryScopeRecent => '直近';
+
+  @override
+  String get summaryScopeFull => '全体';
+
+  @override
+  String get summaryRalliesLabel => 'ラリー数';
+
+  @override
+  String get runSummary => 'Claude で要約する';
+
+  @override
+  String get summaryNotice => 'claude -p（モデル: Haiku）を実行します（利用枠を消費）。';
+
+  @override
+  String get summaryRunning => '要約中…';
+
+  @override
+  String summaryFailed(String error) {
+    return '要約に失敗しました: $error';
+  }
+
+  @override
+  String get registerMemo => 'メモを登録';
+
+  @override
+  String get lastPromptLabel => '最終プロンプト';
 }

@@ -19,5 +19,16 @@
   "cancel": "キャンセル",
   "delete": "削除",
   "deleteConfirmMessage": "このメモを削除しますか？",
-  "sessionIdLabel": "セッションID: {id}"
+  "sessionIdLabel": "セッションID: {id}",
+  "sessionDetailTitle": "セッション詳細",
+  "back": "戻る",
+  "summaryScopeRecent": "直近",
+  "summaryScopeFull": "全体",
+  "summaryRalliesLabel": "ラリー数",
+  "runSummary": "Claude で要約する",
+  "summaryNotice": "claude -p（モデル: Haiku）を実行します（利用枠を消費）。",
+  "summaryRunning": "要約中…",
+  "summaryFailed": "要約に失敗しました: {error}",
+  "registerMemo": "メモを登録",
+  "lastPromptLabel": "最終プロンプト"
 }

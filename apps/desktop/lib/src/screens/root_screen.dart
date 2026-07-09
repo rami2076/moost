@@ -4,11 +4,12 @@ import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
 import 'memo_form_screen.dart';
+import 'session_detail_screen.dart';
 
 /// 「今どの画面か」を表す状態。スタック型ナビゲーションは使わず、
 /// この 1 つの状態変数を switch して画面を切り替える（design.md 6.1 / 6.4）。
 ///
-/// sessionDetail / settings / notes は次スライスで足す。
+/// settings / notes は次スライスで足す。
 sealed class MenuScreen {
   const MenuScreen();
 }
@@ -27,6 +28,12 @@ class EditMemoScreen extends MenuScreen {
   final Memo memo;
 
   const EditMemoScreen(this.memo);
+}
+
+class SessionDetailMenuScreen extends MenuScreen {
+  final RecentSession session;
+
+  const SessionDetailMenuScreen(this.session);
 }
 
 /// 一覧のタブ。遷移の「戻り先タブ」制御に使う（design.md 6.3）。
@@ -52,6 +59,10 @@ class _RootScreenState extends State<RootScreen> {
   MenuScreen _screen = const ListScreen();
   ListTab _tab = ListTab.recent;
 
+  // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
+  final SummaryCache _summaryCache = SummaryCache();
+  int _summaryRallies = 1;
+
   late Future<List<RecentSession>> _sessions;
   late Future<List<Memo>> _memos;
 
@@ -70,6 +81,7 @@ class _RootScreenState extends State<RootScreen> {
 
   Future<List<RecentSession>> _loadSessions() async {
     final settings = await widget.settingsStore.load();
+    _summaryRallies = settings.summaryRallyCount;
     return widget.adapter
         .recentSessions(limit: settings.recentSessionLimit);
   }
@@ -80,7 +92,21 @@ class _RootScreenState extends State<RootScreen> {
       ListScreen() => _buildList(context),
       NewMemoScreen(:final session) => _buildNewMemo(session),
       EditMemoScreen(:final memo) => _buildEditMemo(memo),
+      SessionDetailMenuScreen(:final session) => _buildSessionDetail(session),
     };
+  }
+
+  Widget _buildSessionDetail(RecentSession session) {
+    return SessionDetailScreen(
+      session: session,
+      adapter: widget.adapter,
+      summaryCache: _summaryCache,
+      initialRallies: _summaryRallies,
+      onBack: () => _showList(ListTab.recent),
+      // セッション詳細からメモ登録へ（一覧を経由しない直接遷移）
+      onRegisterMemo: () =>
+          setState(() => _screen = NewMemoScreen(session)),
+    );
   }
 
   /// 遷移は「戻り先のタブ」まで制御する（design.md 6.3）。
@@ -176,6 +202,8 @@ class _RootScreenState extends State<RootScreen> {
                     onCopyResumeCommand: _copyResumeCommand,
                     onTapSession: (session) =>
                         setState(() => _screen = NewMemoScreen(session)),
+                    onOpenDetail: (session) => setState(
+                        () => _screen = SessionDetailMenuScreen(session)),
                   ),
                 ListTab.memos => _MemoList(
                     memos: _memos,
@@ -217,11 +245,13 @@ class _SessionList extends StatelessWidget {
     required String sessionId,
   }) onCopyResumeCommand;
   final void Function(RecentSession session) onTapSession;
+  final void Function(RecentSession session) onOpenDetail;
 
   const _SessionList({
     required this.sessions,
     required this.onCopyResumeCommand,
     required this.onTapSession,
+    required this.onOpenDetail,
   });
 
   @override
@@ -259,13 +289,23 @@ class _SessionList extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.copy, size: 18),
-                tooltip: l10n.copyResumeCommand,
-                onPressed: () => onCopyResumeCommand(
-                  projectPath: session.projectPath,
-                  sessionId: session.sessionId,
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.article_outlined, size: 18),
+                    tooltip: l10n.sessionDetailTitle,
+                    onPressed: () => onOpenDetail(session),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: l10n.copyResumeCommand,
+                    onPressed: () => onCopyResumeCommand(
+                      projectPath: session.projectPath,
+                      sessionId: session.sessionId,
+                    ),
+                  ),
+                ],
               ),
             );
           },

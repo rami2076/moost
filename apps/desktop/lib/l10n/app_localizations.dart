@@ -217,6 +217,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Session ID: {id}'**
   String sessionIdLabel(String id);
+
+  /// No description provided for @sessionDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Detail'**
+  String get sessionDetailTitle;
+
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// No description provided for @summaryScopeRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get summaryScopeRecent;
+
+  /// No description provided for @summaryScopeFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole session'**
+  String get summaryScopeFull;
+
+  /// No description provided for @summaryRalliesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rallies'**
+  String get summaryRalliesLabel;
+
+  /// No description provided for @runSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize with Claude'**
+  String get runSummary;
+
+  /// No description provided for @summaryNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs claude -p (model: Haiku) and consumes your usage quota.'**
+  String get summaryNotice;
+
+  /// No description provided for @summaryRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarizing…'**
+  String get summaryRunning;
+
+  /// No description provided for @summaryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize failed: {error}'**
+  String summaryFailed(String error);
+
+  /// No description provided for @registerMemo.
+  ///
+  /// In en, this message translates to:
+  /// **'Register memo'**
+  String get registerMemo;
+
+  /// No description provided for @lastPromptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last prompt'**
+  String get lastPromptLabel;
 }
 
 class _AppLocalizationsDelegate

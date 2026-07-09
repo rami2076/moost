@@ -33,5 +33,23 @@
         "type": "String"
       }
     }
-  }
+  },
+  "sessionDetailTitle": "Session Detail",
+  "back": "Back",
+  "summaryScopeRecent": "Recent",
+  "summaryScopeFull": "Whole session",
+  "summaryRalliesLabel": "Rallies",
+  "runSummary": "Summarize with Claude",
+  "summaryNotice": "Runs claude -p (model: Haiku) and consumes your usage quota.",
+  "summaryRunning": "Summarizing…",
+  "summaryFailed": "Summarize failed: {error}",
+  "@summaryFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "registerMemo": "Register memo",
+  "lastPromptLabel": "Last prompt"
 }

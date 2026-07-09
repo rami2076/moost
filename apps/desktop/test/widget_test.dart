@@ -107,6 +107,51 @@ void main() {
     });
   });
 
+  testWidgets('session detail runs summary and caches it', (tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
+    addTearDown(() => tempDir.deleteSync(recursive: true));
+
+    final adapter = _FakeAdapter([
+      RecentSession(
+        sessionId: 'sess-1',
+        projectPath: '/tmp/proj',
+        lastPrompt: 'do something',
+        updatedAt: DateTime.utc(2026, 7, 9),
+        aiTitle: 'My Session',
+      ),
+    ]);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        adapter: adapter,
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+      ));
+      await settle(tester);
+
+      // セッション詳細アイコンを開く
+      await tester.tap(find.byTooltip('Session Detail'));
+      await tester.pump();
+      expect(find.text('My Session'), findsOneWidget);
+      expect(find.textContaining('consumes your usage quota'),
+          findsOneWidget);
+
+      // 要約実行 → フェイクの要約結果が出る
+      await tester.tap(find.text('Summarize with Claude'));
+      await settle(tester);
+      expect(find.text('SUMMARY: sess-1 recent 1'), findsOneWidget);
+      expect(adapter.summarizeCalls, 1);
+
+      // 戻って開き直すとキャッシュから出る（再実行しない）
+      await tester.tap(find.text('Back'));
+      await settle(tester);
+      await tester.tap(find.byTooltip('Session Detail'));
+      await tester.pump();
+      expect(find.text('SUMMARY: sess-1 recent 1'), findsOneWidget);
+      expect(adapter.summarizeCalls, 1);
+    });
+  });
+
   testWidgets('save is disabled while title is empty', (tester) async {
     final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
     addTearDown(() => tempDir.deleteSync(recursive: true));
@@ -139,4 +184,38 @@ void main() {
       expect(saveButton.onPressed, isNull);
     });
   });
+}
+
+/// テスト用の AgentAdapter。要約はセッションID・範囲を埋め込んだ固定文字列を返す。
+class _FakeAdapter implements AgentAdapter {
+  final List<RecentSession> _sessions;
+  int summarizeCalls = 0;
+
+  _FakeAdapter(this._sessions);
+
+  @override
+  String get agentId => 'fake';
+
+  @override
+  Future<List<RecentSession>> recentSessions({int limit = 20}) async =>
+      _sessions;
+
+  @override
+  String buildResumeCommand({
+    required String projectPath,
+    required String sessionId,
+  }) =>
+      'cd $projectPath && claude --resume $sessionId';
+
+  @override
+  Future<String> summarize({
+    required String sessionId,
+    required String projectPath,
+    required SummaryScope scope,
+    int rallies = 1,
+  }) async {
+    summarizeCalls++;
+    final label = scope == SummaryScope.full ? 'full' : 'recent $rallies';
+    return 'SUMMARY: $sessionId $label';
+  }
 }

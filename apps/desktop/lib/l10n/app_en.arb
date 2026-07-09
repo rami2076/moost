@@ -52,6 +52,19 @@
   },
   "registerMemo": "Register memo",
   "lastPromptLabel": "Last prompt",
+  "metaTitle": "Title",
+  "metaProject": "Project",
+  "metaSessionId": "Session ID",
+  "metaLastUsed": "Last used",
+  "ralliesTarget": "Last {count} rallies",
+  "@ralliesTarget": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "copiedToClipboard": "Copied",
   "footerSettings": "Settings",
   "footerNotes": "Notes",
   "footerQuit": "Quit",

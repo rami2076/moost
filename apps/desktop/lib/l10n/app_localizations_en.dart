@@ -109,6 +109,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lastPromptLabel => 'Last prompt';
 
   @override
+  String get metaTitle => 'Title';
+
+  @override
+  String get metaProject => 'Project';
+
+  @override
+  String get metaSessionId => 'Session ID';
+
+  @override
+  String get metaLastUsed => 'Last used';
+
+  @override
+  String ralliesTarget(int count) {
+    return 'Last $count rallies';
+  }
+
+  @override
+  String get copiedToClipboard => 'Copied';
+
+  @override
   String get footerSettings => 'Settings';
 
   @override

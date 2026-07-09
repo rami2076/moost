@@ -284,6 +284,42 @@ abstract class AppLocalizations {
   /// **'Last prompt'**
   String get lastPromptLabel;
 
+  /// No description provided for @metaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get metaTitle;
+
+  /// No description provided for @metaProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get metaProject;
+
+  /// No description provided for @metaSessionId.
+  ///
+  /// In en, this message translates to:
+  /// **'Session ID'**
+  String get metaSessionId;
+
+  /// No description provided for @metaLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last used'**
+  String get metaLastUsed;
+
+  /// No description provided for @ralliesTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Last {count} rallies'**
+  String ralliesTarget(int count);
+
+  /// No description provided for @copiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copiedToClipboard;
+
   /// No description provided for @footerSettings.
   ///
   /// In en, this message translates to:

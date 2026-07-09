@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
 
-/// セッション詳細 + 要約実行（design.md 6.1）。
+/// セッション詳細 + 要約実行（design.md 6.1。レイアウトは Swift 版に合わせる）。
 ///
-/// 要約結果は SummaryCache（アプリ常駐中のみ）に載せ、同じ範囲を開き直したら
-/// 再実行しない（ADR-002）。要約は永続化しない — 残したい要点は
-/// 「メモを登録」から人がメモ本文へ書き移す。
+/// - メタ情報はラベル + 値の表形式（セッション ID はコピー付き）
+/// - 範囲セグメントと「直近 N ラリーを対象」ステッパーは同一行
+/// - 下部バー: 左に「ターミナルで開く」「メモを登録」、右端に「戻る」
+/// - 要約結果は SummaryCache（アプリ常駐中のみ）に載せる（ADR-002）
 class SessionDetailScreen extends StatefulWidget {
   final RecentSession session;
   final AgentAdapter adapter;
@@ -16,6 +18,7 @@ class SessionDetailScreen extends StatefulWidget {
 
   final VoidCallback onBack;
   final VoidCallback onRegisterMemo;
+  final VoidCallback onOpenTerminal;
 
   const SessionDetailScreen({
     super.key,
@@ -25,6 +28,7 @@ class SessionDetailScreen extends StatefulWidget {
     required this.initialRallies,
     required this.onBack,
     required this.onRegisterMemo,
+    required this.onOpenTerminal,
   });
 
   @override
@@ -63,11 +67,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
   }
 
+  Future<void> _copySessionId() async {
+    await Clipboard.setData(
+        ClipboardData(text: widget.session.sessionId));
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.copiedToClipboard)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final session = widget.session;
 
     return Scaffold(
       body: SafeArea(
@@ -76,100 +89,153 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.sessionDetailTitle,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: widget.onBack,
-                    child: Text(l10n.back),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(session.displayTitle, style: theme.textTheme.bodyMedium),
-              Text(session.projectPath, style: theme.textTheme.bodySmall),
-              Text(
-                l10n.sessionIdLabel(session.sessionId),
-                style: theme.textTheme.bodySmall,
-              ),
+              Text(l10n.sessionDetailTitle,
+                  style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              _buildMetadata(l10n, theme),
               const Divider(height: 24),
-
-              // 要約範囲の切替
-              SegmentedButton<SummaryScope>(
-                segments: [
-                  ButtonSegment(
-                    value: SummaryScope.recent,
-                    label: Text(l10n.summaryScopeRecent),
-                  ),
-                  ButtonSegment(
-                    value: SummaryScope.full,
-                    label: Text(l10n.summaryScopeFull),
-                  ),
-                ],
-                selected: {_scope},
-                onSelectionChanged: _running
-                    ? null
-                    : (s) => setState(() => _scope = s.first),
-              ),
-              if (_scope == SummaryScope.recent) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(l10n.summaryRalliesLabel,
-                        style: theme.textTheme.bodyMedium),
-                    IconButton(
-                      icon: const Icon(Icons.remove, size: 18),
-                      onPressed: (_running || _rallies <= 1)
-                          ? null
-                          : () => setState(() => _rallies--),
-                    ),
-                    Text('$_rallies', style: theme.textTheme.bodyMedium),
-                    IconButton(
-                      icon: const Icon(Icons.add, size: 18),
-                      onPressed: (_running || _rallies >= 20)
-                          ? null
-                          : () => setState(() => _rallies++),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                icon: _running
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome, size: 18),
-                label: Text(_running ? l10n.summaryRunning : l10n.runSummary),
-                onPressed: _running ? null : _runSummary,
-              ),
-              const SizedBox(height: 4),
-              Text(l10n.summaryNotice, style: theme.textTheme.bodySmall),
-              const SizedBox(height: 8),
-
+              _buildSummaryControls(l10n, theme),
+              const SizedBox(height: 12),
               Expanded(child: _buildResult(l10n, theme)),
-
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Spacer(),
-                  FilledButton.tonal(
-                    onPressed: widget.onRegisterMemo,
-                    child: Text(l10n.registerMemo),
-                  ),
-                ],
-              ),
+              _buildBottomBar(l10n),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMetadata(AppLocalizations l10n, ThemeData theme) {
+    final session = widget.session;
+
+    Widget row(String label, Widget value) => Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 110,
+                child: Text(label, style: theme.textTheme.bodySmall),
+              ),
+              Expanded(child: value),
+            ],
+          ),
+        );
+
+    Widget text(String value) => Text(
+          value,
+          style: theme.textTheme.bodyMedium,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
+
+    final lastUsed = session.updatedAt.toLocal();
+    String pad(int n) => n.toString().padLeft(2, '0');
+    final lastUsedText = '${lastUsed.year}-${pad(lastUsed.month)}-'
+        '${pad(lastUsed.day)} ${pad(lastUsed.hour)}:${pad(lastUsed.minute)}';
+
+    return Column(
+      children: [
+        row(l10n.metaTitle, text(session.displayTitle)),
+        row(l10n.metaProject, text(session.projectPath)),
+        row(
+          l10n.metaSessionId,
+          Row(
+            children: [
+              Flexible(child: text(session.sessionId)),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: _copySessionId,
+                child: const Icon(Icons.copy, size: 14),
+              ),
+            ],
+          ),
+        ),
+        row(l10n.metaLastUsed, text(lastUsedText)),
+        row(l10n.lastPromptLabel, text(session.lastPrompt)),
+      ],
+    );
+  }
+
+  Widget _buildSummaryControls(AppLocalizations l10n, ThemeData theme) {
+    final recentSelected = _scope == SummaryScope.recent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 範囲セグメント + 「直近 N ラリーを対象」ステッパー（同一行）
+        Row(
+          children: [
+            SegmentedButton<SummaryScope>(
+              segments: [
+                ButtonSegment(
+                  value: SummaryScope.recent,
+                  label: Text(l10n.summaryScopeRecent),
+                ),
+                ButtonSegment(
+                  value: SummaryScope.full,
+                  label: Text(l10n.summaryScopeFull),
+                ),
+              ],
+              selected: {_scope},
+              showSelectedIcon: false,
+              onSelectionChanged: _running
+                  ? null
+                  : (s) => setState(() => _scope = s.first),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              l10n.ralliesTarget(_rallies),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: recentSelected ? null : theme.disabledColor,
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: (!recentSelected || _running || _rallies >= 20)
+                      ? null
+                      : () => setState(() => _rallies++),
+                  child: const Icon(Icons.arrow_drop_up, size: 20),
+                ),
+                InkWell(
+                  onTap: (!recentSelected || _running || _rallies <= 1)
+                      ? null
+                      : () => setState(() => _rallies--),
+                  child: const Icon(Icons.arrow_drop_down, size: 20),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // 要約実行ボタン + 注記（同一行）
+        Row(
+          children: [
+            FilledButton.tonalIcon(
+              icon: _running
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome, size: 16),
+              label:
+                  Text(_running ? l10n.summaryRunning : l10n.runSummary),
+              onPressed: _running ? null : _runSummary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.summaryNotice,
+                style: theme.textTheme.bodySmall,
+                maxLines: 2,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -185,14 +251,32 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
     final cached = _cachedSummary;
     if (cached == null) {
-      return Align(
-        alignment: Alignment.topLeft,
-        child: Text('${l10n.lastPromptLabel}: ${widget.session.lastPrompt}',
-            style: theme.textTheme.bodySmall),
-      );
+      return const SizedBox.shrink();
     }
     return SingleChildScrollView(
       child: SelectableText(cached, style: theme.textTheme.bodyMedium),
+    );
+  }
+
+  Widget _buildBottomBar(AppLocalizations l10n) {
+    return Row(
+      children: [
+        FilledButton.tonalIcon(
+          icon: const Icon(Icons.terminal, size: 16),
+          label: Text(l10n.openInTerminal),
+          onPressed: widget.onOpenTerminal,
+        ),
+        const SizedBox(width: 8),
+        FilledButton.tonal(
+          onPressed: widget.onRegisterMemo,
+          child: Text(l10n.registerMemo),
+        ),
+        const Spacer(),
+        TextButton(
+          onPressed: widget.onBack,
+          child: Text(l10n.back),
+        ),
+      ],
     );
   }
 }

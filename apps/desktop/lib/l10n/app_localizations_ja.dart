@@ -108,6 +108,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get lastPromptLabel => '最終プロンプト';
 
   @override
+  String get metaTitle => 'タイトル';
+
+  @override
+  String get metaProject => 'プロジェクト';
+
+  @override
+  String get metaSessionId => 'セッションID';
+
+  @override
+  String get metaLastUsed => '最終利用';
+
+  @override
+  String ralliesTarget(int count) {
+    return '直近 $count ラリーを対象';
+  }
+
+  @override
+  String get copiedToClipboard => 'コピーしました';
+
+  @override
   String get footerSettings => '設定';
 
   @override

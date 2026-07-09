@@ -111,30 +111,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // 直近セッション表示件数（5〜100、5 刻み）
+                      // 直近セッション表示件数（5〜100、5 刻みのコンボボックス）
                       Text(l10n.settingRecentLimit,
                           style: theme.textTheme.bodySmall),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove, size: 18),
-                            onPressed: settings.recentSessionLimit <= 5
-                                ? null
-                                : () => _update(settings.copyWith(
-                                    recentSessionLimit:
-                                        settings.recentSessionLimit - 5)),
-                          ),
-                          Text('${settings.recentSessionLimit}',
-                              style: theme.textTheme.bodyMedium),
-                          IconButton(
-                            icon: const Icon(Icons.add, size: 18),
-                            onPressed: settings.recentSessionLimit >= 100
-                                ? null
-                                : () => _update(settings.copyWith(
-                                    recentSessionLimit:
-                                        settings.recentSessionLimit + 5)),
-                          ),
+                      DropdownButton<int>(
+                        // 手編集された 5 刻み以外の値は最寄りの選択肢へ丸める
+                        value: (settings.recentSessionLimit / 5)
+                                .round()
+                                .clamp(1, 20) *
+                            5,
+                        isExpanded: true,
+                        items: [
+                          for (var n = 5; n <= 100; n += 5)
+                            DropdownMenuItem(value: n, child: Text('$n')),
                         ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            _update(settings.copyWith(
+                                recentSessionLimit: value));
+                          }
+                        },
                       ),
                       const SizedBox(height: 16),
 

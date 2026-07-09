@@ -142,6 +142,10 @@ class _RootScreenState extends State<RootScreen> {
       // セッション詳細からメモ登録へ（一覧を経由しない直接遷移）
       onRegisterMemo: () =>
           setState(() => _screen = NewMemoScreen(session)),
+      onOpenTerminal: () => _openInTerminal(
+        projectPath: session.projectPath,
+        sessionId: session.sessionId,
+      ),
     );
   }
 

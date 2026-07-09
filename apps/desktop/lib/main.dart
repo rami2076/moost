@@ -21,16 +21,21 @@ Future<void> main() async {
     quitLabel: l10n.trayQuit,
   );
 
+  // ポップオーバー風の固定ウィンドウ: タイトルバーなし・移動/リサイズ不可
   const windowOptions = WindowOptions(
     size: Size(570, 660),
     skipTaskbar: true,
+    titleBarStyle: TitleBarStyle.hidden,
+    windowButtonVisibility: false,
   );
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    // 初回起動はウィンドウを見せる。以後、閉じるとトレイに隠れる
-    await windowManager.show();
-    await windowManager.focus();
-  });
+  // 初回表示をトレイアイコン直下に置くため、先にトレイを用意する
   await tray.init();
+  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.setMovable(false);
+    await windowManager.setResizable(false);
+    // 初回起動はウィンドウを見せる。以後、閉じる/外を触るとトレイに隠れる
+    await tray.showWindow();
+  });
 
   runApp(MoostApp(
     adapter: ClaudeCodeAdapter(),

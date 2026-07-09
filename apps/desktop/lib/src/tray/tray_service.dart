@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -84,9 +85,27 @@ class TrayService with TrayListener, WindowListener {
   }
 
   Future<void> showWindow() async {
-    await windowManager.setAlignment(Alignment.topRight);
+    await _positionUnderTrayIcon();
     await windowManager.show();
     await windowManager.focus();
     shownCount.value++;
+  }
+
+  /// トレイアイコンの直下・中央揃えに配置する（NSPopover の見た目に寄せる）。
+  Future<void> _positionUnderTrayIcon() async {
+    final icon = await trayManager.getBounds();
+    if (icon == null) {
+      await windowManager.setAlignment(Alignment.topRight);
+      return;
+    }
+    final size = await windowManager.getSize();
+    var x = icon.center.dx - size.width / 2;
+    // 画面右端からはみ出さないようにクランプする
+    final display = ui.PlatformDispatcher.instance.displays.firstOrNull;
+    if (display != null) {
+      final screenWidth = display.size.width / display.devicePixelRatio;
+      x = x.clamp(8.0, screenWidth - size.width - 8.0);
+    }
+    await windowManager.setPosition(Offset(x, icon.bottom + 6));
   }
 }

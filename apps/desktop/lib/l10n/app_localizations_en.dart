@@ -107,4 +107,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lastPromptLabel => 'Last prompt';
+
+  @override
+  String get footerSettings => 'Settings';
+
+  @override
+  String get footerNotes => 'Notes';
+
+  @override
+  String get footerQuit => 'Quit';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingTerminal => 'Resume terminal';
+
+  @override
+  String get settingRecentLimit => 'Recent sessions shown';
+
+  @override
+  String get settingClaudePath => 'claude command path (for summaries)';
+
+  @override
+  String get settingClaudePathHint => 'Leave empty to auto-detect';
+
+  @override
+  String settingClaudePathDetected(String path) {
+    return 'Auto-detected: $path';
+  }
+
+  @override
+  String get settingClaudePathNotFound => 'Auto-detect: not found';
+
+  @override
+  String get notesTitle => 'Notes';
+
+  @override
+  String get noteAutomationTitle => 'Terminal automation permission';
+
+  @override
+  String get noteAutomationBody =>
+      'The first time you resume a session, macOS asks for automation permission. Allow it once and it won\'t ask again.';
+
+  @override
+  String get noteRetentionTitle => 'Session retention';
+
+  @override
+  String get noteRetentionBody =>
+      'Sessions are kept by Claude Code based on cleanupPeriodDays (default 30 days). Even with a memo, an expired session may no longer be resumable.';
+
+  @override
+  String get noteSummaryTitle => 'About summaries';
+
+  @override
+  String get noteSummaryBody =>
+      'Summaries run claude -p (model: Haiku) and consume your usage quota each time. \'Recent\' extracts locally and is fast/cheap; \'Whole session\' reads everything and costs more.';
+
+  @override
+  String get noteRefreshTitle => 'List refresh timing';
+
+  @override
+  String get noteRefreshBody =>
+      'The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.';
 }

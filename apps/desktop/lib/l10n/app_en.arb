@@ -51,5 +51,31 @@
     }
   },
   "registerMemo": "Register memo",
-  "lastPromptLabel": "Last prompt"
+  "lastPromptLabel": "Last prompt",
+  "footerSettings": "Settings",
+  "footerNotes": "Notes",
+  "footerQuit": "Quit",
+  "settingsTitle": "Settings",
+  "settingTerminal": "Resume terminal",
+  "settingRecentLimit": "Recent sessions shown",
+  "settingClaudePath": "claude command path (for summaries)",
+  "settingClaudePathHint": "Leave empty to auto-detect",
+  "settingClaudePathDetected": "Auto-detected: {path}",
+  "@settingClaudePathDetected": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "settingClaudePathNotFound": "Auto-detect: not found",
+  "notesTitle": "Notes",
+  "noteAutomationTitle": "Terminal automation permission",
+  "noteAutomationBody": "The first time you resume a session, macOS asks for automation permission. Allow it once and it won't ask again.",
+  "noteRetentionTitle": "Session retention",
+  "noteRetentionBody": "Sessions are kept by Claude Code based on cleanupPeriodDays (default 30 days). Even with a memo, an expired session may no longer be resumable.",
+  "noteSummaryTitle": "About summaries",
+  "noteSummaryBody": "Summaries run claude -p (model: Haiku) and consume your usage quota each time. 'Recent' extracts locally and is fast/cheap; 'Whole session' reads everything and costs more.",
+  "noteRefreshTitle": "List refresh timing",
+  "noteRefreshBody": "The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open."
 }

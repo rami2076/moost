@@ -283,6 +283,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last prompt'**
   String get lastPromptLabel;
+
+  /// No description provided for @footerSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get footerSettings;
+
+  /// No description provided for @footerNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get footerNotes;
+
+  /// No description provided for @footerQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get footerQuit;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// No description provided for @settingTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume terminal'**
+  String get settingTerminal;
+
+  /// No description provided for @settingRecentLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent sessions shown'**
+  String get settingRecentLimit;
+
+  /// No description provided for @settingClaudePath.
+  ///
+  /// In en, this message translates to:
+  /// **'claude command path (for summaries)'**
+  String get settingClaudePath;
+
+  /// No description provided for @settingClaudePathHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to auto-detect'**
+  String get settingClaudePathHint;
+
+  /// No description provided for @settingClaudePathDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-detected: {path}'**
+  String settingClaudePathDetected(String path);
+
+  /// No description provided for @settingClaudePathNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-detect: not found'**
+  String get settingClaudePathNotFound;
+
+  /// No description provided for @notesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get notesTitle;
+
+  /// No description provided for @noteAutomationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal automation permission'**
+  String get noteAutomationTitle;
+
+  /// No description provided for @noteAutomationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The first time you resume a session, macOS asks for automation permission. Allow it once and it won\'t ask again.'**
+  String get noteAutomationBody;
+
+  /// No description provided for @noteRetentionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Session retention'**
+  String get noteRetentionTitle;
+
+  /// No description provided for @noteRetentionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions are kept by Claude Code based on cleanupPeriodDays (default 30 days). Even with a memo, an expired session may no longer be resumable.'**
+  String get noteRetentionBody;
+
+  /// No description provided for @noteSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About summaries'**
+  String get noteSummaryTitle;
+
+  /// No description provided for @noteSummaryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Summaries run claude -p (model: Haiku) and consume your usage quota each time. \'Recent\' extracts locally and is fast/cheap; \'Whole session\' reads everything and costs more.'**
+  String get noteSummaryBody;
+
+  /// No description provided for @noteRefreshTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'List refresh timing'**
+  String get noteRefreshTitle;
+
+  /// No description provided for @noteRefreshBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.'**
+  String get noteRefreshBody;
 }
 
 class _AppLocalizationsDelegate

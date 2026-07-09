@@ -106,4 +106,67 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get lastPromptLabel => '最終プロンプト';
+
+  @override
+  String get footerSettings => '設定';
+
+  @override
+  String get footerNotes => '注意';
+
+  @override
+  String get footerQuit => '終了';
+
+  @override
+  String get settingsTitle => '設定';
+
+  @override
+  String get settingTerminal => '復帰先ターミナル';
+
+  @override
+  String get settingRecentLimit => '直近セッション表示件数';
+
+  @override
+  String get settingClaudePath => 'claude コマンドのパス（要約用）';
+
+  @override
+  String get settingClaudePathHint => '空欄で自動検出';
+
+  @override
+  String settingClaudePathDetected(String path) {
+    return '自動検出: $path';
+  }
+
+  @override
+  String get settingClaudePathNotFound => '自動検出: 見つかりません';
+
+  @override
+  String get notesTitle => '注意';
+
+  @override
+  String get noteAutomationTitle => 'ターミナル操作の権限';
+
+  @override
+  String get noteAutomationBody =>
+      'セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます。一度「許可」を選べば以後は表示されません。';
+
+  @override
+  String get noteRetentionTitle => 'セッションの保持期間';
+
+  @override
+  String get noteRetentionBody =>
+      'セッションは Claude Code が cleanupPeriodDays（デフォルト 30 日）に基づいて保持します。メモを登録していても、期限切れのセッションには復帰できない場合があります。';
+
+  @override
+  String get noteSummaryTitle => 'Claude 要約について';
+
+  @override
+  String get noteSummaryBody =>
+      '要約は claude -p（モデル: Haiku）で実行され、実行のたびに利用枠を消費します。「直近」はローカルで抜粋するため高速・低コスト、「全体」はセッション全体を読むため時間と枠を多く消費します。';
+
+  @override
+  String get noteRefreshTitle => '一覧の更新タイミング';
+
+  @override
+  String get noteRefreshBody =>
+      '直近セッション一覧は、アプリを開いたとき・タブを切り替えたとき・フォームから戻ったときに更新されます。手動リロードはなく、開きっぱなしの間は更新されません。';
 }

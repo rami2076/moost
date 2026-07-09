@@ -1,15 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
 import 'memo_form_screen.dart';
+import 'notes_screen.dart';
 import 'session_detail_screen.dart';
+import 'settings_screen.dart';
 
 /// 「今どの画面か」を表す状態。スタック型ナビゲーションは使わず、
 /// この 1 つの状態変数を switch して画面を切り替える（design.md 6.1 / 6.4）。
-///
-/// settings / notes は次スライスで足す。
 sealed class MenuScreen {
   const MenuScreen();
 }
@@ -34,6 +36,14 @@ class SessionDetailMenuScreen extends MenuScreen {
   final RecentSession session;
 
   const SessionDetailMenuScreen(this.session);
+}
+
+class SettingsMenuScreen extends MenuScreen {
+  const SettingsMenuScreen();
+}
+
+class NotesMenuScreen extends MenuScreen {
+  const NotesMenuScreen();
 }
 
 /// 一覧のタブ。遷移の「戻り先タブ」制御に使う（design.md 6.3）。
@@ -61,6 +71,7 @@ class _RootScreenState extends State<RootScreen> {
 
   // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
   final SummaryCache _summaryCache = SummaryCache();
+  final ClaudePathResolver _pathResolver = ClaudePathResolver();
   int _summaryRallies = 1;
 
   late Future<List<RecentSession>> _sessions;
@@ -93,6 +104,12 @@ class _RootScreenState extends State<RootScreen> {
       NewMemoScreen(:final session) => _buildNewMemo(session),
       EditMemoScreen(:final memo) => _buildEditMemo(memo),
       SessionDetailMenuScreen(:final session) => _buildSessionDetail(session),
+      SettingsMenuScreen() => SettingsScreen(
+          settingsStore: widget.settingsStore,
+          pathResolver: _pathResolver,
+          onBack: () => _showList(_tab),
+        ),
+      NotesMenuScreen() => NotesScreen(onBack: () => _showList(_tab)),
     };
   }
 
@@ -213,8 +230,38 @@ class _RootScreenState extends State<RootScreen> {
                   ),
               },
             ),
+            _buildFooter(context),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFooter(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          TextButton.icon(
+            icon: const Icon(Icons.settings, size: 16),
+            label: Text(l10n.footerSettings),
+            onPressed: () =>
+                setState(() => _screen = const SettingsMenuScreen()),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.info_outline, size: 16),
+            label: Text(l10n.footerNotes),
+            onPressed: () =>
+                setState(() => _screen = const NotesMenuScreen()),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            icon: const Icon(Icons.power_settings_new, size: 16),
+            label: Text(l10n.footerQuit),
+            onPressed: () => exit(0),
+          ),
+        ],
       ),
     );
   }

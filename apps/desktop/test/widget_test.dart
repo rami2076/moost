@@ -152,6 +152,38 @@ void main() {
     });
   });
 
+  testWidgets('footer opens settings and notes, then returns',
+      (tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
+    addTearDown(() => tempDir.deleteSync(recursive: true));
+
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        adapter: ClaudeCodeAdapter(claudeHome: claudeHome.path),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+      ));
+      await settle(tester);
+
+      // 設定を開く → 復帰先ターミナルの項目が見える
+      await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      await settle(tester);
+      expect(find.text('Resume terminal'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Back'));
+      await settle(tester);
+
+      // 注意を開く → 利用枠の説明が見える
+      await tester.tap(find.widgetWithText(TextButton, 'Notes'));
+      await tester.pump();
+      expect(find.text('About summaries'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Back'));
+      await settle(tester);
+      expect(find.text('No sessions found'), findsOneWidget);
+    });
+  });
+
   testWidgets('save is disabled while title is empty', (tester) async {
     final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
     addTearDown(() => tempDir.deleteSync(recursive: true));

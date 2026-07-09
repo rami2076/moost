@@ -93,17 +93,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: ListView(
                     children: [
-                      // 復帰先ターミナル
+                      // 復帰先ターミナル（クリックで下にリストが開くコンボボックス）
                       Text(l10n.settingTerminal,
                           style: theme.textTheme.bodySmall),
-                      DropdownButton<String>(
-                        value: settings.terminalApp,
-                        isExpanded: true,
-                        items: [
+                      const SizedBox(height: 4),
+                      DropdownMenu<String>(
+                        initialSelection: settings.terminalApp,
+                        requestFocusOnTap: false,
+                        expandedInsets: EdgeInsets.zero,
+                        dropdownMenuEntries: [
                           for (final t in _terminals)
-                            DropdownMenuItem(value: t, child: Text(t)),
+                            DropdownMenuEntry(value: t, label: t),
                         ],
-                        onChanged: (value) {
+                        onSelected: (value) {
                           if (value != null) {
                             _update(settings.copyWith(terminalApp: value));
                           }
@@ -114,18 +116,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       // 直近セッション表示件数（5〜100、5 刻みのコンボボックス）
                       Text(l10n.settingRecentLimit,
                           style: theme.textTheme.bodySmall),
-                      DropdownButton<int>(
+                      const SizedBox(height: 4),
+                      DropdownMenu<int>(
                         // 手編集された 5 刻み以外の値は最寄りの選択肢へ丸める
-                        value: (settings.recentSessionLimit / 5)
+                        initialSelection: (settings.recentSessionLimit / 5)
                                 .round()
                                 .clamp(1, 20) *
                             5,
-                        isExpanded: true,
-                        items: [
+                        requestFocusOnTap: false,
+                        expandedInsets: EdgeInsets.zero,
+                        menuHeight: 240,
+                        dropdownMenuEntries: [
                           for (var n = 5; n <= 100; n += 5)
-                            DropdownMenuItem(value: n, child: Text('$n')),
+                            DropdownMenuEntry(value: n, label: '$n'),
                         ],
-                        onChanged: (value) {
+                        onSelected: (value) {
                           if (value != null) {
                             _update(settings.copyWith(
                                 recentSessionLimit: value));

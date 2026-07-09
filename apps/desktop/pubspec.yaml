@@ -1,0 +1,28 @@
+name: moost_desktop
+description: Moost desktop app — session memos and one-click resume (macOS first).
+publish_to: 'none'
+
+# バージョンの単一情報源（RELEASE.md 1.2）。設定画面の表示もここから取得する
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  moost_core:
+    path: ../../packages/core
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  # gen_l10n による文言の外部化（requirements.md 非機能要件: i18n）
+  generate: true

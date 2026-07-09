@@ -1,0 +1,13 @@
+{
+  "@@locale": "ja",
+  "appTitle": "Moost",
+  "tabRecentSessions": "直近セッション",
+  "tabMemos": "メモ一覧",
+  "noSessionsFound": "セッションがありません",
+  "noMemosFound": "メモがありません",
+  "copyResumeCommand": "復帰コマンドをコピー",
+  "resumeCommandCopied": "復帰コマンドをコピーしました",
+  "loadFailed": "読み込みに失敗しました: {error}",
+  "settings": "設定",
+  "notes": "注意"
+}

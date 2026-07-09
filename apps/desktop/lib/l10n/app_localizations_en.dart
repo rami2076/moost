@@ -170,4 +170,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noteRefreshBody =>
       'The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.';
+
+  @override
+  String get openInTerminal => 'Open in terminal';
+
+  @override
+  String get resumeInTerminal => 'Resume in terminal';
+
+  @override
+  String terminalLaunchFailed(String error) {
+    return 'Failed to open terminal: $error';
+  }
 }

@@ -397,6 +397,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.'**
   String get noteRefreshBody;
+
+  /// No description provided for @openInTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in terminal'**
+  String get openInTerminal;
+
+  /// No description provided for @resumeInTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume in terminal'**
+  String get resumeInTerminal;
+
+  /// No description provided for @terminalLaunchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open terminal: {error}'**
+  String terminalLaunchFailed(String error);
 }
 
 class _AppLocalizationsDelegate

@@ -129,6 +129,9 @@ void main() {
       ));
       await settle(tester);
 
+      // セッション行にターミナル起動ボタンが並ぶ
+      expect(find.byTooltip('Open in terminal'), findsOneWidget);
+
       // セッション詳細アイコンを開く
       await tester.tap(find.byTooltip('Session Detail'));
       await tester.pump();

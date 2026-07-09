@@ -77,5 +77,15 @@
   "noteSummaryTitle": "About summaries",
   "noteSummaryBody": "Summaries run claude -p (model: Haiku) and consume your usage quota each time. 'Recent' extracts locally and is fast/cheap; 'Whole session' reads everything and costs more.",
   "noteRefreshTitle": "List refresh timing",
-  "noteRefreshBody": "The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open."
+  "noteRefreshBody": "The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.",
+  "openInTerminal": "Open in terminal",
+  "resumeInTerminal": "Resume in terminal",
+  "terminalLaunchFailed": "Failed to open terminal: {error}",
+  "@terminalLaunchFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }

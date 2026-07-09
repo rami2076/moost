@@ -72,6 +72,7 @@ class _RootScreenState extends State<RootScreen> {
   // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
   final SummaryCache _summaryCache = SummaryCache();
   final ClaudePathResolver _pathResolver = ClaudePathResolver();
+  final TerminalLauncher _terminalLauncher = TerminalLauncher();
   int _summaryRallies = 1;
 
   late Future<List<RecentSession>> _sessions;
@@ -217,6 +218,7 @@ class _RootScreenState extends State<RootScreen> {
                 ListTab.recent => _SessionList(
                     sessions: _sessions,
                     onCopyResumeCommand: _copyResumeCommand,
+                    onOpenInTerminal: _openInTerminal,
                     onTapSession: (session) =>
                         setState(() => _screen = NewMemoScreen(session)),
                     onOpenDetail: (session) => setState(
@@ -225,6 +227,7 @@ class _RootScreenState extends State<RootScreen> {
                 ListTab.memos => _MemoList(
                     memos: _memos,
                     onCopyResumeCommand: _copyResumeCommand,
+                    onOpenInTerminal: _openInTerminal,
                     onTapMemo: (memo) =>
                         setState(() => _screen = EditMemoScreen(memo)),
                   ),
@@ -283,6 +286,30 @@ class _RootScreenState extends State<RootScreen> {
       SnackBar(content: Text(l10n.resumeCommandCopied)),
     );
   }
+
+  /// 設定のターミナルで復帰コマンドを実行する。
+  Future<void> _openInTerminal({
+    required String projectPath,
+    required String sessionId,
+  }) async {
+    final command = widget.adapter.buildResumeCommand(
+      projectPath: projectPath,
+      sessionId: sessionId,
+    );
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final settings = await widget.settingsStore.load();
+      await _terminalLauncher.launch(
+        terminal: TerminalApp.fromSetting(settings.terminalApp),
+        command: command,
+      );
+    } on Object catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.terminalLaunchFailed('$e'))),
+      );
+    }
+  }
 }
 
 class _SessionList extends StatelessWidget {
@@ -291,12 +318,17 @@ class _SessionList extends StatelessWidget {
     required String projectPath,
     required String sessionId,
   }) onCopyResumeCommand;
+  final Future<void> Function({
+    required String projectPath,
+    required String sessionId,
+  }) onOpenInTerminal;
   final void Function(RecentSession session) onTapSession;
   final void Function(RecentSession session) onOpenDetail;
 
   const _SessionList({
     required this.sessions,
     required this.onCopyResumeCommand,
+    required this.onOpenInTerminal,
     required this.onTapSession,
     required this.onOpenDetail,
   });
@@ -340,6 +372,14 @@ class _SessionList extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
+                    icon: const Icon(Icons.terminal, size: 18),
+                    tooltip: l10n.openInTerminal,
+                    onPressed: () => onOpenInTerminal(
+                      projectPath: session.projectPath,
+                      sessionId: session.sessionId,
+                    ),
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.article_outlined, size: 18),
                     tooltip: l10n.sessionDetailTitle,
                     onPressed: () => onOpenDetail(session),
@@ -368,11 +408,16 @@ class _MemoList extends StatelessWidget {
     required String projectPath,
     required String sessionId,
   }) onCopyResumeCommand;
+  final Future<void> Function({
+    required String projectPath,
+    required String sessionId,
+  }) onOpenInTerminal;
   final void Function(Memo memo) onTapMemo;
 
   const _MemoList({
     required this.memos,
     required this.onCopyResumeCommand,
+    required this.onOpenInTerminal,
     required this.onTapMemo,
   });
 
@@ -413,13 +458,28 @@ class _MemoList extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.copy, size: 18),
-                tooltip: l10n.copyResumeCommand,
-                onPressed: () => onCopyResumeCommand(
-                  projectPath: memo.projectPath,
-                  sessionId: memo.sessionId,
-                ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // メモは復帰情報を自己完結で持つので、元セッションが一覧から
+                  // 消えていてもここから再開できる（ADR-003）
+                  IconButton(
+                    icon: const Icon(Icons.terminal, size: 18),
+                    tooltip: l10n.resumeInTerminal,
+                    onPressed: () => onOpenInTerminal(
+                      projectPath: memo.projectPath,
+                      sessionId: memo.sessionId,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: l10n.copyResumeCommand,
+                    onPressed: () => onCopyResumeCommand(
+                      projectPath: memo.projectPath,
+                      sessionId: memo.sessionId,
+                    ),
+                  ),
+                ],
               ),
             );
           },

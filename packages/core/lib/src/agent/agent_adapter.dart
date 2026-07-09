@@ -1,0 +1,42 @@
+import '../model/recent_session.dart';
+
+/// セッション要約の対象範囲。
+enum SummaryScope {
+  /// 直近 N ラリーの抜粋を渡す（高速・低コスト）。
+  recent,
+
+  /// セッション全体を対象にする（時間と利用枠を多く消費）。
+  full,
+}
+
+/// エージェント CLI ごとの差分を閉じ込める抽象インターフェース。
+///
+/// 吸収する差分は 4 つ（design.md 2 章）:
+/// 1. セッション履歴の場所とパース
+/// 2. セッションタイトル・メタデータ取得
+/// 3. 復帰コマンドの組み立て
+/// 4. 要約用ヘッドレス実行コマンド
+///
+/// このインターフェースに特定エージェント固有の概念
+/// （`~/.claude/` のパス構造、ai-title 等）を漏らさないこと。
+abstract interface class AgentAdapter {
+  /// エージェント種別の識別子。メモの `agent` フィールドに記録される。
+  String get agentId;
+
+  /// 直近セッション一覧を最新順で返す。タイトル取得まで済ませた状態で返す。
+  Future<List<RecentSession>> recentSessions({int limit = 20});
+
+  /// セッションへ復帰するためのシェルコマンドを組み立てる。
+  String buildResumeCommand({
+    required String projectPath,
+    required String sessionId,
+  });
+
+  /// セッションを要約して結果テキストを返す。
+  Future<String> summarize({
+    required String sessionId,
+    required String projectPath,
+    required SummaryScope scope,
+    int rallies = 1,
+  });
+}

@@ -1,0 +1,11 @@
+# Dart / Flutter
+.dart_tool/
+build/
+*.iml
+.idea/
+
+# ビルド成果物
+dist/
+
+# macOS
+.DS_Store

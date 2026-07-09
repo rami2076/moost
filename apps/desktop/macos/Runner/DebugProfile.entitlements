@@ -2,8 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Moost は ~/.claude/ の読み取りと ~/.moost/ への書き込み、
+	     claude CLI のサブプロセス起動が必須のため App Sandbox を無効にする。
+	     App Store 配布はしない前提（RELEASE.md 4 章の ad-hoc 署名方針） -->
 	<key>com.apple.security.app-sandbox</key>
-	<true/>
+	<false/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.server</key>

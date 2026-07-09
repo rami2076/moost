@@ -3,18 +3,30 @@ import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import 'memo_form_screen.dart';
 
 /// 「今どの画面か」を表す状態。スタック型ナビゲーションは使わず、
 /// この 1 つの状態変数を switch して画面を切り替える（design.md 6.1 / 6.4）。
 ///
-/// フェーズ 2 の最初のスライスでは list のみ実装。
-/// newMemo / editMemo / sessionDetail / settings / notes は次スライスで足す。
+/// sessionDetail / settings / notes は次スライスで足す。
 sealed class MenuScreen {
   const MenuScreen();
 }
 
 class ListScreen extends MenuScreen {
   const ListScreen();
+}
+
+class NewMemoScreen extends MenuScreen {
+  final RecentSession session;
+
+  const NewMemoScreen(this.session);
+}
+
+class EditMemoScreen extends MenuScreen {
+  final Memo memo;
+
+  const EditMemoScreen(this.memo);
 }
 
 /// 一覧のタブ。遷移の「戻り先タブ」制御に使う（design.md 6.3）。
@@ -37,8 +49,7 @@ class RootScreen extends StatefulWidget {
 }
 
 class _RootScreenState extends State<RootScreen> {
-  // 次スライスで newMemo / sessionDetail 等への遷移で書き換わる
-  final MenuScreen _screen = const ListScreen();
+  MenuScreen _screen = const ListScreen();
   ListTab _tab = ListTab.recent;
 
   late Future<List<RecentSession>> _sessions;
@@ -67,7 +78,67 @@ class _RootScreenState extends State<RootScreen> {
   Widget build(BuildContext context) {
     return switch (_screen) {
       ListScreen() => _buildList(context),
+      NewMemoScreen(:final session) => _buildNewMemo(session),
+      EditMemoScreen(:final memo) => _buildEditMemo(memo),
     };
+  }
+
+  /// 遷移は「戻り先のタブ」まで制御する（design.md 6.3）。
+  void _showList(ListTab tab) {
+    setState(() {
+      _screen = const ListScreen();
+      _tab = tab;
+      _reload();
+    });
+  }
+
+  Widget _buildNewMemo(RecentSession session) {
+    return MemoFormScreen(
+      projectPath: session.projectPath,
+      sessionId: session.sessionId,
+      // メモタイトルの初期値はセッションタイトル（requirements.md 3.3）
+      initialTitle: session.displayTitle,
+      isEdit: false,
+      onSave: ({required title, required tags, required body}) async {
+        final now = DateTime.now().toUtc();
+        await widget.memoStore.add(Memo(
+          id: generateUuidV4(),
+          agent: widget.adapter.agentId,
+          sessionId: session.sessionId,
+          title: title,
+          tags: tags,
+          body: body,
+          projectPath: session.projectPath,
+          createdAt: now,
+          updatedAt: now,
+        ));
+        // 登録したメモを確認できるようメモ一覧タブへ戻す
+        _showList(ListTab.memos);
+      },
+      // 入口だった直近セッションタブへ戻す
+      onCancel: () => _showList(ListTab.recent),
+    );
+  }
+
+  Widget _buildEditMemo(Memo memo) {
+    return MemoFormScreen(
+      projectPath: memo.projectPath,
+      sessionId: memo.sessionId,
+      initialTitle: memo.title,
+      initialTags: memo.tags.join(', '),
+      initialBody: memo.body,
+      isEdit: true,
+      onSave: ({required title, required tags, required body}) async {
+        await widget.memoStore
+            .update(memo.id, title: title, tags: tags, body: body);
+        _showList(ListTab.memos);
+      },
+      onCancel: () => _showList(ListTab.memos),
+      onDelete: () async {
+        await widget.memoStore.delete(memo.id);
+        _showList(ListTab.memos);
+      },
+    );
   }
 
   Widget _buildList(BuildContext context) {
@@ -103,10 +174,14 @@ class _RootScreenState extends State<RootScreen> {
                 ListTab.recent => _SessionList(
                     sessions: _sessions,
                     onCopyResumeCommand: _copyResumeCommand,
+                    onTapSession: (session) =>
+                        setState(() => _screen = NewMemoScreen(session)),
                   ),
                 ListTab.memos => _MemoList(
                     memos: _memos,
                     onCopyResumeCommand: _copyResumeCommand,
+                    onTapMemo: (memo) =>
+                        setState(() => _screen = EditMemoScreen(memo)),
                   ),
               },
             ),
@@ -141,10 +216,12 @@ class _SessionList extends StatelessWidget {
     required String projectPath,
     required String sessionId,
   }) onCopyResumeCommand;
+  final void Function(RecentSession session) onTapSession;
 
   const _SessionList({
     required this.sessions,
     required this.onCopyResumeCommand,
+    required this.onTapSession,
   });
 
   @override
@@ -170,6 +247,7 @@ class _SessionList extends StatelessWidget {
           itemBuilder: (context, index) {
             final session = items[index];
             return ListTile(
+              onTap: () => onTapSession(session),
               title: Text(
                 session.displayTitle,
                 maxLines: 1,
@@ -203,10 +281,12 @@ class _MemoList extends StatelessWidget {
     required String projectPath,
     required String sessionId,
   }) onCopyResumeCommand;
+  final void Function(Memo memo) onTapMemo;
 
   const _MemoList({
     required this.memos,
     required this.onCopyResumeCommand,
+    required this.onTapMemo,
   });
 
   @override
@@ -232,6 +312,7 @@ class _MemoList extends StatelessWidget {
           itemBuilder: (context, index) {
             final memo = items[index];
             return ListTile(
+              onTap: () => onTapMemo(memo),
               title: Text(
                 memo.title,
                 maxLines: 1,

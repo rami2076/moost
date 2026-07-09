@@ -39,4 +39,36 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get notes => '注意';
+
+  @override
+  String get memoFormNewTitle => 'メモを登録';
+
+  @override
+  String get memoFormEditTitle => 'メモを編集';
+
+  @override
+  String get fieldTitleLabel => 'タイトル';
+
+  @override
+  String get fieldTagsLabel => 'タグ（カンマ区切り）';
+
+  @override
+  String get fieldBodyLabel => 'メモ本文';
+
+  @override
+  String get save => '保存';
+
+  @override
+  String get cancel => 'キャンセル';
+
+  @override
+  String get delete => '削除';
+
+  @override
+  String get deleteConfirmMessage => 'このメモを削除しますか？';
+
+  @override
+  String sessionIdLabel(String id) {
+    return 'セッションID: $id';
+  }
 }

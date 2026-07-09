@@ -9,5 +9,15 @@
   "resumeCommandCopied": "復帰コマンドをコピーしました",
   "loadFailed": "読み込みに失敗しました: {error}",
   "settings": "設定",
-  "notes": "注意"
+  "notes": "注意",
+  "memoFormNewTitle": "メモを登録",
+  "memoFormEditTitle": "メモを編集",
+  "fieldTitleLabel": "タイトル",
+  "fieldTagsLabel": "タグ（カンマ区切り）",
+  "fieldBodyLabel": "メモ本文",
+  "save": "保存",
+  "cancel": "キャンセル",
+  "delete": "削除",
+  "deleteConfirmMessage": "このメモを削除しますか？",
+  "sessionIdLabel": "セッションID: {id}"
 }

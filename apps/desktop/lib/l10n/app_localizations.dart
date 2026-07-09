@@ -157,6 +157,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Notes'**
   String get notes;
+
+  /// No description provided for @memoFormNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Register Memo'**
+  String get memoFormNewTitle;
+
+  /// No description provided for @memoFormEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Memo'**
+  String get memoFormEditTitle;
+
+  /// No description provided for @fieldTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get fieldTitleLabel;
+
+  /// No description provided for @fieldTagsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags (comma separated)'**
+  String get fieldTagsLabel;
+
+  /// No description provided for @fieldBodyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get fieldBodyLabel;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @deleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this memo?'**
+  String get deleteConfirmMessage;
+
+  /// No description provided for @sessionIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session ID: {id}'**
+  String sessionIdLabel(String id);
 }
 
 class _AppLocalizationsDelegate

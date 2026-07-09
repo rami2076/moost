@@ -16,5 +16,22 @@
     }
   },
   "settings": "Settings",
-  "notes": "Notes"
+  "notes": "Notes",
+  "memoFormNewTitle": "Register Memo",
+  "memoFormEditTitle": "Edit Memo",
+  "fieldTitleLabel": "Title",
+  "fieldTagsLabel": "Tags (comma separated)",
+  "fieldBodyLabel": "Body",
+  "save": "Save",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "deleteConfirmMessage": "Delete this memo?",
+  "sessionIdLabel": "Session ID: {id}",
+  "@sessionIdLabel": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  }
 }

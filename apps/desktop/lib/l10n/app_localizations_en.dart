@@ -39,4 +39,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notes => 'Notes';
+
+  @override
+  String get memoFormNewTitle => 'Register Memo';
+
+  @override
+  String get memoFormEditTitle => 'Edit Memo';
+
+  @override
+  String get fieldTitleLabel => 'Title';
+
+  @override
+  String get fieldTagsLabel => 'Tags (comma separated)';
+
+  @override
+  String get fieldBodyLabel => 'Body';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get deleteConfirmMessage => 'Delete this memo?';
+
+  @override
+  String sessionIdLabel(String id) {
+    return 'Session ID: $id';
+  }
 }

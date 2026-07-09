@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
@@ -54,11 +55,16 @@ class RootScreen extends StatefulWidget {
   final MemoStore memoStore;
   final SettingsStore settingsStore;
 
+  /// トレイからウィンドウが再表示された通知。受けたら一覧を再読込する
+  /// （design.md 6.1: ポップオーバーを開いたときに自動更新）。
+  final ValueListenable<int>? windowShown;
+
   const RootScreen({
     super.key,
     required this.adapter,
     required this.memoStore,
     required this.settingsStore,
+    this.windowShown,
   });
 
   @override
@@ -82,6 +88,18 @@ class _RootScreenState extends State<RootScreen> {
   void initState() {
     super.initState();
     _reload();
+    widget.windowShown?.addListener(_onWindowShown);
+  }
+
+  @override
+  void dispose() {
+    widget.windowShown?.removeListener(_onWindowShown);
+    super.dispose();
+  }
+
+  void _onWindowShown() {
+    if (!mounted) return;
+    setState(_reload);
   }
 
   /// 一覧の再読込。開いたとき・タブ切替時・フォームから戻ったときに呼ぶ

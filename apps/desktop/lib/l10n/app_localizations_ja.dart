@@ -171,6 +171,12 @@ class AppLocalizationsJa extends AppLocalizations {
       '直近セッション一覧は、アプリを開いたとき・タブを切り替えたとき・フォームから戻ったときに更新されます。手動リロードはなく、開きっぱなしの間は更新されません。';
 
   @override
+  String get trayOpen => 'Moost を開く';
+
+  @override
+  String get trayQuit => 'Moost を終了';
+
+  @override
   String get openInTerminal => 'ターミナルで開く';
 
   @override

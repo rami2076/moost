@@ -16,6 +16,10 @@ dependencies:
   moost_core:
     path: ../../packages/core
   cupertino_icons: ^1.0.8
+  # トレイ常駐（design.md 6.1）。バージョンは公開 7 日超のものに固定
+  # （supply-chain rules/dart.md）。native は AppKit UI API のみ使用と監査済み。
+  tray_manager: 0.5.3
+  window_manager: 0.5.1
 
 dev_dependencies:
   flutter_test:
@@ -26,3 +30,5 @@ flutter:
   uses-material-design: true
   # gen_l10n による文言の外部化（requirements.md 非機能要件: i18n）
   generate: true
+  assets:
+    - assets/tray_icon.png

@@ -22,6 +22,9 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<!-- トレイ常駐アプリのため Dock アイコンを出さない（design.md 6 章） -->
+	<key>LSUIElement</key>
+	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>

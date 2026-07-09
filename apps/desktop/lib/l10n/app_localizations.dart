@@ -398,6 +398,18 @@ abstract class AppLocalizations {
   /// **'The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.'**
   String get noteRefreshBody;
 
+  /// No description provided for @trayOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Moost'**
+  String get trayOpen;
+
+  /// No description provided for @trayQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit Moost'**
+  String get trayQuit;
+
   /// No description provided for @openInTerminal.
   ///
   /// In en, this message translates to:

@@ -172,6 +172,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'The recent-sessions list refreshes when you open the app, switch tabs, or return from a form. There is no manual reload; it does not update while left open.';
 
   @override
+  String get trayOpen => 'Open Moost';
+
+  @override
+  String get trayQuit => 'Quit Moost';
+
+  @override
   String get openInTerminal => 'Open in terminal';
 
   @override

@@ -50,6 +50,8 @@
   "noteSummaryBody": "要約は claude -p（モデル: Haiku）で実行され、実行のたびに利用枠を消費します。「直近」はローカルで抜粋するため高速・低コスト、「全体」はセッション全体を読むため時間と枠を多く消費します。",
   "noteRefreshTitle": "一覧の更新タイミング",
   "noteRefreshBody": "直近セッション一覧は、アプリを開いたとき・タブを切り替えたとき・フォームから戻ったときに更新されます。手動リロードはなく、開きっぱなしの間は更新されません。",
+  "trayOpen": "Moost を開く",
+  "trayQuit": "Moost を終了",
   "openInTerminal": "ターミナルで開く",
   "resumeInTerminal": "ターミナルで再開",
   "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}"

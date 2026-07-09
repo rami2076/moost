@@ -28,13 +28,11 @@ Future<void> main() async {
     titleBarStyle: TitleBarStyle.hidden,
     windowButtonVisibility: false,
   );
-  // 初回表示をトレイアイコン直下に置くため、先にトレイを用意する
   await tray.init();
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.setMovable(false);
     await windowManager.setResizable(false);
-    // 初回起動はウィンドウを見せる。以後、閉じる/外を触るとトレイに隠れる
-    await tray.showWindow();
+    // 起動時はトレイアイコンだけ。ウィンドウはトレイクリックで初めて表示する
   });
 
   runApp(MoostApp(

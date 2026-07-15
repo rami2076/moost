@@ -475,6 +475,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown agent: {agent}'**
   String unknownAgent(String agent);
+
+  /// Last-used/updated date shown at the right of each list row
+  ///
+  /// In en, this message translates to:
+  /// **'{month}/{day} {time}'**
+  String listUpdatedAt(int month, int day, String time);
 }
 
 class _AppLocalizationsDelegate

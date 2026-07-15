@@ -118,5 +118,20 @@
         "type": "String"
       }
     }
+  },
+  "listUpdatedAt": "{month}/{day} {time}",
+  "@listUpdatedAt": {
+    "description": "Last-used/updated date shown at the right of each list row",
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
   }
 }

@@ -88,11 +88,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get summaryRalliesLabel => 'Rallies';
 
   @override
-  String get runSummary => 'Summarize with Claude';
+  String runSummary(String agent) {
+    return 'Summarize with $agent';
+  }
 
   @override
   String get summaryNotice =>
-      'Runs claude -p (model: Haiku) and consumes your usage quota.';
+      'Runs the agent CLI headless and consumes your usage quota.';
 
   @override
   String get summaryRunning => 'Summarizing…';
@@ -107,6 +109,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lastPromptLabel => 'Last prompt';
+
+  @override
+  String get metaAgent => 'Agent';
 
   @override
   String get metaTitle => 'Title';
@@ -206,5 +211,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String terminalLaunchFailed(String error) {
     return 'Failed to open terminal: $error';
+  }
+
+  @override
+  String unknownAgent(String agent) {
+    return 'Unknown agent: $agent';
   }
 }

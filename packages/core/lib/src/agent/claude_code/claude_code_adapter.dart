@@ -3,6 +3,7 @@ import 'dart:io';
 import '../../model/recent_session.dart';
 import '../../shell_escape.dart';
 import '../agent_adapter.dart';
+import '../summarize_exception.dart';
 import 'ai_title_reader.dart';
 import 'claude_path_resolver.dart';
 import 'claude_summarizer.dart';
@@ -11,6 +12,8 @@ import 'transcript_extractor.dart';
 
 /// Claude Code 向けの [AgentAdapter] 実装（第 1 弾で唯一の実装）。
 class ClaudeCodeAdapter implements AgentAdapter {
+  static const id = 'claude-code';
+
   final SessionHistoryReader _historyReader;
   final AiTitleReader _aiTitleReader;
   final TranscriptExtractor _transcriptExtractor;
@@ -31,6 +34,7 @@ class ClaudeCodeAdapter implements AgentAdapter {
   ClaudeCodeAdapter._(String claudeHome, this.claudePathOverride)
       : _historyReader = SessionHistoryReader(
           historyFile: File('$claudeHome/history.jsonl'),
+          agentId: id,
           excludeMarker: ClaudeSummarizer.marker,
         ),
         _aiTitleReader = AiTitleReader(
@@ -42,7 +46,10 @@ class ClaudeCodeAdapter implements AgentAdapter {
         _pathResolver = ClaudePathResolver();
 
   @override
-  String get agentId => 'claude-code';
+  String get agentId => id;
+
+  @override
+  String get displayName => 'Claude';
 
   @override
   Future<List<RecentSession>> recentSessions({int limit = 20}) async {

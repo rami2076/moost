@@ -1,5 +1,9 @@
 /// 直近セッション一覧の 1 行分の表示データ。
 class RecentSession {
+  /// このセッションを提供したエージェントの識別子（[AgentAdapter.agentId]）。
+  /// 統合リストでのバッジ表示と、復帰・要約時の adapter ルーティングに使う。
+  final String agentId;
+
   final String sessionId;
   final String projectPath;
 
@@ -13,6 +17,7 @@ class RecentSession {
   final String? aiTitle;
 
   const RecentSession({
+    required this.agentId,
     required this.sessionId,
     required this.projectPath,
     required this.lastPrompt,
@@ -37,6 +42,7 @@ class RecentSession {
   }
 
   RecentSession withAiTitle(String? aiTitle) => RecentSession(
+        agentId: agentId,
         sessionId: sessionId,
         projectPath: projectPath,
         lastPrompt: lastPrompt,

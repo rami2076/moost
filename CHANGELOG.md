@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- Codex CLI 対応（AgentAdapter の第 2 実装）
+  - packages/core: CodexAdapter（`~/.codex/history.jsonl` 集約 + rollout JSONL の
+    `session_meta.cwd` でプロジェクトパス補完、`codex resume` 復帰、
+    `codex exec --ephemeral` 要約（直近抜粋 / `exec resume` 全体の 2 モード））
+  - packages/core: AdapterRegistry（複数エージェントの直近セッションを時系列マージ、
+    agentId による adapter ルーティング）
+  - apps/desktop: 統合リスト + エージェントバッジ（セッション / メモの両タブ）、
+    セッション詳細にエージェント行、要約ボタンをエージェント名表示に
+
 ## [1.0.0] - 2026-07-16
 
 Dart/Flutter 版の初回リリース（Swift 版 claude-session-memo 1.0.4 の後継）。

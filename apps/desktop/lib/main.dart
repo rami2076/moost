@@ -36,7 +36,10 @@ Future<void> main() async {
   });
 
   runApp(MoostApp(
-    adapter: ClaudeCodeAdapter(),
+    registry: AdapterRegistry([
+      ClaudeCodeAdapter(),
+      CodexAdapter(),
+    ]),
     memoStore: MemoStore.defaultLocation(),
     settingsStore: SettingsStore.defaultLocation(),
     windowShown: tray.shownCount,
@@ -44,7 +47,7 @@ Future<void> main() async {
 }
 
 class MoostApp extends StatelessWidget {
-  final AgentAdapter adapter;
+  final AdapterRegistry registry;
   final MemoStore memoStore;
   final SettingsStore settingsStore;
 
@@ -53,7 +56,7 @@ class MoostApp extends StatelessWidget {
 
   const MoostApp({
     super.key,
-    required this.adapter,
+    required this.registry,
     required this.memoStore,
     required this.settingsStore,
     this.windowShown,
@@ -72,7 +75,7 @@ class MoostApp extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       theme: _buildTheme(),
       home: RootScreen(
-        adapter: adapter,
+        registry: registry,
         memoStore: memoStore,
         settingsStore: settingsStore,
         windowShown: windowShown,

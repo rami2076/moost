@@ -5,6 +5,7 @@ void main() {
   group('RecentSession.displayTitle', () {
     RecentSession build({String? aiTitle, String lastPrompt = 'prompt'}) {
       return RecentSession(
+        agentId: 'claude-code',
         sessionId: 'id',
         projectPath: '/p',
         lastPrompt: lastPrompt,

@@ -30,7 +30,8 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
         // 存在しないディレクトリを指す adapter → 空一覧になる
-        adapter: ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude'),
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
       ));
@@ -64,7 +65,8 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
-        adapter: ClaudeCodeAdapter(claudeHome: claudeHome.path),
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
       ));
@@ -113,6 +115,7 @@ void main() {
 
     final adapter = _FakeAdapter([
       RecentSession(
+        agentId: 'fake',
         sessionId: 'sess-1',
         projectPath: '/tmp/proj',
         lastPrompt: 'do something',
@@ -123,7 +126,7 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
-        adapter: adapter,
+        registry: AdapterRegistry([adapter]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
       ));
@@ -164,7 +167,8 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
-        adapter: ClaudeCodeAdapter(claudeHome: claudeHome.path),
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
       ));
@@ -201,7 +205,8 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
-        adapter: ClaudeCodeAdapter(claudeHome: claudeHome.path),
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
       ));
@@ -230,6 +235,9 @@ class _FakeAdapter implements AgentAdapter {
 
   @override
   String get agentId => 'fake';
+
+  @override
+  String get displayName => 'Claude';
 
   @override
   Future<List<RecentSession>> recentSessions({int limit = 20}) async =>

@@ -14,6 +14,7 @@ void main() {
     historyFile = File('${tempDir.path}/history.jsonl');
     reader = SessionHistoryReader(
       historyFile: historyFile,
+      agentId: 'claude-code',
       excludeMarker: '[Moost要約]',
     );
   });

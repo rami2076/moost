@@ -251,13 +251,13 @@ abstract class AppLocalizations {
   /// No description provided for @runSummary.
   ///
   /// In en, this message translates to:
-  /// **'Summarize with Claude'**
-  String get runSummary;
+  /// **'Summarize with {agent}'**
+  String runSummary(String agent);
 
   /// No description provided for @summaryNotice.
   ///
   /// In en, this message translates to:
-  /// **'Runs claude -p (model: Haiku) and consumes your usage quota.'**
+  /// **'Runs the agent CLI headless and consumes your usage quota.'**
   String get summaryNotice;
 
   /// No description provided for @summaryRunning.
@@ -283,6 +283,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last prompt'**
   String get lastPromptLabel;
+
+  /// No description provided for @metaAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get metaAgent;
 
   /// No description provided for @metaTitle.
   ///
@@ -463,6 +469,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to open terminal: {error}'**
   String terminalLaunchFailed(String error);
+
+  /// No description provided for @unknownAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown agent: {agent}'**
+  String unknownAgent(String agent);
 }
 
 class _AppLocalizationsDelegate

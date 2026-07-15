@@ -51,7 +51,7 @@ class NotesMenuScreen extends MenuScreen {
 enum ListTab { recent, memos }
 
 class RootScreen extends StatefulWidget {
-  final AgentAdapter adapter;
+  final AdapterRegistry registry;
   final MemoStore memoStore;
   final SettingsStore settingsStore;
 
@@ -61,7 +61,7 @@ class RootScreen extends StatefulWidget {
 
   const RootScreen({
     super.key,
-    required this.adapter,
+    required this.registry,
     required this.memoStore,
     required this.settingsStore,
     this.windowShown,
@@ -112,9 +112,13 @@ class _RootScreenState extends State<RootScreen> {
   Future<List<RecentSession>> _loadSessions() async {
     final settings = await widget.settingsStore.load();
     _summaryRallies = settings.summaryRallyCount;
-    return widget.adapter
+    return widget.registry
         .recentSessions(limit: settings.recentSessionLimit);
   }
+
+  /// バッジ表示用のエージェント名。未知の agentId は生の id をそのまま出す。
+  String _agentLabel(String agentId) =>
+      widget.registry.byId(agentId)?.displayName ?? agentId;
 
   @override
   Widget build(BuildContext context) {
@@ -133,9 +137,12 @@ class _RootScreenState extends State<RootScreen> {
   }
 
   Widget _buildSessionDetail(RecentSession session) {
+    // セッションは registry 経由で取得したものなので adapter は必ず見つかる
+    final adapter = widget.registry.byId(session.agentId)!;
     return SessionDetailScreen(
       session: session,
-      adapter: widget.adapter,
+      adapter: adapter,
+      agentName: adapter.displayName,
       summaryCache: _summaryCache,
       initialRallies: _summaryRallies,
       onBack: () => _showList(ListTab.recent),
@@ -143,6 +150,7 @@ class _RootScreenState extends State<RootScreen> {
       onRegisterMemo: () =>
           setState(() => _screen = NewMemoScreen(session)),
       onOpenTerminal: () => _openInTerminal(
+        agent: session.agentId,
         projectPath: session.projectPath,
         sessionId: session.sessionId,
       ),
@@ -169,7 +177,7 @@ class _RootScreenState extends State<RootScreen> {
         final now = DateTime.now().toUtc();
         await widget.memoStore.add(Memo(
           id: generateUuidV4(),
-          agent: widget.adapter.agentId,
+          agent: session.agentId,
           sessionId: session.sessionId,
           title: title,
           tags: tags,
@@ -239,6 +247,7 @@ class _RootScreenState extends State<RootScreen> {
               child: switch (_tab) {
                 ListTab.recent => _SessionList(
                     sessions: _sessions,
+                    agentLabel: _agentLabel,
                     onCopyResumeCommand: _copyResumeCommand,
                     onOpenInTerminal: _openInTerminal,
                     onTapSession: (session) =>
@@ -248,6 +257,7 @@ class _RootScreenState extends State<RootScreen> {
                   ),
                 ListTab.memos => _MemoList(
                     memos: _memos,
+                    agentLabel: _agentLabel,
                     onCopyResumeCommand: _copyResumeCommand,
                     onOpenInTerminal: _openInTerminal,
                     onTapMemo: (memo) =>
@@ -291,11 +301,29 @@ class _RootScreenState extends State<RootScreen> {
     );
   }
 
+  /// agent に対応する adapter を引く。メモは復帰情報を自己完結で持つため、
+  /// 対応 adapter を外した後のメモから呼ばれると null になりうる。
+  AgentAdapter? _adapterFor(String agent) {
+    final adapter = widget.registry.byId(agent);
+    if (adapter == null && mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.unknownAgent(agent))),
+      );
+    }
+    return adapter;
+  }
+
   Future<void> _copyResumeCommand({
+    required String agent,
     required String projectPath,
     required String sessionId,
   }) async {
-    final command = widget.adapter.buildResumeCommand(
+    final adapter = _adapterFor(agent);
+    if (adapter == null) {
+      return;
+    }
+    final command = adapter.buildResumeCommand(
       projectPath: projectPath,
       sessionId: sessionId,
     );
@@ -311,10 +339,15 @@ class _RootScreenState extends State<RootScreen> {
 
   /// 設定のターミナルで復帰コマンドを実行する。
   Future<void> _openInTerminal({
+    required String agent,
     required String projectPath,
     required String sessionId,
   }) async {
-    final command = widget.adapter.buildResumeCommand(
+    final adapter = _adapterFor(agent);
+    if (adapter == null) {
+      return;
+    }
+    final command = adapter.buildResumeCommand(
       projectPath: projectPath,
       sessionId: sessionId,
     );
@@ -336,11 +369,14 @@ class _RootScreenState extends State<RootScreen> {
 
 class _SessionList extends StatelessWidget {
   final Future<List<RecentSession>> sessions;
+  final String Function(String agentId) agentLabel;
   final Future<void> Function({
+    required String agent,
     required String projectPath,
     required String sessionId,
   }) onCopyResumeCommand;
   final Future<void> Function({
+    required String agent,
     required String projectPath,
     required String sessionId,
   }) onOpenInTerminal;
@@ -349,6 +385,7 @@ class _SessionList extends StatelessWidget {
 
   const _SessionList({
     required this.sessions,
+    required this.agentLabel,
     required this.onCopyResumeCommand,
     required this.onOpenInTerminal,
     required this.onTapSession,
@@ -379,10 +416,18 @@ class _SessionList extends StatelessWidget {
             final session = items[index];
             return ListTile(
               onTap: () => onTapSession(session),
-              title: Text(
-                session.displayTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      session.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _AgentBadge(agentLabel(session.agentId)),
+                ],
               ),
               subtitle: Text(
                 session.projectPath,
@@ -397,6 +442,7 @@ class _SessionList extends StatelessWidget {
                     icon: const Icon(Icons.terminal, size: 18),
                     tooltip: l10n.openInTerminal,
                     onPressed: () => onOpenInTerminal(
+                      agent: session.agentId,
                       projectPath: session.projectPath,
                       sessionId: session.sessionId,
                     ),
@@ -410,6 +456,7 @@ class _SessionList extends StatelessWidget {
                     icon: const Icon(Icons.copy, size: 18),
                     tooltip: l10n.copyResumeCommand,
                     onPressed: () => onCopyResumeCommand(
+                      agent: session.agentId,
                       projectPath: session.projectPath,
                       sessionId: session.sessionId,
                     ),
@@ -426,11 +473,14 @@ class _SessionList extends StatelessWidget {
 
 class _MemoList extends StatelessWidget {
   final Future<List<Memo>> memos;
+  final String Function(String agentId) agentLabel;
   final Future<void> Function({
+    required String agent,
     required String projectPath,
     required String sessionId,
   }) onCopyResumeCommand;
   final Future<void> Function({
+    required String agent,
     required String projectPath,
     required String sessionId,
   }) onOpenInTerminal;
@@ -438,6 +488,7 @@ class _MemoList extends StatelessWidget {
 
   const _MemoList({
     required this.memos,
+    required this.agentLabel,
     required this.onCopyResumeCommand,
     required this.onOpenInTerminal,
     required this.onTapMemo,
@@ -467,10 +518,18 @@ class _MemoList extends StatelessWidget {
             final memo = items[index];
             return ListTile(
               onTap: () => onTapMemo(memo),
-              title: Text(
-                memo.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      memo.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _AgentBadge(agentLabel(memo.agent)),
+                ],
               ),
               subtitle: Text(
                 memo.tags.isEmpty
@@ -489,6 +548,7 @@ class _MemoList extends StatelessWidget {
                     icon: const Icon(Icons.terminal, size: 18),
                     tooltip: l10n.resumeInTerminal,
                     onPressed: () => onOpenInTerminal(
+                      agent: memo.agent,
                       projectPath: memo.projectPath,
                       sessionId: memo.sessionId,
                     ),
@@ -497,6 +557,7 @@ class _MemoList extends StatelessWidget {
                     icon: const Icon(Icons.copy, size: 18),
                     tooltip: l10n.copyResumeCommand,
                     onPressed: () => onCopyResumeCommand(
+                      agent: memo.agent,
                       projectPath: memo.projectPath,
                       sessionId: memo.sessionId,
                     ),
@@ -507,6 +568,31 @@ class _MemoList extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// 統合リストでどのエージェントのセッション/メモかを示す小さなバッジ。
+class _AgentBadge extends StatelessWidget {
+  final String label;
+
+  const _AgentBadge(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSecondaryContainer,
+        ),
+      ),
     );
   }
 }

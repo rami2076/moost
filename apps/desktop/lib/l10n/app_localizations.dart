@@ -475,6 +475,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown agent: {agent}'**
   String unknownAgent(String agent);
+
+  /// Last-used date shown at the right of each session row
+  ///
+  /// In en, this message translates to:
+  /// **'{month}/{day} {time}'**
+  String sessionUpdatedAt(int month, int day, String time);
 }
 
 class _AppLocalizationsDelegate

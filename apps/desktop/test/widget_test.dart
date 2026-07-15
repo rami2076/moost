@@ -173,6 +173,15 @@ void main() {
       // セッション行にターミナル起動ボタンが並ぶ
       expect(find.byTooltip('Open in terminal'), findsOneWidget);
 
+      // 最終利用日時がサブタイトル行に出る（表示はローカル時刻・en ロケール）
+      final localUpdated = DateTime.utc(2026, 7, 9).toLocal();
+      String pad(int n) => n.toString().padLeft(2, '0');
+      expect(
+        find.text('${localUpdated.month}/${localUpdated.day} '
+            '${pad(localUpdated.hour)}:${pad(localUpdated.minute)}'),
+        findsOneWidget,
+      );
+
       // セッション詳細アイコンを開く
       await tester.tap(find.byTooltip('Session Detail'));
       await tester.pump();

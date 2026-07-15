@@ -217,4 +217,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String unknownAgent(String agent) {
     return 'Unknown agent: $agent';
   }
+
+  @override
+  String sessionUpdatedAt(int month, int day, String time) {
+    return '$month/$day $time';
+  }
 }

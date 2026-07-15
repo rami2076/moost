@@ -62,5 +62,6 @@
   "openInTerminal": "ターミナルで開く",
   "resumeInTerminal": "ターミナルで再開",
   "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}",
-  "unknownAgent": "不明なエージェント: {agent}"
+  "unknownAgent": "不明なエージェント: {agent}",
+  "sessionUpdatedAt": "{month}月{day}日 {time}"
 }

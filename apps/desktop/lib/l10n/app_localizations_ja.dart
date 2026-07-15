@@ -216,4 +216,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String unknownAgent(String agent) {
     return '不明なエージェント: $agent';
   }
+
+  @override
+  String sessionUpdatedAt(int month, int day, String time) {
+    return '$month月$day日 $time';
+  }
 }

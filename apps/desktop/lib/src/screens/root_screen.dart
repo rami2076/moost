@@ -414,6 +414,13 @@ class _SessionList extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final session = items[index];
+            final updatedAt = session.updatedAt.toLocal();
+            String pad(int n) => n.toString().padLeft(2, '0');
+            final updatedAtText = l10n.sessionUpdatedAt(
+              updatedAt.month,
+              updatedAt.day,
+              '${pad(updatedAt.hour)}:${pad(updatedAt.minute)}',
+            );
             return ListTile(
               onTap: () => onTapSession(session),
               title: Row(
@@ -429,11 +436,23 @@ class _SessionList extends StatelessWidget {
                   _AgentBadge(agentLabel(session.agentId)),
                 ],
               ),
-              subtitle: Text(
-                session.projectPath,
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              // 最終利用日時はサブタイトル行の右端（プロジェクトパスと同じ行）
+              subtitle: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      session.projectPath,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    updatedAtText,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,

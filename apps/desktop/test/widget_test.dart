@@ -17,12 +17,49 @@ Future<void> settle(WidgetTester tester) async {
   }
 }
 
+/// テスト用の一時ディレクトリを作り、競合に耐える teardown を登録する。
+///
+/// ストアの保存は「.tmp 書き込み → rename」のアトミック方式のため、
+/// 保存 I/O が残ったまま teardown がディレクトリを消すと、遅れて走る
+/// rename が PathNotFoundException でテストを落とす（CI の遅いランナーで
+/// 顕在化）。teardown は FakeAsync ゾーンで走るので同期リトライにする。
+Directory createTempDir() {
+  final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
+  addTearDown(() {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        tempDir.deleteSync(recursive: true);
+        return;
+      } on FileSystemException {
+        if (attempt >= 4) {
+          rethrow;
+        }
+        sleep(const Duration(milliseconds: 50));
+      }
+    }
+  });
+  return tempDir;
+}
+
+/// 進行中のアトミック書き込み（.tmp → rename）が掃けるまで待つ。
+/// runAsync の中（実時間が進むゾーン）で、テスト本体の最後に呼ぶ。
+Future<void> drainPendingWrites(Directory tempDir) async {
+  for (var i = 0; i < 50; i++) {
+    final hasTmp = tempDir
+        .listSync(recursive: true)
+        .any((entity) => entity.path.endsWith('.tmp'));
+    if (!hasTmp) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
+
 void main() {
   testWidgets('renders session list tab with empty stores', (tester) async {
     // FakeAsync ゾーン（runAsync の外）では非同期 I/O の Future が完了しない
     // ため、テンポラリディレクトリ操作は同期 API を使う
-    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final tempDir = createTempDir();
 
     // 実ファイル I/O を伴う Future は FakeAsync では完了しないため、
     // テスト全体を runAsync 内で実行し、pump を明示的に打つ
@@ -51,8 +88,7 @@ void main() {
   });
 
   testWidgets('memo create / edit / delete flow', (tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final tempDir = createTempDir();
 
     // 疑似 history.jsonl でセッションを 1 件用意する
     final claudeHome = Directory('${tempDir.path}/claude')..createSync();
@@ -106,12 +142,14 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
       await settle(tester);
       expect(find.text('No memos found'), findsOneWidget);
+
+      // 削除の保存 I/O が残ったまま teardown に入らないよう掃ける
+      await drainPendingWrites(tempDir);
     });
   });
 
   testWidgets('session detail runs summary and caches it', (tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final tempDir = createTempDir();
 
     final adapter = _FakeAdapter([
       RecentSession(
@@ -160,8 +198,7 @@ void main() {
 
   testWidgets('footer opens settings and notes, then returns',
       (tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final tempDir = createTempDir();
 
     final claudeHome = Directory('${tempDir.path}/claude')..createSync();
 
@@ -192,8 +229,7 @@ void main() {
   });
 
   testWidgets('save is disabled while title is empty', (tester) async {
-    final tempDir = Directory.systemTemp.createTempSync('moost_widget_');
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final tempDir = createTempDir();
 
     final claudeHome = Directory('${tempDir.path}/claude')..createSync();
     File('${claudeHome.path}/history.jsonl').writeAsStringSync(jsonEncode({

@@ -119,9 +119,9 @@
       }
     }
   },
-  "sessionUpdatedAt": "{month}/{day} {time}",
-  "@sessionUpdatedAt": {
-    "description": "Last-used date shown at the right of each session row",
+  "listUpdatedAt": "{month}/{day} {time}",
+  "@listUpdatedAt": {
+    "description": "Last-used/updated date shown at the right of each list row",
     "placeholders": {
       "month": {
         "type": "int"

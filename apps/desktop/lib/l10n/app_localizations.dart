@@ -476,11 +476,11 @@ abstract class AppLocalizations {
   /// **'Unknown agent: {agent}'**
   String unknownAgent(String agent);
 
-  /// Last-used date shown at the right of each session row
+  /// Last-used/updated date shown at the right of each list row
   ///
   /// In en, this message translates to:
   /// **'{month}/{day} {time}'**
-  String sessionUpdatedAt(int month, int day, String time);
+  String listUpdatedAt(int month, int day, String time);
 }
 
 class _AppLocalizationsDelegate

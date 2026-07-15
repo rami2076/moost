@@ -50,6 +50,17 @@ class NotesMenuScreen extends MenuScreen {
 /// 一覧のタブ。遷移の「戻り先タブ」制御に使う（design.md 6.3）。
 enum ListTab { recent, memos }
 
+/// 一覧行のサブタイトル右端に出す最終更新日時（ローカル時刻）。
+String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
+  final local = updatedAt.toLocal();
+  String pad(int n) => n.toString().padLeft(2, '0');
+  return l10n.listUpdatedAt(
+    local.month,
+    local.day,
+    '${pad(local.hour)}:${pad(local.minute)}',
+  );
+}
+
 class RootScreen extends StatefulWidget {
   final AdapterRegistry registry;
   final MemoStore memoStore;
@@ -414,13 +425,8 @@ class _SessionList extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final session = items[index];
-            final updatedAt = session.updatedAt.toLocal();
-            String pad(int n) => n.toString().padLeft(2, '0');
-            final updatedAtText = l10n.sessionUpdatedAt(
-              updatedAt.month,
-              updatedAt.day,
-              '${pad(updatedAt.hour)}:${pad(updatedAt.minute)}',
-            );
+            final updatedAtText =
+                _formatListUpdatedAt(l10n, session.updatedAt);
             return ListTile(
               onTap: () => onTapSession(session),
               title: Row(
@@ -550,13 +556,25 @@ class _MemoList extends StatelessWidget {
                   _AgentBadge(agentLabel(memo.agent)),
                 ],
               ),
-              subtitle: Text(
-                memo.tags.isEmpty
-                    ? memo.projectPath
-                    : '${memo.tags.join(', ')} — ${memo.projectPath}',
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              // 最終更新日時はサブタイトル行の右端（セッション一覧と同じ配置）
+              subtitle: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      memo.tags.isEmpty
+                          ? memo.projectPath
+                          : '${memo.tags.join(', ')} — ${memo.projectPath}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatListUpdatedAt(l10n, memo.updatedAt),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,

@@ -218,7 +218,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String sessionUpdatedAt(int month, int day, String time) {
+  String listUpdatedAt(int month, int day, String time) {
     return '$month月$day日 $time';
   }
 }

@@ -1,0 +1,87 @@
+# タグ push で起動するリリース自動化（RELEASE.md 3.2）。
+# analyze / test を再実行してから release ビルド → ad-hoc 署名 → dmg 化 →
+# GitHub Release 作成（dmg + CHANGELOG 該当節を添付）。
+#
+# 使い方:
+#   1. CHANGELOG の [Unreleased] を [x.y.z] - YYYY-MM-DD に確定
+#   2. apps/desktop/pubspec.yaml の version を上げてコミット（PR → マージ）
+#   3. git tag v<x.y.z> && git push origin v<x.y.z>
+#
+# `-` を含むタグ（例: v0.0.1-citest）は prerelease として作成される。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+
+      - name: Enforce lockfiles
+        run: |
+          (cd packages/core && dart pub get --enforce-lockfile)
+          (cd apps/desktop && flutter pub get --enforce-lockfile)
+
+      - name: Analyze and test
+        run: |
+          (cd packages/core && dart analyze && dart test)
+          (cd apps/desktop && flutter analyze && flutter test)
+
+      - name: Build macOS app (release)
+        run: flutter build macos --release
+        working-directory: apps/desktop
+
+      # 当面は ad-hoc 署名（RELEASE.md 4 章。Swift 版と同じ）。
+      # 初回起動時の Gatekeeper 警告は README の回避手順で対応する
+      - name: Ad-hoc sign
+        run: >
+          codesign --force --deep --sign -
+          "apps/desktop/build/macos/Build/Products/Release/moost_desktop.app"
+
+      - name: Create dmg
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist/dmg
+          cp -R "apps/desktop/build/macos/Build/Products/Release/moost_desktop.app" \
+            "dist/dmg/Moost.app"
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname "Moost $VERSION" -srcfolder dist/dmg \
+            -ov -format UDZO "dist/Moost-$VERSION.dmg"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      # CHANGELOG から「## [x.y.z]」〜次の「## [」直前までを抜き出す。
+      # 該当節がないタグ（テストタグ等）は定型文にフォールバックする
+      - name: Extract changelog section
+        run: |
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
+            /^## \[/ {flag=0}
+            flag' CHANGELOG.md > RELEASE_NOTES.md
+          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
+            echo "(CHANGELOG に $VERSION の節がありません)" > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE_FLAG=""
+          case "$GITHUB_REF_NAME" in
+            *-*) PRERELEASE_FLAG="--prerelease" ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" "dist/Moost-$VERSION.dmg" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            $PRERELEASE_FLAG

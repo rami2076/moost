@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-16
+
+Dart/Flutter 版の初回リリース（Swift 版 claude-session-memo 1.0.4 の後継）。
+
 ### Added
 
 - Codex CLI 対応（AgentAdapter の第 2 実装）

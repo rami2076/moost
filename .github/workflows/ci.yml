@@ -1,0 +1,61 @@
+# PR・main push ごとの品質ゲート（RELEASE.md 2 章）。
+# macOS 固有処理を含まない検証は消費係数 1 倍の Linux ランナーで行う。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    name: core (analyze + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+      - name: Enforce lockfile
+        run: dart pub get --enforce-lockfile
+        working-directory: packages/core
+      - name: Analyze
+        run: dart analyze
+        working-directory: packages/core
+      - name: Test
+        run: dart test
+        working-directory: packages/core
+
+  desktop:
+    name: desktop (analyze + widget test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+      - name: Enforce lockfile
+        run: flutter pub get --enforce-lockfile
+        working-directory: apps/desktop
+      - name: Analyze
+        run: flutter analyze
+        working-directory: apps/desktop
+      - name: Test
+        run: flutter test
+        working-directory: apps/desktop
+
+  osv-scan:
+    name: osv-scanner (lockfiles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # メジャーバージョンだけのタグ（@v2）は提供されていないため完全一致で指定する
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        with:
+          scan-args: |-
+            --lockfile=./packages/core/pubspec.lock
+            --lockfile=./apps/desktop/pubspec.lock

@@ -148,6 +148,64 @@ void main() {
     });
   });
 
+  testWidgets('memo list row delete with inline confirmation',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    // メモを 1 件持つストアを直接用意する（登録フローは別テストで担保済み）
+    final now = DateTime.utc(2026, 7, 16).toIso8601String();
+    File('${tempDir.path}/memos.json').writeAsStringSync(jsonEncode({
+      'schemaVersion': 1,
+      'memos': [
+        {
+          'id': 'memo-1',
+          'agent': 'claude-code',
+          'sessionId': 'sess-1',
+          'title': 'row memo',
+          'tags': <String>[],
+          'body': '',
+          'projectPath': '/tmp/proj',
+          'createdAt': now,
+          'updatedAt': now,
+        },
+      ],
+    }));
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Memos'));
+      await settle(tester);
+      expect(find.text('row memo'), findsOneWidget);
+
+      // ゴミ箱アイコン → 一覧上部にタイトル入りの確認バーが出る
+      await tester.tap(find.byTooltip('Delete'));
+      await tester.pump();
+      expect(find.text('Delete "row memo"?'), findsOneWidget);
+
+      // キャンセルでバーが消え、メモは残る
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      expect(find.text('Delete "row memo"?'), findsNothing);
+      expect(find.text('row memo'), findsOneWidget);
+
+      // もう一度ゴミ箱 → 削除で確定するとメモが消える
+      await tester.tap(find.byTooltip('Delete'));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await settle(tester);
+      expect(find.text('No memos found'), findsOneWidget);
+
+      await drainPendingWrites(tempDir);
+    });
+  });
+
   testWidgets('session detail runs summary and caches it', (tester) async {
     final tempDir = createTempDir();
 

@@ -19,6 +19,7 @@
   "cancel": "キャンセル",
   "delete": "削除",
   "deleteConfirmMessage": "このメモを削除しますか？",
+  "deleteConfirmTitled": "「{title}」を削除しますか？",
   "sessionIdLabel": "セッションID: {id}",
   "sessionDetailTitle": "セッション詳細",
   "back": "戻る",

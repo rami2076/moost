@@ -86,6 +86,10 @@ class _RootScreenState extends State<RootScreen> {
   MenuScreen _screen = const ListScreen();
   ListTab _tab = ListTab.recent;
 
+  /// メモ一覧の行から削除を押されたメモ。null 以外のとき一覧上部に
+  /// 確認バーを出す（Swift 版と同じインライン確認。ダイアログは出さない）。
+  Memo? _pendingDeleteMemo;
+
   // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
   final SummaryCache _summaryCache = SummaryCache();
   final ClaudePathResolver _pathResolver = ClaudePathResolver();
@@ -118,6 +122,8 @@ class _RootScreenState extends State<RootScreen> {
   void _reload() {
     _sessions = _loadSessions();
     _memos = widget.memoStore.load();
+    // 一覧が変わるタイミングで出しっぱなしの削除確認を引っ込める
+    _pendingDeleteMemo = null;
   }
 
   Future<List<RecentSession>> _loadSessions() async {
@@ -254,6 +260,8 @@ class _RootScreenState extends State<RootScreen> {
                 },
               ),
             ),
+            if (_tab == ListTab.memos && _pendingDeleteMemo != null)
+              _buildDeleteConfirmBar(context, _pendingDeleteMemo!),
             Expanded(
               child: switch (_tab) {
                 ListTab.recent => _SessionList(
@@ -273,6 +281,8 @@ class _RootScreenState extends State<RootScreen> {
                     onOpenInTerminal: _openInTerminal,
                     onTapMemo: (memo) =>
                         setState(() => _screen = EditMemoScreen(memo)),
+                    onDeleteMemo: (memo) =>
+                        setState(() => _pendingDeleteMemo = memo),
                   ),
               },
             ),
@@ -281,6 +291,47 @@ class _RootScreenState extends State<RootScreen> {
         ),
       ),
     );
+  }
+
+  /// メモ一覧上部の削除確認バー（画面遷移せず、その場で確定できる）。
+  Widget _buildDeleteConfirmBar(BuildContext context, Memo memo) {
+    final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              l10n.deleteConfirmTitled(memo.title),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _pendingDeleteMemo = null),
+            child: Text(l10n.cancel),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+            ),
+            onPressed: () => _deleteMemoConfirmed(memo),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteMemoConfirmed(Memo memo) async {
+    await widget.memoStore.delete(memo.id);
+    if (!mounted) {
+      return;
+    }
+    setState(_reload);
   }
 
   Widget _buildFooter(BuildContext context) {
@@ -510,6 +561,7 @@ class _MemoList extends StatelessWidget {
     required String sessionId,
   }) onOpenInTerminal;
   final void Function(Memo memo) onTapMemo;
+  final void Function(Memo memo) onDeleteMemo;
 
   const _MemoList({
     required this.memos,
@@ -517,6 +569,7 @@ class _MemoList extends StatelessWidget {
     required this.onCopyResumeCommand,
     required this.onOpenInTerminal,
     required this.onTapMemo,
+    required this.onDeleteMemo,
   });
 
   @override
@@ -598,6 +651,11 @@ class _MemoList extends StatelessWidget {
                       projectPath: memo.projectPath,
                       sessionId: memo.sessionId,
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    tooltip: l10n.delete,
+                    onPressed: () => onDeleteMemo(memo),
                   ),
                 ],
               ),

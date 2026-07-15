@@ -53,7 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: google/osv-scanner-action/osv-scanner-action@v2
+      # メジャーバージョンだけのタグ（@v2）は提供されていないため完全一致で指定する
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
         with:
           scan-args: |-
             --lockfile=./packages/core/pubspec.lock

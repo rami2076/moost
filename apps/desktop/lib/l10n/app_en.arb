@@ -39,8 +39,15 @@
   "summaryScopeRecent": "Recent",
   "summaryScopeFull": "Whole session",
   "summaryRalliesLabel": "Rallies",
-  "runSummary": "Summarize with Claude",
-  "summaryNotice": "Runs claude -p (model: Haiku) and consumes your usage quota.",
+  "runSummary": "Summarize with {agent}",
+  "@runSummary": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "summaryNotice": "Runs the agent CLI headless and consumes your usage quota.",
   "summaryRunning": "Summarizing…",
   "summaryFailed": "Summarize failed: {error}",
   "@summaryFailed": {
@@ -52,6 +59,7 @@
   },
   "registerMemo": "Register memo",
   "lastPromptLabel": "Last prompt",
+  "metaAgent": "Agent",
   "metaTitle": "Title",
   "metaProject": "Project",
   "metaSessionId": "Session ID",
@@ -99,6 +107,14 @@
   "@terminalLaunchFailed": {
     "placeholders": {
       "error": {
+        "type": "String"
+      }
+    }
+  },
+  "unknownAgent": "Unknown agent: {agent}",
+  "@unknownAgent": {
+    "placeholders": {
+      "agent": {
         "type": "String"
       }
     }

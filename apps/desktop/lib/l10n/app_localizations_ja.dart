@@ -88,10 +88,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get summaryRalliesLabel => 'ラリー数';
 
   @override
-  String get runSummary => 'Claude で要約する';
+  String runSummary(String agent) {
+    return '$agent で要約する';
+  }
 
   @override
-  String get summaryNotice => 'claude -p（モデル: Haiku）を実行します（利用枠を消費）。';
+  String get summaryNotice => 'エージェント CLI をヘッドレス実行します（利用枠を消費）。';
 
   @override
   String get summaryRunning => '要約中…';
@@ -106,6 +108,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get lastPromptLabel => '最終プロンプト';
+
+  @override
+  String get metaAgent => 'エージェント';
 
   @override
   String get metaTitle => 'タイトル';
@@ -205,5 +210,10 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String terminalLaunchFailed(String error) {
     return 'ターミナルの起動に失敗しました: $error';
+  }
+
+  @override
+  String unknownAgent(String agent) {
+    return '不明なエージェント: $agent';
   }
 }

@@ -13,6 +13,10 @@ import '../../l10n/app_localizations.dart';
 class SessionDetailScreen extends StatefulWidget {
   final RecentSession session;
   final AgentAdapter adapter;
+
+  /// メタ情報と要約ボタンに出すエージェント名（例: "Claude"）。
+  final String agentName;
+
   final SummaryCache summaryCache;
   final int initialRallies;
 
@@ -24,6 +28,7 @@ class SessionDetailScreen extends StatefulWidget {
     super.key,
     required this.session,
     required this.adapter,
+    required this.agentName,
     required this.summaryCache,
     required this.initialRallies,
     required this.onBack,
@@ -138,6 +143,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     return Column(
       children: [
         row(l10n.metaTitle, text(session.displayTitle)),
+        row(l10n.metaAgent, text(widget.agentName)),
         row(l10n.metaProject, text(session.projectPath)),
         row(
           l10n.metaSessionId,
@@ -221,8 +227,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.auto_awesome, size: 16),
-              label:
-                  Text(_running ? l10n.summaryRunning : l10n.runSummary),
+              label: Text(_running
+                  ? l10n.summaryRunning
+                  : l10n.runSummary(widget.agentName)),
               onPressed: _running ? null : _runSummary,
             ),
             const SizedBox(width: 8),

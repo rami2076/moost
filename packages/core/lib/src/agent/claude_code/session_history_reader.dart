@@ -12,12 +12,16 @@ import '../../model/recent_session.dart';
 class SessionHistoryReader {
   final File historyFile;
 
+  /// 生成する [RecentSession] に刻むエージェント識別子。
+  final String agentId;
+
   /// このマーカーで始まるプロンプトのセッションは一覧から除外する
   /// （要約用フォークセッションの混入防止。design.md 5 章）。
   final String excludeMarker;
 
   SessionHistoryReader({
     required this.historyFile,
+    required this.agentId,
     required this.excludeMarker,
   });
 
@@ -53,6 +57,7 @@ class SessionHistoryReader {
 
     return entries.take(limit).map((entry) {
       return RecentSession(
+        agentId: agentId,
         sessionId: entry.sessionId,
         projectPath: entry.project,
         lastPrompt: entry.display,

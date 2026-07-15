@@ -7,6 +7,15 @@
 
 ### Added
 
+- Codex CLI 対応（AgentAdapter の第 2 実装）
+  - packages/core: CodexAdapter（`~/.codex/history.jsonl` 集約 + rollout JSONL の
+    `session_meta.cwd` でプロジェクトパス補完、`codex resume` 復帰、
+    `codex exec --ephemeral` 要約（直近抜粋 / `exec resume` 全体の 2 モード））
+  - packages/core: AdapterRegistry（複数エージェントの直近セッションを時系列マージ、
+    agentId による adapter ルーティング）
+  - apps/desktop: 統合リスト + エージェントバッジ（セッション / メモの両タブ）、
+    セッション詳細にエージェント行、要約ボタンをエージェント名表示に
+
 - packages/core: フェーズ 1 の初期実装
   - 直近セッション一覧の取得（history.jsonl 集約 + ai-title 末尾走査）
   - メモ CRUD（`~/.moost/v1/memos.json`、アトミック書き込み・破損時退避）

@@ -25,12 +25,13 @@
   "summaryScopeRecent": "直近",
   "summaryScopeFull": "全体",
   "summaryRalliesLabel": "ラリー数",
-  "runSummary": "Claude で要約する",
-  "summaryNotice": "claude -p（モデル: Haiku）を実行します（利用枠を消費）。",
+  "runSummary": "{agent} で要約する",
+  "summaryNotice": "エージェント CLI をヘッドレス実行します（利用枠を消費）。",
   "summaryRunning": "要約中…",
   "summaryFailed": "要約に失敗しました: {error}",
   "registerMemo": "メモを登録",
   "lastPromptLabel": "最終プロンプト",
+  "metaAgent": "エージェント",
   "metaTitle": "タイトル",
   "metaProject": "プロジェクト",
   "metaSessionId": "セッションID",
@@ -60,5 +61,6 @@
   "trayQuit": "Moost を終了",
   "openInTerminal": "ターミナルで開く",
   "resumeInTerminal": "ターミナルで再開",
-  "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}"
+  "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}",
+  "unknownAgent": "不明なエージェント: {agent}"
 }

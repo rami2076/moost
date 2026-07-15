@@ -23,6 +23,9 @@ abstract interface class AgentAdapter {
   /// エージェント種別の識別子。メモの `agent` フィールドに記録される。
   String get agentId;
 
+  /// UI のバッジ等に出す人間向けの名前（例: "Claude"）。
+  String get displayName;
+
   /// 直近セッション一覧を最新順で返す。タイトル取得まで済ませた状態で返す。
   Future<List<RecentSession>> recentSessions({int limit = 20});
 

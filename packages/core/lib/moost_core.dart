@@ -1,6 +1,7 @@
 /// Moost core — セッションメモとワンクリック復帰のロジック層（UI 非依存）。
 library;
 
+export 'src/agent/adapter_registry.dart';
 export 'src/agent/agent_adapter.dart';
 export 'src/agent/claude_code/ai_title_reader.dart';
 export 'src/agent/claude_code/claude_code_adapter.dart';
@@ -8,6 +9,13 @@ export 'src/agent/claude_code/claude_path_resolver.dart';
 export 'src/agent/claude_code/claude_summarizer.dart';
 export 'src/agent/claude_code/session_history_reader.dart';
 export 'src/agent/claude_code/transcript_extractor.dart';
+export 'src/agent/codex/codex_adapter.dart';
+export 'src/agent/codex/codex_history_reader.dart';
+export 'src/agent/codex/codex_path_resolver.dart';
+export 'src/agent/codex/codex_rollout_reader.dart';
+export 'src/agent/codex/codex_summarizer.dart';
+export 'src/agent/codex/codex_transcript_extractor.dart';
+export 'src/agent/summarize_exception.dart';
 export 'src/model/memo.dart';
 export 'src/model/recent_session.dart';
 export 'src/shell_escape.dart';

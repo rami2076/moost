@@ -2,6 +2,14 @@
 
 Memo + Roost — AI コーディングエージェント CLI（まず Claude Code）のセッションにメモを付けて記録し、ワンクリックでセッションへ復帰できるシステムトレイ常駐アプリ。
 
+## インストール（macOS）
+
+[Releases](https://github.com/rami2076/moost/releases) から dmg をダウンロードし、
+`Moost.app` を Applications へドラッグする。
+
+> **初回起動時の注意**: 当面 ad-hoc 署名のため Gatekeeper の警告が出る。
+> Finder で `Moost.app` を右クリック →「開く」を選ぶと以後は起動できる。
+
 ## 構成
 
 ```

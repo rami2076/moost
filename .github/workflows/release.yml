@@ -73,6 +73,24 @@ jobs:
             echo "(CHANGELOG に $VERSION の節がありません)" > RELEASE_NOTES.md
           fi
 
+      # インストールコマンドをノート末尾に付ける（gh CLI 経由の DL は
+      # quarantine が付かず Gatekeeper 警告なしで起動できる）
+      - name: Append install command
+        run: |
+          cat >> RELEASE_NOTES.md << EOF
+
+          ## インストール
+
+          \`\`\`bash
+          gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.dmg' -O /tmp/Moost.dmg
+          hdiutil attach /tmp/Moost.dmg -nobrowse
+          cp -R "/Volumes/Moost $VERSION/Moost.app" /Applications/
+          hdiutil detach "/Volumes/Moost $VERSION"
+          rm /tmp/Moost.dmg
+          open /Applications/Moost.app
+          \`\`\`
+          EOF
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -86,8 +86,8 @@ class _RootScreenState extends State<RootScreen> {
   MenuScreen _screen = const ListScreen();
   ListTab _tab = ListTab.recent;
 
-  /// メモ一覧の行から削除を押されたメモ。null 以外のとき一覧上部に
-  /// 確認バーを出す（Swift 版と同じインライン確認。ダイアログは出さない）。
+  /// メモ一覧の行から削除を押されたメモ。null 以外のとき該当行だけを
+  /// 確認表示に置き換える（Swift 版と同じ。他の行は動かさない）。
   Memo? _pendingDeleteMemo;
 
   // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
@@ -260,8 +260,6 @@ class _RootScreenState extends State<RootScreen> {
                 },
               ),
             ),
-            if (_tab == ListTab.memos && _pendingDeleteMemo != null)
-              _buildDeleteConfirmBar(context, _pendingDeleteMemo!),
             Expanded(
               child: switch (_tab) {
                 ListTab.recent => _SessionList(
@@ -277,51 +275,22 @@ class _RootScreenState extends State<RootScreen> {
                 ListTab.memos => _MemoList(
                     memos: _memos,
                     agentLabel: _agentLabel,
+                    pendingDeleteMemoId: _pendingDeleteMemo?.id,
                     onCopyResumeCommand: _copyResumeCommand,
                     onOpenInTerminal: _openInTerminal,
                     onTapMemo: (memo) =>
                         setState(() => _screen = EditMemoScreen(memo)),
                     onDeleteMemo: (memo) =>
                         setState(() => _pendingDeleteMemo = memo),
+                    onCancelDelete: () =>
+                        setState(() => _pendingDeleteMemo = null),
+                    onConfirmDelete: _deleteMemoConfirmed,
                   ),
               },
             ),
             _buildFooter(context),
           ],
         ),
-      ),
-    );
-  }
-
-  /// メモ一覧上部の削除確認バー（画面遷移せず、その場で確定できる）。
-  Widget _buildDeleteConfirmBar(BuildContext context, Memo memo) {
-    final l10n = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              l10n.deleteConfirmTitled(memo.title),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          TextButton(
-            onPressed: () => setState(() => _pendingDeleteMemo = null),
-            child: Text(l10n.cancel),
-          ),
-          const SizedBox(width: 4),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-            ),
-            onPressed: () => _deleteMemoConfirmed(memo),
-            child: Text(l10n.delete),
-          ),
-        ],
       ),
     );
   }
@@ -563,13 +532,21 @@ class _MemoList extends StatelessWidget {
   final void Function(Memo memo) onTapMemo;
   final void Function(Memo memo) onDeleteMemo;
 
+  /// 削除確認中のメモ id。該当行だけ確認表示に置き換える。
+  final String? pendingDeleteMemoId;
+  final VoidCallback onCancelDelete;
+  final void Function(Memo memo) onConfirmDelete;
+
   const _MemoList({
     required this.memos,
     required this.agentLabel,
+    required this.pendingDeleteMemoId,
     required this.onCopyResumeCommand,
     required this.onOpenInTerminal,
     required this.onTapMemo,
     required this.onDeleteMemo,
+    required this.onCancelDelete,
+    required this.onConfirmDelete,
   });
 
   @override
@@ -594,6 +571,9 @@ class _MemoList extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final memo = items[index];
+            if (memo.id == pendingDeleteMemoId) {
+              return _buildConfirmRow(context, l10n, memo);
+            }
             return ListTile(
               onTap: () => onTapMemo(memo),
               title: Row(
@@ -663,6 +643,43 @@ class _MemoList extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  /// 削除確認中の行。通常行と同じ 2 行分の高さを保ったまま、
+  /// 内容だけを「削除しますか？ + キャンセル / 削除」に置き換える。
+  Widget _buildConfirmRow(
+    BuildContext context,
+    AppLocalizations l10n,
+    Memo memo,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      title: Text(
+        l10n.deleteConfirmTitled(memo.title),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // 通常行（タイトル + サブタイトル）と高さを揃えるための空行
+      subtitle: const Text(''),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton.tonal(
+            onPressed: onCancelDelete,
+            child: Text(l10n.cancel),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+            ),
+            onPressed: () => onConfirmDelete(memo),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
     );
   }
 }

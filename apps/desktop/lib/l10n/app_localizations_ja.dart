@@ -68,6 +68,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get deleteConfirmMessage => 'このメモを削除しますか？';
 
   @override
+  String deleteConfirmTitled(String title) {
+    return '「$title」を削除しますか？';
+  }
+
+  @override
   String sessionIdLabel(String id) {
     return 'セッションID: $id';
   }

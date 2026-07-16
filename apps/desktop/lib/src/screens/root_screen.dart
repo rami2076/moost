@@ -86,6 +86,10 @@ class _RootScreenState extends State<RootScreen> {
   MenuScreen _screen = const ListScreen();
   ListTab _tab = ListTab.recent;
 
+  /// メモ一覧の行から削除を押されたメモ。null 以外のとき該当行だけを
+  /// 確認表示に置き換える（Swift 版と同じ。他の行は動かさない）。
+  Memo? _pendingDeleteMemo;
+
   // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
   final SummaryCache _summaryCache = SummaryCache();
   final ClaudePathResolver _pathResolver = ClaudePathResolver();
@@ -118,6 +122,8 @@ class _RootScreenState extends State<RootScreen> {
   void _reload() {
     _sessions = _loadSessions();
     _memos = widget.memoStore.load();
+    // 一覧が変わるタイミングで出しっぱなしの削除確認を引っ込める
+    _pendingDeleteMemo = null;
   }
 
   Future<List<RecentSession>> _loadSessions() async {
@@ -269,10 +275,16 @@ class _RootScreenState extends State<RootScreen> {
                 ListTab.memos => _MemoList(
                     memos: _memos,
                     agentLabel: _agentLabel,
+                    pendingDeleteMemoId: _pendingDeleteMemo?.id,
                     onCopyResumeCommand: _copyResumeCommand,
                     onOpenInTerminal: _openInTerminal,
                     onTapMemo: (memo) =>
                         setState(() => _screen = EditMemoScreen(memo)),
+                    onDeleteMemo: (memo) =>
+                        setState(() => _pendingDeleteMemo = memo),
+                    onCancelDelete: () =>
+                        setState(() => _pendingDeleteMemo = null),
+                    onConfirmDelete: _deleteMemoConfirmed,
                   ),
               },
             ),
@@ -281,6 +293,14 @@ class _RootScreenState extends State<RootScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _deleteMemoConfirmed(Memo memo) async {
+    await widget.memoStore.delete(memo.id);
+    if (!mounted) {
+      return;
+    }
+    setState(_reload);
   }
 
   Widget _buildFooter(BuildContext context) {
@@ -510,13 +530,23 @@ class _MemoList extends StatelessWidget {
     required String sessionId,
   }) onOpenInTerminal;
   final void Function(Memo memo) onTapMemo;
+  final void Function(Memo memo) onDeleteMemo;
+
+  /// 削除確認中のメモ id。該当行だけ確認表示に置き換える。
+  final String? pendingDeleteMemoId;
+  final VoidCallback onCancelDelete;
+  final void Function(Memo memo) onConfirmDelete;
 
   const _MemoList({
     required this.memos,
     required this.agentLabel,
+    required this.pendingDeleteMemoId,
     required this.onCopyResumeCommand,
     required this.onOpenInTerminal,
     required this.onTapMemo,
+    required this.onDeleteMemo,
+    required this.onCancelDelete,
+    required this.onConfirmDelete,
   });
 
   @override
@@ -541,6 +571,9 @@ class _MemoList extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final memo = items[index];
+            if (memo.id == pendingDeleteMemoId) {
+              return _buildConfirmRow(context, l10n, memo);
+            }
             return ListTile(
               onTap: () => onTapMemo(memo),
               title: Row(
@@ -599,12 +632,62 @@ class _MemoList extends StatelessWidget {
                       sessionId: memo.sessionId,
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    tooltip: l10n.delete,
+                    onPressed: () => onDeleteMemo(memo),
+                  ),
                 ],
               ),
             );
           },
         );
       },
+    );
+  }
+
+  /// 削除確認中の行。通常行と同じ 2 行分の高さを保ったまま、
+  /// 内容だけを「削除しますか？ + キャンセル / 削除」に置き換える。
+  Widget _buildConfirmRow(
+    BuildContext context,
+    AppLocalizations l10n,
+    Memo memo,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // 行内に収める小ぶりなボタン（通常サイズだと行の主役になりすぎる）
+    final compactStyle = FilledButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      minimumSize: const Size(0, 28),
+      textStyle: const TextStyle(fontSize: 12),
+    );
+    return ListTile(
+      title: Text(
+        l10n.deleteConfirmTitled(memo.title),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // 通常行（タイトル + サブタイトル）と高さを揃えるための空行
+      subtitle: const Text(''),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton.tonal(
+            style: compactStyle,
+            onPressed: onCancelDelete,
+            child: Text(l10n.cancel),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            style: compactStyle.copyWith(
+              backgroundColor: WidgetStatePropertyAll(colorScheme.error),
+              foregroundColor: WidgetStatePropertyAll(colorScheme.onError),
+            ),
+            onPressed: () => onConfirmDelete(memo),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
     );
   }
 }

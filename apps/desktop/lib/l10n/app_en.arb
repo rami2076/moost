@@ -26,6 +26,15 @@
   "cancel": "Cancel",
   "delete": "Delete",
   "deleteConfirmMessage": "Delete this memo?",
+  "deleteConfirmTitled": "Delete \"{title}\"?",
+  "@deleteConfirmTitled": {
+    "description": "Inline confirmation shown above the memo list when deleting from a row",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "sessionIdLabel": "Session ID: {id}",
   "@sessionIdLabel": {
     "placeholders": {

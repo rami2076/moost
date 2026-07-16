@@ -212,6 +212,12 @@ abstract class AppLocalizations {
   /// **'Delete this memo?'**
   String get deleteConfirmMessage;
 
+  /// Inline confirmation shown above the memo list when deleting from a row
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{title}\"?'**
+  String deleteConfirmTitled(String title);
+
   /// No description provided for @sessionIdLabel.
   ///
   /// In en, this message translates to:

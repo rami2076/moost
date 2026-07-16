@@ -68,6 +68,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteConfirmMessage => 'Delete this memo?';
 
   @override
+  String deleteConfirmTitled(String title) {
+    return 'Delete \"$title\"?';
+  }
+
+  @override
   String sessionIdLabel(String id) {
     return 'Session ID: $id';
   }

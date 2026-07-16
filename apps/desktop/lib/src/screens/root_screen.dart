@@ -654,6 +654,13 @@ class _MemoList extends StatelessWidget {
     Memo memo,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
+    // 行内に収める小ぶりなボタン（通常サイズだと行の主役になりすぎる）
+    final compactStyle = FilledButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      minimumSize: const Size(0, 28),
+      textStyle: const TextStyle(fontSize: 12),
+    );
     return ListTile(
       title: Text(
         l10n.deleteConfirmTitled(memo.title),
@@ -666,14 +673,15 @@ class _MemoList extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           FilledButton.tonal(
+            style: compactStyle,
             onPressed: onCancelDelete,
             child: Text(l10n.cancel),
           ),
           const SizedBox(width: 8),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
+            style: compactStyle.copyWith(
+              backgroundColor: WidgetStatePropertyAll(colorScheme.error),
+              foregroundColor: WidgetStatePropertyAll(colorScheme.onError),
             ),
             onPressed: () => onConfirmDelete(memo),
             child: Text(l10n.delete),

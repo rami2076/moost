@@ -260,43 +260,31 @@ class _RootScreenState extends State<RootScreen> {
                 },
               ),
             ),
+            if (_tab == ListTab.memos && _pendingDeleteMemo != null)
+              _buildDeleteConfirmBar(context, _pendingDeleteMemo!),
             Expanded(
-              // 削除確認バーはリストに挿入せず先頭行へ重ねる（Stack）。
-              // 挿入すると全行が押し下がり、行の高さ・位置が動いて見えるため
-              child: Stack(
-                children: [
-                  switch (_tab) {
-                    ListTab.recent => _SessionList(
-                        sessions: _sessions,
-                        agentLabel: _agentLabel,
-                        onCopyResumeCommand: _copyResumeCommand,
-                        onOpenInTerminal: _openInTerminal,
-                        onTapSession: (session) =>
-                            setState(() => _screen = NewMemoScreen(session)),
-                        onOpenDetail: (session) => setState(
-                            () => _screen = SessionDetailMenuScreen(session)),
-                      ),
-                    ListTab.memos => _MemoList(
-                        memos: _memos,
-                        agentLabel: _agentLabel,
-                        onCopyResumeCommand: _copyResumeCommand,
-                        onOpenInTerminal: _openInTerminal,
-                        onTapMemo: (memo) =>
-                            setState(() => _screen = EditMemoScreen(memo)),
-                        onDeleteMemo: (memo) =>
-                            setState(() => _pendingDeleteMemo = memo),
-                      ),
-                  },
-                  if (_tab == ListTab.memos && _pendingDeleteMemo != null)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      child:
-                          _buildDeleteConfirmBar(context, _pendingDeleteMemo!),
-                    ),
-                ],
-              ),
+              child: switch (_tab) {
+                ListTab.recent => _SessionList(
+                    sessions: _sessions,
+                    agentLabel: _agentLabel,
+                    onCopyResumeCommand: _copyResumeCommand,
+                    onOpenInTerminal: _openInTerminal,
+                    onTapSession: (session) =>
+                        setState(() => _screen = NewMemoScreen(session)),
+                    onOpenDetail: (session) => setState(
+                        () => _screen = SessionDetailMenuScreen(session)),
+                  ),
+                ListTab.memos => _MemoList(
+                    memos: _memos,
+                    agentLabel: _agentLabel,
+                    onCopyResumeCommand: _copyResumeCommand,
+                    onOpenInTerminal: _openInTerminal,
+                    onTapMemo: (memo) =>
+                        setState(() => _screen = EditMemoScreen(memo)),
+                    onDeleteMemo: (memo) =>
+                        setState(() => _pendingDeleteMemo = memo),
+                  ),
+              },
             ),
             _buildFooter(context),
           ],
@@ -305,40 +293,35 @@ class _RootScreenState extends State<RootScreen> {
     );
   }
 
-  /// メモ一覧先頭に重ねる削除確認バー（画面遷移せず、その場で確定できる）。
-  /// リストの上に浮かせるため、背景色 + 影で下の行と区別する。
+  /// メモ一覧上部の削除確認バー（画面遷移せず、その場で確定できる）。
   Widget _buildDeleteConfirmBar(BuildContext context, Memo memo) {
     final l10n = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      elevation: 2,
-      color: colorScheme.surfaceContainerHigh,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.deleteConfirmTitled(memo.title),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              l10n.deleteConfirmTitled(memo.title),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            TextButton(
-              onPressed: () => setState(() => _pendingDeleteMemo = null),
-              child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _pendingDeleteMemo = null),
+            child: Text(l10n.cancel),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
             ),
-            const SizedBox(width: 4),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-              ),
-              onPressed: () => _deleteMemoConfirmed(memo),
-              child: Text(l10n.delete),
-            ),
-          ],
-        ),
+            onPressed: () => _deleteMemoConfirmed(memo),
+            child: Text(l10n.delete),
+          ),
+        ],
       ),
     );
   }

@@ -103,3 +103,52 @@ jobs:
             --title "$GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \
             $PRERELEASE_FLAG
+
+      # Homebrew tap の cask を新バージョンへ書き換える（Issue #11）。
+      # GITHUB_TOKEN は自リポジトリにしか効かないため、tap への push は
+      # 書き込み可 deploy key（secret: TAP_DEPLOY_KEY）で行う。
+      # prerelease（タグに '-' 入り）は brew に流さない
+      - name: Bump Homebrew tap
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+        run: |
+          SHA256=$(shasum -a 256 "dist/Moost-$VERSION.dmg" | awk '{print $1}')
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_deploy_key
+          chmod 600 ~/.ssh/tap_deploy_key
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_deploy_key -o StrictHostKeyChecking=accept-new"
+
+          git clone --depth 1 git@github.com:rami2076/homebrew-tap.git tap
+          cd tap
+
+          # sed での部分置換はフォーマット変化に弱いため、cask は毎回丸ごと生成する
+          cat > Casks/moost.rb << EOF
+          cask "moost" do
+            version "$VERSION"
+            sha256 "$SHA256"
+
+            url "https://github.com/${{ github.repository }}/releases/download/v#{version}/Moost-#{version}.dmg"
+            name "Moost"
+            desc "Attach memos to AI coding agent sessions and resume them from the system tray"
+            homepage "https://github.com/${{ github.repository }}"
+
+            app "Moost.app"
+
+            caveats <<~EOS
+              Moost is currently ad-hoc signed. If Gatekeeper blocks the first launch,
+              remove the quarantine attribute:
+
+                xattr -dr com.apple.quarantine /Applications/Moost.app
+
+              Or install with: brew install --cask --no-quarantine moost
+            EOS
+          end
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/moost.rb
+          git commit -m "moost $VERSION"
+          git push origin main

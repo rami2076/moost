@@ -23,6 +23,9 @@ dependencies:
   # マルチディスプレイでのポップオーバー配置（Issue #16）。
   # 既存の推移的依存を lockfile と同一バージョンで直接依存へ昇格
   screen_retriever: 0.2.2
+  # バージョン表示・更新チェックの自バージョン取得（RELEASE.md 1.2 の単一情報源）。
+  # 10.2.1 は公開 7 日未満のため 10.2.0 に固定（supply-chain rules/dart.md）
+  package_info_plus: 10.2.0
 
 dev_dependencies:
   flutter_test:

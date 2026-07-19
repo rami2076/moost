@@ -175,32 +175,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ValueListenableBuilder<bool>(
                           valueListenable:
                               CopyFeedbackTiming.animationEnabled,
-                          builder: (context, enabled, _) => SwitchListTile(
-                            title: Text('animation',
-                                style: theme.textTheme.bodyMedium),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            value: enabled,
-                            onChanged: (value) => CopyFeedbackTiming
-                                .animationEnabled.value = value,
+                          builder: (context, animationEnabled, _) => Column(
+                            children: [
+                              SwitchListTile(
+                                title: Text('animation',
+                                    style: theme.textTheme.bodyMedium),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                value: animationEnabled,
+                                onChanged: (value) => CopyFeedbackTiming
+                                    .animationEnabled.value = value,
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    // sweep はアニメーション有効時のみ意味を持つ
+                                    child: _DebugMsField(
+                                      label: 'sweep',
+                                      notifier: CopyFeedbackTiming.sweepMs,
+                                      enabled: animationEnabled,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _DebugMsField(
+                                      label: 'hold',
+                                      notifier: CopyFeedbackTiming.holdMs,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _DebugMsField(
-                                label: 'sweep',
-                                notifier: CopyFeedbackTiming.sweepMs,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _DebugMsField(
-                                label: 'hold',
-                                notifier: CopyFeedbackTiming.holdMs,
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ],
@@ -218,8 +224,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 class _DebugMsField extends StatefulWidget {
   final String label;
   final ValueNotifier<int> notifier;
+  final bool enabled;
 
-  const _DebugMsField({required this.label, required this.notifier});
+  const _DebugMsField({
+    required this.label,
+    required this.notifier,
+    this.enabled = true,
+  });
 
   @override
   State<_DebugMsField> createState() => _DebugMsFieldState();
@@ -239,6 +250,7 @@ class _DebugMsFieldState extends State<_DebugMsField> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
+      enabled: widget.enabled,
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: InputDecoration(

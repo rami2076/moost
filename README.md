@@ -4,6 +4,24 @@ Memo + Roost — AI コーディングエージェント CLI（まず Claude Cod
 
 ## インストール（macOS）
 
+### Homebrew（推奨）
+
+```bash
+brew install --cask rami2076/tap/moost
+xattr -dr com.apple.quarantine /Applications/Moost.app
+```
+
+更新は `brew upgrade` で入る。2 行目は ad-hoc 署名による Gatekeeper 警告の
+回避（brew はダウンロードに quarantine 属性を付けるため）。
+
+### gh CLI
+
+各 [Release](https://github.com/rami2076/moost/releases) のノートに
+コピペで動くインストールコマンドを記載している（quarantine が付かないため
+Gatekeeper 警告なしで起動できる）。
+
+### 手動ダウンロード
+
 [Releases](https://github.com/rami2076/moost/releases) から dmg をダウンロードし、
 `Moost.app` を Applications へドラッグする。
 

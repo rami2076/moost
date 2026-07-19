@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Homebrew tap（`rami2076/tap`）で配信。release.yml がリリース時に cask を自動 bump（#11）
+
 ## [1.2.0] - 2026-07-16
 
 ### Added

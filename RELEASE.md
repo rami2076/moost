@@ -95,6 +95,43 @@ git タグを打つだけの軽量リリースとする。
 リリース済みバージョンの緊急修正は、タグから `hotfix/<x.y.z+1>` を切って
 修正 → PATCH を上げて 3.1/3.2 と同じ手順でリリースし、`main` にもマージして戻す。
 
+### 3.4 Homebrew tap への自動反映と deploy key
+
+リリース（`-` を含まないタグ）時、release.yml が
+[rami2076/homebrew-tap](https://github.com/rami2076/homebrew-tap) の
+`Casks/moost.rb` を丸ごと再生成して push する（version / sha256 / dmg URL）。
+ユーザーは `brew install --cask rami2076/tap/moost` で導入、`brew upgrade` で更新できる。
+
+**認証の構成**（Actions の `GITHUB_TOKEN` は自リポジトリにしか効かないため）:
+
+- 公開鍵: homebrew-tap の Settings → Deploy keys（`read_only=false` = push 許可）
+- 秘密鍵: moost の Actions secret `TAP_DEPLOY_KEY`（暗号化保管・閲覧不可）
+- 鍵はこの用途専用の使い捨て品。**バックアップは持たない**
+  （失効・漏洩時は下記ローテーションで作り直すだけ。手元や Drive に控えを置かない）
+
+**鍵のローテーション手順**（漏洩疑い・紛失時。所要 3 分）:
+
+```bash
+# 1. 旧 deploy key を削除（id は一覧で確認）
+gh api repos/rami2076/homebrew-tap/keys --jq '.[] | {id, title}'
+gh api -X DELETE repos/rami2076/homebrew-tap/keys/<id>
+
+# 2. 新しい鍵ペアを作成し、公開鍵を tap へ・秘密鍵を secret へ登録して手元を削除
+ssh-keygen -t ed25519 -N '' -C "moost-release-tap-bump" -f /tmp/tap_key -q
+gh api -X POST repos/rami2076/homebrew-tap/keys \
+  -f title="moost release.yml (tap bump)" \
+  -f key="$(cat /tmp/tap_key.pub)" -F read_only=false
+gh secret set TAP_DEPLOY_KEY --repo rami2076/moost < /tmp/tap_key
+rm -f /tmp/tap_key /tmp/tap_key.pub
+```
+
+**登録状態の確認**:
+
+```bash
+gh secret list --repo rami2076/moost          # TAP_DEPLOY_KEY があること
+gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵があること
+```
+
 ## 4. 署名・公証（macOS）についての現状整理
 
 - 当面は **ad-hoc 署名**（Swift 版 1.0.4 と同じ）。初回起動時に Gatekeeper の警告が出るため、

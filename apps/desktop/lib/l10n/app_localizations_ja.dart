@@ -164,6 +164,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingClaudePathNotFound => '自動検出: 見つかりません';
 
   @override
+  String get settingCopyAnimation => 'コピー成功アニメーション';
+
+  @override
   String get notesTitle => '注意';
 
   @override

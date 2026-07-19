@@ -17,10 +17,12 @@ class CopyFeedbackTiming {
   static final ValueNotifier<int> holdMs = ValueNotifier(400);
 
   /// 円周スイープアニメーションの有効/無効（無効なら即チェック表示）。
+  /// ユーザー設定 `Settings.copyAnimation` の実行時キャリア:
+  /// 起動時（RootScreen の設定読込）と設定画面のトグルで同期される。
   static final ValueNotifier<bool> animationEnabled = ValueNotifier(true);
 
-  /// アニメーションを再生すべきか（リリースビルドでは常に true）。
-  static bool get animate => !kDebugMode || animationEnabled.value;
+  /// アニメーションを再生すべきか。
+  static bool get animate => animationEnabled.value;
 
   /// デバッグビルドなら調整値、リリースビルドなら [release] を返す。
   static Duration sweep(Duration release) => kDebugMode

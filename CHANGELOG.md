@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- 設定に「コピー成功アニメーション」の ON/OFF を追加（`settings.json` に永続化）
+
 ### Changed
 
 - コピー操作（復帰コマンド・セッション ID・更新コマンド）の成功表示を、

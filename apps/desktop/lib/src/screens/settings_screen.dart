@@ -163,6 +163,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : l10n.settingClaudePathDetected(_detectedPath!),
                         style: theme.textTheme.bodySmall,
                       ),
+                      const SizedBox(height: 16),
+
+                      // コピー成功アニメーション（永続化されるユーザー設定）
+                      SwitchListTile(
+                        title: Text(l10n.settingCopyAnimation,
+                            style: theme.textTheme.bodyMedium),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: settings.copyAnimation,
+                        onChanged: (value) {
+                          // 実行時キャリアと保存の両方へ反映する
+                          CopyFeedbackTiming.animationEnabled.value = value;
+                          _update(
+                              settings.copyWith(copyAnimation: value));
+                        },
+                      ),
 
                       // デバッグビルド限定: コピーフィードバックの時間調整。
                       // 開発者向けツールのため l10n は通さない・永続化しない
@@ -175,35 +191,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ValueListenableBuilder<bool>(
                           valueListenable:
                               CopyFeedbackTiming.animationEnabled,
-                          builder: (context, animationEnabled, _) => Column(
+                          builder: (context, animationEnabled, _) => Row(
                             children: [
-                              SwitchListTile(
-                                title: Text('animation',
-                                    style: theme.textTheme.bodyMedium),
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                value: animationEnabled,
-                                onChanged: (value) => CopyFeedbackTiming
-                                    .animationEnabled.value = value,
+                              Expanded(
+                                // sweep はアニメーション有効時のみ意味を持つ
+                                child: _DebugMsField(
+                                  label: 'sweep',
+                                  notifier: CopyFeedbackTiming.sweepMs,
+                                  enabled: animationEnabled,
+                                ),
                               ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    // sweep はアニメーション有効時のみ意味を持つ
-                                    child: _DebugMsField(
-                                      label: 'sweep',
-                                      notifier: CopyFeedbackTiming.sweepMs,
-                                      enabled: animationEnabled,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _DebugMsField(
-                                      label: 'hold',
-                                      notifier: CopyFeedbackTiming.holdMs,
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _DebugMsField(
+                                  label: 'hold',
+                                  notifier: CopyFeedbackTiming.holdMs,
+                                ),
                               ),
                             ],
                           ),

@@ -97,6 +97,7 @@
     }
   },
   "settingClaudePathNotFound": "Auto-detect: not found",
+  "settingCopyAnimation": "Copy success animation",
   "notesTitle": "Notes",
   "noteAutomationTitle": "Terminal automation permission",
   "noteAutomationBody": "The first time you resume a session, macOS asks for automation permission. Allow it once and it won't ask again.",

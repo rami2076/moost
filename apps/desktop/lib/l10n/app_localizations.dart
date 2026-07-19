@@ -380,6 +380,12 @@ abstract class AppLocalizations {
   /// **'Auto-detect: not found'**
   String get settingClaudePathNotFound;
 
+  /// No description provided for @settingCopyAnimation.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy success animation'**
+  String get settingCopyAnimation;
+
   /// No description provided for @notesTitle.
   ///
   /// In en, this message translates to:

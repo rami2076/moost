@@ -47,6 +47,7 @@
   "settingClaudePathHint": "空欄で自動検出",
   "settingClaudePathDetected": "自動検出: {path}",
   "settingClaudePathNotFound": "自動検出: 見つかりません",
+  "settingCopyAnimation": "コピー成功アニメーション",
   "notesTitle": "注意",
   "noteAutomationTitle": "ターミナル操作の権限",
   "noteAutomationBody": "セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます。一度「許可」を選べば以後は表示されません。",

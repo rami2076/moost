@@ -165,6 +165,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingClaudePathNotFound => 'Auto-detect: not found';
 
   @override
+  String get settingCopyAnimation => 'Copy success animation';
+
+  @override
   String get notesTitle => 'Notes';
 
   @override

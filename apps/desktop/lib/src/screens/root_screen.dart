@@ -199,6 +199,8 @@ class _RootScreenState extends State<RootScreen> {
   Future<List<RecentSession>> _loadSessions() async {
     final settings = await widget.settingsStore.load();
     _summaryRallies = settings.summaryRallyCount;
+    // 永続化されたアニメーション設定を実行時キャリアへ反映する
+    CopyFeedbackTiming.animationEnabled.value = settings.copyAnimation;
     return widget.registry
         .recentSessions(limit: settings.recentSessionLimit);
   }

@@ -14,11 +14,15 @@ class Settings {
 
   final int summaryRallyCount;
 
+  /// コピー成功時のフィードバックアニメーション（円周スイープ）の有無。
+  final bool copyAnimation;
+
   const Settings({
     this.terminalApp = 'Terminal.app',
     this.recentSessionLimit = 20,
     this.claudePath = '',
     this.summaryRallyCount = 1,
+    this.copyAnimation = true,
   });
 
   Settings copyWith({
@@ -26,12 +30,14 @@ class Settings {
     int? recentSessionLimit,
     String? claudePath,
     int? summaryRallyCount,
+    bool? copyAnimation,
   }) {
     return Settings(
       terminalApp: terminalApp ?? this.terminalApp,
       recentSessionLimit: recentSessionLimit ?? this.recentSessionLimit,
       claudePath: claudePath ?? this.claudePath,
       summaryRallyCount: summaryRallyCount ?? this.summaryRallyCount,
+      copyAnimation: copyAnimation ?? this.copyAnimation,
     );
   }
 
@@ -40,6 +46,7 @@ class Settings {
         'recentSessionLimit': recentSessionLimit,
         'claudePath': claudePath,
         'summaryRallyCount': summaryRallyCount,
+        'copyAnimation': copyAnimation,
       };
 
   factory Settings.fromJson(Map<String, Object?> json) {
@@ -55,6 +62,11 @@ class Settings {
       return value is num ? value.toInt() : fallback;
     }
 
+    bool boolean(String key, bool fallback) {
+      final value = json[key];
+      return value is bool ? value : fallback;
+    }
+
     return Settings(
       terminalApp: str('terminalApp', defaults.terminalApp),
       recentSessionLimit:
@@ -62,6 +74,7 @@ class Settings {
       claudePath: str('claudePath', defaults.claudePath),
       summaryRallyCount:
           integer('summaryRallyCount', defaults.summaryRallyCount),
+      copyAnimation: boolean('copyAnimation', defaults.copyAnimation),
     );
   }
 }

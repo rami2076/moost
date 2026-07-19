@@ -64,5 +64,7 @@
   "resumeInTerminal": "ターミナルで再開",
   "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}",
   "unknownAgent": "不明なエージェント: {agent}",
+  "updateAvailable": "{version} が利用可能",
+  "updateCommandCopied": "更新コマンドをコピーしました（ターミナルで実行してください）",
   "listUpdatedAt": "{month}月{day}日 {time}"
 }

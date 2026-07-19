@@ -4,11 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:moost_core/moost_core.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'l10n/app_localizations.dart';
 import 'src/screens/root_screen.dart';
 import 'src/tray/tray_service.dart';
+import 'src/update/update_checker.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +37,8 @@ Future<void> main() async {
     // 起動時はトレイアイコンだけ。ウィンドウはトレイクリックで初めて表示する
   });
 
+  final packageInfo = await PackageInfo.fromPlatform();
+
   runApp(MoostApp(
     registry: AdapterRegistry([
       ClaudeCodeAdapter(),
@@ -43,6 +47,7 @@ Future<void> main() async {
     memoStore: MemoStore.defaultLocation(),
     settingsStore: SettingsStore.defaultLocation(),
     windowShown: tray.shownCount,
+    updateChecker: UpdateChecker(currentVersion: packageInfo.version),
   ));
 }
 
@@ -50,6 +55,13 @@ class MoostApp extends StatelessWidget {
   final AdapterRegistry registry;
   final MemoStore memoStore;
   final SettingsStore settingsStore;
+
+  /// 更新チェック（null なら通知機能なし。widget テストでは省略する）。
+  final UpdateChecker? updateChecker;
+
+  /// テスト用の注入ポイント（null なら実環境の既定動作）。
+  final bool Function()? isBrewManaged;
+  final Future<void> Function(Uri url)? openUrl;
 
   /// トレイからウィンドウが表示されたことを知らせる通知（null なら常駐なし）。
   final ValueListenable<int>? windowShown;
@@ -60,6 +72,9 @@ class MoostApp extends StatelessWidget {
     required this.memoStore,
     required this.settingsStore,
     this.windowShown,
+    this.updateChecker,
+    this.isBrewManaged,
+    this.openUrl,
   });
 
   @override
@@ -79,6 +94,9 @@ class MoostApp extends StatelessWidget {
         memoStore: memoStore,
         settingsStore: settingsStore,
         windowShown: windowShown,
+        updateChecker: updateChecker,
+        isBrewManaged: isBrewManaged,
+        openUrl: openUrl,
       ),
     );
   }

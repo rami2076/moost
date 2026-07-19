@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moost_core/moost_core.dart';
 import 'package:moost_desktop/main.dart';
+import 'package:moost_desktop/src/update/update_checker.dart';
 
 /// runAsync の中で実 I/O の完了を待ちながらフレームを進める。
 ///
@@ -211,6 +212,70 @@ void main() {
     });
   });
 
+  testWidgets('update notice appears in the footer and copies brew command',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    final openedUrls = <Uri>[];
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        updateChecker: _FakeUpdateChecker(UpdateInfo(
+          version: '9.9.9',
+          releaseUrl:
+              Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
+        )),
+        isBrewManaged: () => true,
+        openUrl: (url) async => openedUrls.add(url),
+      ));
+      await settle(tester);
+
+      // フッターに更新ボタンが出る
+      expect(find.text('v9.9.9 available'), findsOneWidget);
+
+      // brew 導入なので、タップで更新コマンドコピーの通知が出る
+      await tester.tap(find.text('v9.9.9 available'));
+      await settle(tester);
+      expect(
+        find.textContaining('Update command copied'),
+        findsOneWidget,
+      );
+      expect(openedUrls, isEmpty);
+    });
+  });
+
+  testWidgets('update notice opens the release page for manual installs',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    final openedUrls = <Uri>[];
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        updateChecker: _FakeUpdateChecker(UpdateInfo(
+          version: '9.9.9',
+          releaseUrl:
+              Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
+        )),
+        isBrewManaged: () => false,
+        openUrl: (url) async => openedUrls.add(url),
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('v9.9.9 available'));
+      await settle(tester);
+      expect(openedUrls, [
+        Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
+      ]);
+    });
+  });
+
   testWidgets('session detail runs summary and caches it', (tester) async {
     final tempDir = createTempDir();
 
@@ -332,6 +397,16 @@ void main() {
       expect(saveButton.onPressed, isNull);
     });
   });
+}
+
+/// テスト用の UpdateChecker。ネットワークに出ず固定の結果を返す。
+class _FakeUpdateChecker extends UpdateChecker {
+  final UpdateInfo? _info;
+
+  _FakeUpdateChecker(this._info) : super(currentVersion: '0.0.0');
+
+  @override
+  Future<UpdateInfo?> check() async => _info;
 }
 
 /// テスト用の AgentAdapter。要約はセッションID・範囲を埋め込んだ固定文字列を返す。

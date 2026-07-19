@@ -482,6 +482,18 @@ abstract class AppLocalizations {
   /// **'Unknown agent: {agent}'**
   String unknownAgent(String agent);
 
+  /// Footer button shown when a newer release exists
+  ///
+  /// In en, this message translates to:
+  /// **'{version} available'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateCommandCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Update command copied — run it in a terminal'**
+  String get updateCommandCopied;
+
   /// Last-used/updated date shown at the right of each list row
   ///
   /// In en, this message translates to:

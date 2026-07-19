@@ -223,6 +223,14 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String updateAvailable(String version) {
+    return '$version が利用可能';
+  }
+
+  @override
+  String get updateCommandCopied => '更新コマンドをコピーしました（ターミナルで実行してください）';
+
+  @override
   String listUpdatedAt(int month, int day, String time) {
     return '$month月$day日 $time';
   }

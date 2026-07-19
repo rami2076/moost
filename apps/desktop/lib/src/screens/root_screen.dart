@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../update/update_checker.dart';
 import 'memo_form_screen.dart';
 import 'notes_screen.dart';
 import 'session_detail_screen.dart';
@@ -70,13 +71,34 @@ class RootScreen extends StatefulWidget {
   /// （design.md 6.1: ポップオーバーを開いたときに自動更新）。
   final ValueListenable<int>? windowShown;
 
+  /// 更新チェック（Issue #12）。null なら通知機能なし。
+  final UpdateChecker? updateChecker;
+
+  /// brew 管理下（Caskroom にあり）かの判定。null なら実環境を見る。
+  /// テストで差し替えるための注入ポイント。
+  final bool Function()? isBrewManaged;
+
+  /// URL を既定ブラウザで開く。null なら `open` コマンドを使う。
+  final Future<void> Function(Uri url)? openUrl;
+
   const RootScreen({
     super.key,
     required this.registry,
     required this.memoStore,
     required this.settingsStore,
     this.windowShown,
+    this.updateChecker,
+    this.isBrewManaged,
+    this.openUrl,
   });
+
+  static bool defaultIsBrewManaged() =>
+      Directory('/opt/homebrew/Caskroom/moost').existsSync() ||
+      Directory('/usr/local/Caskroom/moost').existsSync();
+
+  static Future<void> defaultOpenUrl(Uri url) async {
+    await Process.run('open', [url.toString()]);
+  }
 
   @override
   State<RootScreen> createState() => _RootScreenState();
@@ -99,10 +121,14 @@ class _RootScreenState extends State<RootScreen> {
   late Future<List<RecentSession>> _sessions;
   late Future<List<Memo>> _memos;
 
+  /// 新バージョンの情報（null なら未検出）。フッターに表示する。
+  UpdateInfo? _availableUpdate;
+
   @override
   void initState() {
     super.initState();
     _reload();
+    _checkForUpdate();
     widget.windowShown?.addListener(_onWindowShown);
   }
 
@@ -115,6 +141,39 @@ class _RootScreenState extends State<RootScreen> {
   void _onWindowShown() {
     if (!mounted) return;
     setState(_reload);
+    _checkForUpdate();
+  }
+
+  /// 新バージョンのチェック。失敗は UpdateChecker 側で沈黙する。
+  Future<void> _checkForUpdate() async {
+    final checker = widget.updateChecker;
+    if (checker == null) {
+      return;
+    }
+    final update = await checker.check();
+    if (!mounted || update?.version == _availableUpdate?.version) {
+      return;
+    }
+    setState(() => _availableUpdate = update);
+  }
+
+  /// 更新ボタン: brew 導入なら更新コマンドをコピー、手動導入なら
+  /// リリースページを開く（Issue #12。ダイアログは出さない）。
+  Future<void> _onUpdateTapped(UpdateInfo update) async {
+    final l10n = AppLocalizations.of(context)!;
+    final isBrew =
+        (widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged)();
+    if (isBrew) {
+      await Clipboard.setData(
+        const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.updateCommandCopied)),
+      );
+    } else {
+      await (widget.openUrl ?? RootScreen.defaultOpenUrl)(update.releaseUrl);
+    }
   }
 
   /// 一覧の再読込。開いたとき・タブ切替時・フォームから戻ったときに呼ぶ
@@ -333,6 +392,13 @@ class _RootScreenState extends State<RootScreen> {
             onPressed: () =>
                 setState(() => _screen = const NotesMenuScreen()),
           ),
+          if (_availableUpdate != null)
+            TextButton.icon(
+              icon: const Icon(Icons.arrow_circle_up, size: 16),
+              label:
+                  Text(l10n.updateAvailable('v${_availableUpdate!.version}')),
+              onPressed: () => _onUpdateTapped(_availableUpdate!),
+            ),
           const Spacer(),
           TextButton.icon(
             icon: const Icon(Icons.power_settings_new, size: 16),

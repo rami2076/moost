@@ -128,6 +128,16 @@
       }
     }
   },
+  "updateAvailable": "{version} available",
+  "@updateAvailable": {
+    "description": "Footer button shown when a newer release exists",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateCommandCopied": "Update command copied — run it in a terminal",
   "listUpdatedAt": "{month}/{day} {time}",
   "@listUpdatedAt": {
     "description": "Last-used/updated date shown at the right of each list row",

@@ -224,6 +224,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String updateAvailable(String version) {
+    return '$version available';
+  }
+
+  @override
+  String get updateCommandCopied =>
+      'Update command copied — run it in a terminal';
+
+  @override
   String listUpdatedAt(int month, int day, String time) {
     return '$month/$day $time';
   }

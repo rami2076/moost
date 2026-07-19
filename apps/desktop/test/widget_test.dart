@@ -307,9 +307,12 @@ void main() {
       // セッション行にターミナル起動ボタンが並ぶ
       expect(find.byTooltip('Open in terminal'), findsOneWidget);
 
-      // 復帰コマンドのコピー成功でアイコンが緑のチェックに変わる
+      // 復帰コマンドのコピー成功 → 円周スイープが完了するとアイコンが
+      // 緑のチェックに変わる
       await tester.tap(find.byTooltip('Copy resume command'));
-      await settle(tester);
+      await settle(tester); // 非同期のコピー完了・スイープ開始
+      await tester.pump(const Duration(milliseconds: 600)); // スイープ完了
+      await tester.pump();
       expect(greenCheckIcon(), findsOneWidget);
 
       // 最終利用日時がサブタイトル行に出る（表示はローカル時刻・en ロケール）

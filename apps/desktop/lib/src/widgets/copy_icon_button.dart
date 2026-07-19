@@ -11,10 +11,10 @@ class CopyFeedbackTiming {
   CopyFeedbackTiming._();
 
   /// 円周スイープにかける時間（ms）。
-  static final ValueNotifier<int> sweepMs = ValueNotifier(450);
+  static final ValueNotifier<int> sweepMs = ValueNotifier(250);
 
   /// チェックマーク表示を維持する時間（ms）。
-  static final ValueNotifier<int> holdMs = ValueNotifier(1000);
+  static final ValueNotifier<int> holdMs = ValueNotifier(400);
 
   /// 円周スイープアニメーションの有効/無効（無効なら即チェック表示）。
   static final ValueNotifier<bool> animationEnabled = ValueNotifier(true);
@@ -61,8 +61,8 @@ class CopyIconButton extends StatefulWidget {
     this.tooltip,
     this.iconSize = 18,
     this.compact = false,
-    this.sweepDuration = const Duration(milliseconds: 450),
-    this.feedbackDuration = const Duration(milliseconds: 1000),
+    this.sweepDuration = const Duration(milliseconds: 250),
+    this.feedbackDuration = const Duration(milliseconds: 400),
   });
 
   @override

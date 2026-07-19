@@ -113,9 +113,12 @@ class _CopyIconButtonState extends State<CopyIconButton>
           Positioned.fill(
             child: AnimatedBuilder(
               animation: _sweep,
+              // チェック表示中は満円のまま残し、復帰時に一緒に消す
               builder: (context, _) => CustomPaint(
                 painter: _SweepArcPainter(
-                  progress: _sweep.isAnimating ? _sweep.value : 0,
+                  progress: _copied
+                      ? 1.0
+                      : (_sweep.isAnimating ? _sweep.value : 0.0),
                   color: Colors.green,
                 ),
               ),

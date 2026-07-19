@@ -16,6 +16,12 @@ class CopyFeedbackTiming {
   /// チェックマーク表示を維持する時間（ms）。
   static final ValueNotifier<int> holdMs = ValueNotifier(1000);
 
+  /// 円周スイープアニメーションの有効/無効（無効なら即チェック表示）。
+  static final ValueNotifier<bool> animationEnabled = ValueNotifier(true);
+
+  /// アニメーションを再生すべきか（リリースビルドでは常に true）。
+  static bool get animate => !kDebugMode || animationEnabled.value;
+
   /// デバッグビルドなら調整値、リリースビルドなら [release] を返す。
   static Duration sweep(Duration release) => kDebugMode
       ? Duration(milliseconds: sweepMs.value)
@@ -94,7 +100,7 @@ class _CopyIconButtonState extends State<CopyIconButton>
     }
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    if (reduceMotion) {
+    if (reduceMotion || !CopyFeedbackTiming.animate) {
       _showCheck();
       return;
     }

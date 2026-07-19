@@ -172,6 +172,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text('Debug: copy feedback timing',
                             style: theme.textTheme.bodySmall),
                         const SizedBox(height: 8),
+                        ValueListenableBuilder<bool>(
+                          valueListenable:
+                              CopyFeedbackTiming.animationEnabled,
+                          builder: (context, enabled, _) => SwitchListTile(
+                            title: Text('animation',
+                                style: theme.textTheme.bodyMedium),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            value: enabled,
+                            onChanged: (value) => CopyFeedbackTiming
+                                .animationEnabled.value = value,
+                          ),
+                        ),
                         Row(
                           children: [
                             Expanded(

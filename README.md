@@ -7,12 +7,12 @@ Memo + Roost — AI コーディングエージェント CLI（まず Claude Cod
 ### Homebrew（推奨）
 
 ```bash
-brew install --cask --no-quarantine rami2076/tap/moost
+brew install --cask rami2076/tap/moost
+xattr -dr com.apple.quarantine /Applications/Moost.app
 ```
 
-更新は `brew upgrade` で入る。`--no-quarantine` は ad-hoc 署名による
-Gatekeeper 警告の回避（付け忘れた場合は
-`xattr -dr com.apple.quarantine /Applications/Moost.app`）。
+更新は `brew upgrade` で入る。2 行目は ad-hoc 署名による Gatekeeper 警告の
+回避（brew はダウンロードに quarantine 属性を付けるため）。
 
 ### gh CLI
 

@@ -20,6 +20,9 @@ dependencies:
   # （supply-chain rules/dart.md）。native は AppKit UI API のみ使用と監査済み。
   tray_manager: 0.5.3
   window_manager: 0.5.1
+  # マルチディスプレイでのポップオーバー配置（Issue #16）。
+  # 既存の推移的依存を lockfile と同一バージョンで直接依存へ昇格
+  screen_retriever: 0.2.2
 
 dev_dependencies:
   flutter_test:

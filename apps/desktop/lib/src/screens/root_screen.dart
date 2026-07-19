@@ -295,8 +295,20 @@ class _RootScreenState extends State<RootScreen> {
     );
   }
 
+  /// 削除の実行中フラグ。連打や二重発火で delete が並走すると
+  /// アトミック書き込み（.tmp → rename）が競合するため直列化する。
+  bool _deletingMemo = false;
+
   Future<void> _deleteMemoConfirmed(Memo memo) async {
-    await widget.memoStore.delete(memo.id);
+    if (_deletingMemo) {
+      return;
+    }
+    _deletingMemo = true;
+    try {
+      await widget.memoStore.delete(memo.id);
+    } finally {
+      _deletingMemo = false;
+    }
     if (!mounted) {
       return;
     }

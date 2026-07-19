@@ -42,16 +42,21 @@ Directory createTempDir() {
 }
 
 /// 進行中のアトミック書き込み（.tmp → rename）が掃けるまで待つ。
-/// runAsync の中（実時間が進むゾーン）で、テスト本体の最後に呼ぶ。
+/// runAsync の中（実時間が進むゾーン)で、テスト本体の最後に呼ぶ。
+///
+/// 「.tmp なし」の一瞬（書き込み開始前）をクリーンと誤判定しないよう、
+/// まず実時間を置いてから、連続してクリーンであることを確認する。
 Future<void> drainPendingWrites(Directory tempDir) async {
-  for (var i = 0; i < 50; i++) {
+  var cleanStreak = 0;
+  for (var i = 0; i < 60; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 20));
     final hasTmp = tempDir
         .listSync(recursive: true)
         .any((entity) => entity.path.endsWith('.tmp'));
-    if (!hasTmp) {
+    cleanStreak = hasTmp ? 0 : cleanStreak + 1;
+    if (cleanStreak >= 5) {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 20));
   }
 }
 

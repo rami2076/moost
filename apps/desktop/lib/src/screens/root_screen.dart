@@ -177,7 +177,7 @@ class _RootScreenState extends State<RootScreen> {
       setState(() => _updateCommandCopied = true);
       _updateCopiedRevertTimer?.cancel();
       _updateCopiedRevertTimer =
-          Timer(const Duration(milliseconds: 1500), () {
+          Timer(const Duration(milliseconds: 1000), () {
         if (mounted) {
           setState(() => _updateCommandCopied = false);
         }

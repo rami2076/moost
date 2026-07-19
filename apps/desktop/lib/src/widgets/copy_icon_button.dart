@@ -33,7 +33,7 @@ class CopyIconButton extends StatefulWidget {
     this.iconSize = 18,
     this.compact = false,
     this.sweepDuration = const Duration(milliseconds: 450),
-    this.feedbackDuration = const Duration(milliseconds: 1500),
+    this.feedbackDuration = const Duration(milliseconds: 1000),
   });
 
   @override

@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../widgets/copy_icon_button.dart';
 
 /// 設定画面（design.md 6.6）。
 ///
@@ -160,6 +163,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : l10n.settingClaudePathDetected(_detectedPath!),
                         style: theme.textTheme.bodySmall,
                       ),
+
+                      // デバッグビルド限定: コピーフィードバックの時間調整。
+                      // 開発者向けツールのため l10n は通さない・永続化しない
+                      if (kDebugMode) ...[
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        Text('Debug: copy feedback timing',
+                            style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DebugMsField(
+                                label: 'sweep',
+                                notifier: CopyFeedbackTiming.sweepMs,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _DebugMsField(
+                                label: 'hold',
+                                notifier: CopyFeedbackTiming.holdMs,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -167,6 +197,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// デバッグセクション用のミリ秒入力欄（1ms 単位）。
+class _DebugMsField extends StatefulWidget {
+  final String label;
+  final ValueNotifier<int> notifier;
+
+  const _DebugMsField({required this.label, required this.notifier});
+
+  @override
+  State<_DebugMsField> createState() => _DebugMsFieldState();
+}
+
+class _DebugMsFieldState extends State<_DebugMsField> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.notifier.value.toString());
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: InputDecoration(
+        labelText: widget.label,
+        suffixText: 'ms',
+        isDense: true,
+      ),
+      onChanged: (value) {
+        final ms = int.tryParse(value);
+        if (ms != null && ms > 0) {
+          widget.notifier.value = ms.clamp(1, 60000);
+        }
+      },
     );
   }
 }

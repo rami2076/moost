@@ -1,7 +1,30 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+/// デバッグビルド専用: コピーフィードバックの時間を実行中に調整するための
+/// 置き場（設定画面のデバッグセクションから 1ms 単位で変更できる）。
+/// メモリのみで永続化しない。リリースビルドでは各ウィジェットの既定値を使う。
+class CopyFeedbackTiming {
+  CopyFeedbackTiming._();
+
+  /// 円周スイープにかける時間（ms）。
+  static final ValueNotifier<int> sweepMs = ValueNotifier(450);
+
+  /// チェックマーク表示を維持する時間（ms）。
+  static final ValueNotifier<int> holdMs = ValueNotifier(1000);
+
+  /// デバッグビルドなら調整値、リリースビルドなら [release] を返す。
+  static Duration sweep(Duration release) => kDebugMode
+      ? Duration(milliseconds: sweepMs.value)
+      : release;
+
+  static Duration hold(Duration release) => kDebugMode
+      ? Duration(milliseconds: holdMs.value)
+      : release;
+}
 
 /// コピー操作のアイコンボタン。成功すると
 /// 1. アイコンの円周を緑の線が時計回りに一周し（スイープ）
@@ -76,6 +99,7 @@ class _CopyIconButtonState extends State<CopyIconButton>
       return;
     }
     _revertTimer?.cancel();
+    _sweep.duration = CopyFeedbackTiming.sweep(widget.sweepDuration);
     setState(() => _copied = false);
     _sweep.forward(from: 0);
   }
@@ -86,7 +110,7 @@ class _CopyIconButtonState extends State<CopyIconButton>
     }
     setState(() => _copied = true);
     _revertTimer?.cancel();
-    _revertTimer = Timer(widget.feedbackDuration, () {
+    _revertTimer = Timer(CopyFeedbackTiming.hold(widget.feedbackDuration), () {
       if (!mounted) {
         return;
       }

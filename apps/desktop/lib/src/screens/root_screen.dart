@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../update/update_checker.dart';
+import '../widgets/copy_icon_button.dart';
 import 'memo_form_screen.dart';
 import 'notes_screen.dart';
 import 'session_detail_screen.dart';
@@ -135,6 +137,7 @@ class _RootScreenState extends State<RootScreen> {
   @override
   void dispose() {
     widget.windowShown?.removeListener(_onWindowShown);
+    _updateCopiedRevertTimer?.cancel();
     super.dispose();
   }
 
@@ -157,10 +160,13 @@ class _RootScreenState extends State<RootScreen> {
     setState(() => _availableUpdate = update);
   }
 
-  /// 更新ボタン: brew 導入なら更新コマンドをコピー、手動導入なら
-  /// リリースページを開く（Issue #12。ダイアログは出さない）。
+  /// 更新ボタンの brew コマンドコピー成功表示（緑チェック）。
+  bool _updateCommandCopied = false;
+  Timer? _updateCopiedRevertTimer;
+
+  /// 更新ボタン: brew 導入なら更新コマンドをコピー（成功はアイコンの
+  /// 緑チェックで示す）、手動導入ならリリースページを開く（Issue #12）。
   Future<void> _onUpdateTapped(UpdateInfo update) async {
-    final l10n = AppLocalizations.of(context)!;
     final isBrew =
         (widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged)();
     if (isBrew) {
@@ -168,9 +174,14 @@ class _RootScreenState extends State<RootScreen> {
         const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.updateCommandCopied)),
-      );
+      setState(() => _updateCommandCopied = true);
+      _updateCopiedRevertTimer?.cancel();
+      _updateCopiedRevertTimer =
+          Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() => _updateCommandCopied = false);
+        }
+      });
     } else {
       await (widget.openUrl ?? RootScreen.defaultOpenUrl)(update.releaseUrl);
     }
@@ -394,7 +405,11 @@ class _RootScreenState extends State<RootScreen> {
           ),
           if (_availableUpdate != null)
             TextButton.icon(
-              icon: const Icon(Icons.arrow_circle_up, size: 16),
+              icon: Icon(
+                _updateCommandCopied ? Icons.check : Icons.arrow_circle_up,
+                size: 16,
+                color: _updateCommandCopied ? Colors.green : null,
+              ),
               label:
                   Text(l10n.updateAvailable('v${_availableUpdate!.version}')),
               onPressed: () => _onUpdateTapped(_availableUpdate!),
@@ -423,6 +438,8 @@ class _RootScreenState extends State<RootScreen> {
     return adapter;
   }
 
+  /// 復帰コマンドをクリップボードへ。成功のフィードバックは
+  /// 呼び出し元の [CopyIconButton] が担う（スナックバーは出さない）。
   Future<void> _copyResumeCommand({
     required String agent,
     required String projectPath,
@@ -437,13 +454,6 @@ class _RootScreenState extends State<RootScreen> {
       sessionId: sessionId,
     );
     await Clipboard.setData(ClipboardData(text: command));
-    if (!mounted) {
-      return;
-    }
-    final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.resumeCommandCopied)),
-    );
   }
 
   /// 設定のターミナルで復帰コマンドを実行する。
@@ -575,10 +585,9 @@ class _SessionList extends StatelessWidget {
                     tooltip: l10n.sessionDetailTitle,
                     onPressed: () => onOpenDetail(session),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
+                  CopyIconButton(
                     tooltip: l10n.copyResumeCommand,
-                    onPressed: () => onCopyResumeCommand(
+                    onCopy: () => onCopyResumeCommand(
                       agent: session.agentId,
                       projectPath: session.projectPath,
                       sessionId: session.sessionId,
@@ -701,10 +710,9 @@ class _MemoList extends StatelessWidget {
                       sessionId: memo.sessionId,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
+                  CopyIconButton(
                     tooltip: l10n.copyResumeCommand,
-                    onPressed: () => onCopyResumeCommand(
+                    onCopy: () => onCopyResumeCommand(
                       agent: memo.agent,
                       projectPath: memo.projectPath,
                       sessionId: memo.sessionId,

@@ -134,12 +134,6 @@ abstract class AppLocalizations {
   /// **'Copy resume command'**
   String get copyResumeCommand;
 
-  /// No description provided for @resumeCommandCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Resume command copied'**
-  String get resumeCommandCopied;
-
   /// No description provided for @loadFailed.
   ///
   /// In en, this message translates to:
@@ -326,12 +320,6 @@ abstract class AppLocalizations {
   /// **'Last {count} rallies'**
   String ralliesTarget(int count);
 
-  /// No description provided for @copiedToClipboard.
-  ///
-  /// In en, this message translates to:
-  /// **'Copied'**
-  String get copiedToClipboard;
-
   /// No description provided for @footerSettings.
   ///
   /// In en, this message translates to:
@@ -487,12 +475,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{version} available'**
   String updateAvailable(String version);
-
-  /// No description provided for @updateCommandCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Update command copied — run it in a terminal'**
-  String get updateCommandCopied;
 
   /// Last-used/updated date shown at the right of each list row
   ///

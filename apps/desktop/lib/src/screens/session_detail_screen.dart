@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../widgets/copy_icon_button.dart';
 
 /// セッション詳細 + 要約実行（design.md 6.1。レイアウトは Swift 版に合わせる）。
 ///
@@ -70,16 +71,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     } finally {
       if (mounted) setState(() => _running = false);
     }
-  }
-
-  Future<void> _copySessionId() async {
-    await Clipboard.setData(
-        ClipboardData(text: widget.session.sessionId));
-    if (!mounted) return;
-    final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.copiedToClipboard)),
-    );
   }
 
   @override
@@ -151,9 +142,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             children: [
               Flexible(child: text(session.sessionId)),
               const SizedBox(width: 4),
-              InkWell(
-                onTap: _copySessionId,
-                child: const Icon(Icons.copy, size: 14),
+              CopyIconButton(
+                iconSize: 14,
+                compact: true,
+                onCopy: () => Clipboard.setData(
+                  ClipboardData(text: session.sessionId),
+                ),
               ),
             ],
           ),

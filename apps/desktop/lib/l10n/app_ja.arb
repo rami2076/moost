@@ -6,7 +6,6 @@
   "noSessionsFound": "セッションがありません",
   "noMemosFound": "メモがありません",
   "copyResumeCommand": "復帰コマンドをコピー",
-  "resumeCommandCopied": "復帰コマンドをコピーしました",
   "loadFailed": "読み込みに失敗しました: {error}",
   "settings": "設定",
   "notes": "注意",
@@ -38,7 +37,6 @@
   "metaSessionId": "セッションID",
   "metaLastUsed": "最終利用",
   "ralliesTarget": "直近 {count} ラリーを対象",
-  "copiedToClipboard": "コピーしました",
   "footerSettings": "設定",
   "footerNotes": "注意",
   "footerQuit": "終了",
@@ -65,6 +63,5 @@
   "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}",
   "unknownAgent": "不明なエージェント: {agent}",
   "updateAvailable": "{version} が利用可能",
-  "updateCommandCopied": "更新コマンドをコピーしました（ターミナルで実行してください）",
   "listUpdatedAt": "{month}月{day}日 {time}"
 }

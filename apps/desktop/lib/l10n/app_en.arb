@@ -6,7 +6,6 @@
   "noSessionsFound": "No sessions found",
   "noMemosFound": "No memos found",
   "copyResumeCommand": "Copy resume command",
-  "resumeCommandCopied": "Resume command copied",
   "loadFailed": "Failed to load: {error}",
   "@loadFailed": {
     "placeholders": {
@@ -81,7 +80,6 @@
       }
     }
   },
-  "copiedToClipboard": "Copied",
   "footerSettings": "Settings",
   "footerNotes": "Notes",
   "footerQuit": "Quit",
@@ -137,7 +135,6 @@
       }
     }
   },
-  "updateCommandCopied": "Update command copied — run it in a terminal",
   "listUpdatedAt": "{month}/{day} {time}",
   "@listUpdatedAt": {
     "description": "Last-used/updated date shown at the right of each list row",

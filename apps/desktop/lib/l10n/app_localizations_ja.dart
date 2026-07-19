@@ -27,9 +27,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get copyResumeCommand => '復帰コマンドをコピー';
 
   @override
-  String get resumeCommandCopied => '復帰コマンドをコピーしました';
-
-  @override
   String loadFailed(String error) {
     return '読み込みに失敗しました: $error';
   }
@@ -135,9 +132,6 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get copiedToClipboard => 'コピーしました';
-
-  @override
   String get footerSettings => '設定';
 
   @override
@@ -226,9 +220,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String updateAvailable(String version) {
     return '$version が利用可能';
   }
-
-  @override
-  String get updateCommandCopied => '更新コマンドをコピーしました（ターミナルで実行してください）';
 
   @override
   String listUpdatedAt(int month, int day, String time) {

@@ -18,6 +18,14 @@ Future<void> settle(WidgetTester tester) async {
   }
 }
 
+/// コピー成功フィードバックの緑チェックアイコン。
+/// （SegmentedButton の選択中タブにも Icons.check が出るため色で絞る）
+Finder greenCheckIcon() => find.byWidgetPredicate(
+    (widget) =>
+        widget is Icon &&
+        widget.icon == Icons.check &&
+        widget.color == Colors.green);
+
 /// テスト用の一時ディレクトリを作り、競合に耐える teardown を登録する。
 ///
 /// ストアの保存は「.tmp 書き込み → rename」のアトミック方式のため、
@@ -236,13 +244,11 @@ void main() {
       // フッターに更新ボタンが出る
       expect(find.text('v9.9.9 available'), findsOneWidget);
 
-      // brew 導入なので、タップで更新コマンドコピーの通知が出る
+      // brew 導入なので、タップでコマンドがコピーされ
+      // アイコンが緑のチェックに変わる（スナックバーは出さない）
       await tester.tap(find.text('v9.9.9 available'));
       await settle(tester);
-      expect(
-        find.textContaining('Update command copied'),
-        findsOneWidget,
-      );
+      expect(greenCheckIcon(), findsOneWidget);
       expect(openedUrls, isEmpty);
     });
   });
@@ -300,6 +306,11 @@ void main() {
 
       // セッション行にターミナル起動ボタンが並ぶ
       expect(find.byTooltip('Open in terminal'), findsOneWidget);
+
+      // 復帰コマンドのコピー成功でアイコンが緑のチェックに変わる
+      await tester.tap(find.byTooltip('Copy resume command'));
+      await settle(tester);
+      expect(greenCheckIcon(), findsOneWidget);
 
       // 最終利用日時がサブタイトル行に出る（表示はローカル時刻・en ロケール）
       final localUpdated = DateTime.utc(2026, 7, 9).toLocal();

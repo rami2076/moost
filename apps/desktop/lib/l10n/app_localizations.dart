@@ -500,6 +500,12 @@ abstract class AppLocalizations {
   /// **'Update now?'**
   String get updateConfirmQuestion;
 
+  /// Shown after answering No to updateConfirmQuestion, offering the manual copy-command fallback
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the update command instead?'**
+  String get updateConfirmCopyQuestion;
+
   /// No description provided for @yes.
   ///
   /// In en, this message translates to:
@@ -511,6 +517,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No'**
   String get no;
+
+  /// Shown briefly after the upgrade command is copied to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Command copied'**
+  String get updateCommandCopied;
 
   /// No description provided for @updateRunning.
   ///

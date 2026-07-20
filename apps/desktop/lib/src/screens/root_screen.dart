@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -148,6 +149,10 @@ class _RootScreenState extends State<RootScreen> {
   /// 新バージョンの情報（null なら未検出）。フッターに表示する。
   UpdateInfo? _availableUpdate;
 
+  /// 更新ボタンが確認/実行中で横幅を要求しているか（フッターの
+  /// 他のボタンを一時的に隠すかの判定に使う。_UpdateButton から通知）。
+  bool _updateExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -178,7 +183,13 @@ class _RootScreenState extends State<RootScreen> {
     if (!mounted || update?.version == _availableUpdate?.version) {
       return;
     }
-    setState(() => _availableUpdate = update);
+    setState(() {
+      _availableUpdate = update;
+      // バージョンが変わると _UpdateButton は ValueKey(version) ごと
+      // 作り直される（内部状態は自然にリセット）ので、フッター側の
+      // 「拡張中」フラグも合わせて戻す
+      _updateExpanded = false;
+    });
   }
 
   /// 一覧の再読込。開いたとき・タブ切替時・フォームから戻ったときに呼ぶ
@@ -384,39 +395,62 @@ class _RootScreenState extends State<RootScreen> {
 
   Widget _buildFooter(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+
+    Widget? updateButton;
+    if (_availableUpdate != null) {
+      // key は Row の直接の子である Flexible 側に付ける。内側の
+      // _UpdateButton だけに付けても、Expanded/Flexible の有無を
+      // 切り替えた際に Row の reconciliation では「別ウィジェット」と
+      // 判定され _UpdateButtonState ごと作り直されてしまう（key は常に
+      // 同じ直接の子要素上にないと、その要素をまたいだ状態保持ができない）。
+      // flex/fit だけを切り替えることで、ウィジェット種別は変えずに
+      // 「確認/実行中だけ幅を明け渡す」を実現する。
+      updateButton = Flexible(
+        key: ValueKey(_availableUpdate!.version),
+        flex: _updateExpanded ? 1 : 0,
+        fit: _updateExpanded ? FlexFit.tight : FlexFit.loose,
+        child: _UpdateButton(
+          update: _availableUpdate!,
+          isBrewManaged:
+              widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged,
+          openUrl: widget.openUrl ?? RootScreen.defaultOpenUrl,
+          brewUpdater: widget.brewUpdater ?? BrewUpdater(),
+          onRestart: widget.onRestart ?? RootScreen.defaultRestart,
+          onExpandedChanged: (expanded) =>
+              setState(() => _updateExpanded = expanded),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          TextButton.icon(
-            icon: const Icon(Icons.settings, size: 16),
-            label: Text(l10n.footerSettings),
-            onPressed: () =>
-                setState(() => _screen = const SettingsMenuScreen()),
-          ),
-          TextButton.icon(
-            icon: const Icon(Icons.info_outline, size: 16),
-            label: Text(l10n.footerNotes),
-            onPressed: () =>
-                setState(() => _screen = const NotesMenuScreen()),
-          ),
-          if (_availableUpdate != null)
-            // バージョンが変わったら内部状態（確認中/実行中等）をリセット
-            _UpdateButton(
-              key: ValueKey(_availableUpdate!.version),
-              update: _availableUpdate!,
-              isBrewManaged:
-                  widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged,
-              openUrl: widget.openUrl ?? RootScreen.defaultOpenUrl,
-              brewUpdater: widget.brewUpdater ?? BrewUpdater(),
-              onRestart: widget.onRestart ?? RootScreen.defaultRestart,
+          // 更新ボタンが確認/実行中で横幅を要求している間は、他のフッター
+          // ボタンを一時的に隠して確認文言 + Yes/No が収まる余地を作る
+          // （長めの文言だと同居しきれずオーバーフローするため）
+          if (!_updateExpanded) ...[
+            TextButton.icon(
+              icon: const Icon(Icons.settings, size: 16),
+              label: Text(l10n.footerSettings),
+              onPressed: () =>
+                  setState(() => _screen = const SettingsMenuScreen()),
             ),
-          const Spacer(),
-          TextButton.icon(
-            icon: const Icon(Icons.power_settings_new, size: 16),
-            label: Text(l10n.footerQuit),
-            onPressed: () => exit(0),
-          ),
+            TextButton.icon(
+              icon: const Icon(Icons.info_outline, size: 16),
+              label: Text(l10n.footerNotes),
+              onPressed: () =>
+                  setState(() => _screen = const NotesMenuScreen()),
+            ),
+          ],
+          ?updateButton,
+          if (!_updateExpanded) const Spacer(),
+          if (!_updateExpanded)
+            TextButton.icon(
+              icon: const Icon(Icons.power_settings_new, size: 16),
+              label: Text(l10n.footerQuit),
+              onPressed: () => exit(0),
+            ),
         ],
       ),
     );
@@ -805,7 +839,10 @@ class _AgentBadge extends StatelessWidget {
 ///   → タップ:
 ///     - brew 導入: confirming（インライン Yes/No）
 ///     - 手動導入: リリースページを開く（確認なし。ローカルへの変更を伴わないため）
-///   confirming → はい: running / いいえ: idle
+///   confirming → はい: running / いいえ: confirmCopy
+///   confirmCopy（自動実行の代わりにコマンドだけコピーするか）
+///     → はい: copyCommand を実行して copied へ / いいえ: idle（最初に戻る）
+///   copied（"コピーしました"。しばらくして自動で idle へ戻る）
 ///   running（不確定インジケーター。brew の CLI 出力には % がなく実数の
 ///   進捗は取得できない）→ 成功: done / 失敗: failed
 ///   done（"再起動" ボタン）→ タップでアプリを終了し新版を起動
@@ -817,58 +854,107 @@ class _UpdateButton extends StatefulWidget {
   final BrewUpdater brewUpdater;
   final Future<void> Function() onRestart;
 
+  /// confirming/confirmCopy/running/copied（横幅を要求する状態）に
+  /// 入る/出るたびに通知。親フッターが他ボタンの表示・幅を調整する。
+  final ValueChanged<bool>? onExpandedChanged;
+
   const _UpdateButton({
-    super.key,
     required this.update,
     required this.isBrewManaged,
     required this.openUrl,
     required this.brewUpdater,
     required this.onRestart,
+    this.onExpandedChanged,
   });
 
   @override
   State<_UpdateButton> createState() => _UpdateButtonState();
 }
 
-enum _UpdatePhase { idle, confirming, running, done, failed }
+enum _UpdatePhase { idle, confirming, confirmCopy, copied, running, done, failed }
+
+/// 確認文言や実行中表示など、コンパクトな idle/done/failed より
+/// 横幅を要求する状態（フッターの他ボタンを一時的に隠す対象）。
+const _expandedPhases = {
+  _UpdatePhase.confirming,
+  _UpdatePhase.confirmCopy,
+  _UpdatePhase.copied,
+  _UpdatePhase.running,
+};
 
 class _UpdateButtonState extends State<_UpdateButton> {
   var _phase = _UpdatePhase.idle;
   String? _error;
+  Timer? _copiedRevertTimer;
+
+  @override
+  void dispose() {
+    _copiedRevertTimer?.cancel();
+    // 注意: ここで widget.onExpandedChanged を呼んで親の setState を
+    // 誘発してはいけない。dispose はツリーがロックされた unmount 中にも
+    // 走るため（テスト終了時など）、その場合 setState が例外になる。
+    // 親側は _checkForUpdate でバージョン変更時に _updateExpanded を
+    // リセットすることで対処する（このウィジェットの key はバージョンに
+    // 紐付くので、バージョンが変わらない限り dispose 単体では起きない）。
+    super.dispose();
+  }
+
+  void _setPhase(_UpdatePhase phase, {String? error}) {
+    final wasExpanded = _expandedPhases.contains(_phase);
+    setState(() {
+      _phase = phase;
+      _error = error;
+    });
+    final isExpanded = _expandedPhases.contains(phase);
+    if (isExpanded != wasExpanded) {
+      widget.onExpandedChanged?.call(isExpanded);
+    }
+  }
 
   Future<void> _handleIdleOrFailedTap() async {
     if (_phase == _UpdatePhase.failed) {
-      setState(() {
-        _phase = _UpdatePhase.confirming;
-        _error = null;
-      });
+      _setPhase(_UpdatePhase.confirming);
       return;
     }
     if (widget.isBrewManaged()) {
-      setState(() => _phase = _UpdatePhase.confirming);
+      _setPhase(_UpdatePhase.confirming);
     } else {
       // ローカルに変更を加えない操作なので確認は挟まない
       await widget.openUrl(widget.update.releaseUrl);
     }
   }
 
-  void _cancelConfirm() => setState(() => _phase = _UpdatePhase.idle);
+  /// 「アップデートしますか?」で「いいえ」→ 自動実行の代わりに
+  /// コマンドをコピーするかの確認へ（実行そのものを避けたい人の逃げ道）。
+  void _declineUpdate() => _setPhase(_UpdatePhase.confirmCopy);
+
+  /// コピー確認の「いいえ」→ 最初（idle）に戻る。
+  void _declineCopy() => _setPhase(_UpdatePhase.idle);
+
+  Future<void> _copyCommand() async {
+    await Clipboard.setData(
+      const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
+    );
+    if (!mounted) return;
+    _setPhase(_UpdatePhase.copied);
+    _copiedRevertTimer?.cancel();
+    _copiedRevertTimer = Timer(
+        CopyFeedbackTiming.hold(const Duration(milliseconds: 1200)), () {
+      if (mounted) {
+        _setPhase(_UpdatePhase.idle);
+      }
+    });
+  }
 
   Future<void> _runUpdate() async {
-    setState(() {
-      _phase = _UpdatePhase.running;
-      _error = null;
-    });
+    _setPhase(_UpdatePhase.running);
     try {
       await widget.brewUpdater.run();
       if (!mounted) return;
-      setState(() => _phase = _UpdatePhase.done);
+      _setPhase(_UpdatePhase.done);
     } on Object catch (e) {
       if (!mounted) return;
-      setState(() {
-        _phase = _UpdatePhase.failed;
-        _error = '$e';
-      });
+      _setPhase(_UpdatePhase.failed, error: '$e');
     }
   }
 
@@ -892,10 +978,18 @@ class _UpdateButtonState extends State<_UpdateButton> {
             onPressed: _handleIdleOrFailedTap,
           ),
         ),
+      // 確認文言は Expanded + 省略記号にして、長い翻訳文でもボタンの
+      // タップ領域を必ず確保する（フッター側で他ボタンを隠して幅を
+      // 確保した上での、さらなる安全弁）
       _UpdatePhase.confirming => Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(l10n.updateConfirmQuestion, style: theme.textTheme.bodySmall),
+            Expanded(
+              child: Text(
+                l10n.updateConfirmQuestion,
+                style: theme.textTheme.bodySmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             const SizedBox(width: 6),
             FilledButton(
               style: compactStyle,
@@ -905,9 +999,40 @@ class _UpdateButtonState extends State<_UpdateButton> {
             const SizedBox(width: 4),
             FilledButton.tonal(
               style: compactStyle,
-              onPressed: _cancelConfirm,
+              onPressed: _declineUpdate,
               child: Text(l10n.no),
             ),
+          ],
+        ),
+      _UpdatePhase.confirmCopy => Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.updateConfirmCopyQuestion,
+                style: theme.textTheme.bodySmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 6),
+            FilledButton(
+              style: compactStyle,
+              onPressed: _copyCommand,
+              child: Text(l10n.yes),
+            ),
+            const SizedBox(width: 4),
+            FilledButton.tonal(
+              style: compactStyle,
+              onPressed: _declineCopy,
+              child: Text(l10n.no),
+            ),
+          ],
+        ),
+      _UpdatePhase.copied => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check, size: 16, color: Colors.green),
+            const SizedBox(width: 6),
+            Text(l10n.updateCommandCopied, style: theme.textTheme.bodySmall),
           ],
         ),
       _UpdatePhase.running => Row(

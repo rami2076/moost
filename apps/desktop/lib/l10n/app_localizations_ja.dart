@@ -236,10 +236,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get updateConfirmQuestion => 'アップデートしますか?';
 
   @override
+  String get updateConfirmCopyQuestion => 'アップデートコマンドをコピーしますか?';
+
+  @override
   String get yes => 'はい';
 
   @override
   String get no => 'いいえ';
+
+  @override
+  String get updateCommandCopied => 'コマンドをコピーしました';
 
   @override
   String get updateRunning => '更新中…';

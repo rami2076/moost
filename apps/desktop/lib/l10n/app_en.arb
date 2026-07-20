@@ -153,8 +153,16 @@
   "@updateConfirmQuestion": {
     "description": "Shown inline in the footer after tapping Update (brew-managed installs)"
   },
+  "updateConfirmCopyQuestion": "Copy the update command instead?",
+  "@updateConfirmCopyQuestion": {
+    "description": "Shown after answering No to updateConfirmQuestion, offering the manual copy-command fallback"
+  },
   "yes": "Yes",
   "no": "No",
+  "updateCommandCopied": "Command copied",
+  "@updateCommandCopied": {
+    "description": "Shown briefly after the upgrade command is copied to the clipboard"
+  },
   "updateRunning": "Updating…",
   "updateRestart": "Restart",
   "updateFailed": "Update failed: {error}",

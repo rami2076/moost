@@ -317,7 +317,46 @@ void main() {
     });
   });
 
-  testWidgets('update notice: No cancels back to idle without running',
+  testWidgets(
+      'update notice: No on the update confirm offers to copy the command',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    await tester.runAsync(() async {
+      final brewUpdater = _FakeBrewUpdater();
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        updateChecker: _FakeUpdateChecker(UpdateInfo(
+          version: '9.9.9',
+          releaseUrl:
+              Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
+        )),
+        isBrewManaged: () => true,
+        brewUpdater: brewUpdater,
+      ));
+      await settle(tester);
+
+      // 「アップデートしますか?」で No → 実行はせず、コピーするか尋ねる
+      await tester.tap(find.text('Update'));
+      await tester.pump();
+      await tester.tap(find.text('No'));
+      await tester.pump();
+      expect(find.text('Copy the update command instead?'), findsOneWidget);
+      expect(brewUpdater.runCalls, 0);
+
+      // そこで No → 最初（idle）に戻る
+      await tester.tap(find.text('No'));
+      await tester.pump();
+      expect(find.text('Update'), findsOneWidget);
+      expect(brewUpdater.runCalls, 0);
+    });
+  });
+
+  testWidgets(
+      'update notice: Yes on the copy offer copies the command and reverts',
       (tester) async {
     final tempDir = createTempDir();
 
@@ -342,9 +381,18 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('No'));
       await tester.pump();
+      await tester.tap(find.text('Yes'));
+      await settle(tester); // Clipboard.setData の非同期完了を待つ
 
+      expect(find.text('Command copied'), findsOneWidget);
+      expect(greenCheckIcon(), findsOneWidget);
+      expect(brewUpdater.runCalls, 0); // brew は実行しない、コピーのみ
+
+      // しばらくすると自動で idle に戻る（_copiedRevertTimer は実時間の
+      // Timer なので、pump(duration) ではなく実際に待つ）
+      await Future<void>.delayed(const Duration(milliseconds: 1300));
+      await tester.pump();
       expect(find.text('Update'), findsOneWidget);
-      expect(brewUpdater.runCalls, 0);
     });
   });
 

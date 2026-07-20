@@ -237,10 +237,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateConfirmQuestion => 'Update now?';
 
   @override
+  String get updateConfirmCopyQuestion => 'Copy the update command instead?';
+
+  @override
   String get yes => 'Yes';
 
   @override
   String get no => 'No';
+
+  @override
+  String get updateCommandCopied => 'Command copied';
 
   @override
   String get updateRunning => 'Updating…';

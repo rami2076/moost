@@ -86,6 +86,10 @@ class _CopyIconButtonState extends State<CopyIconButton>
   var _copied = false;
   Timer? _revertTimer;
 
+  /// 押下からフィードバック終了（スイープ + チェック保持）までの間、
+  /// 連打で再トリガーされないよう塞ぐ。
+  var _busy = false;
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +109,10 @@ class _CopyIconButtonState extends State<CopyIconButton>
   }
 
   Future<void> _handlePressed() async {
+    if (_busy) {
+      return;
+    }
+    setState(() => _busy = true);
     await widget.onCopy();
     if (!mounted) {
       return;
@@ -132,7 +140,10 @@ class _CopyIconButtonState extends State<CopyIconButton>
         return;
       }
       _sweep.reset();
-      setState(() => _copied = false);
+      setState(() {
+        _copied = false;
+        _busy = false;
+      });
     });
   }
 
@@ -172,7 +183,7 @@ class _CopyIconButtonState extends State<CopyIconButton>
       icon: icon,
       iconSize: arcExtent,
       tooltip: widget.tooltip,
-      onPressed: _handlePressed,
+      onPressed: _busy ? null : _handlePressed,
       padding: widget.compact ? EdgeInsets.zero : null,
       constraints: widget.compact ? const BoxConstraints() : null,
     );

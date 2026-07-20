@@ -164,12 +164,20 @@ class _RootScreenState extends State<RootScreen> {
   bool _updateCommandCopied = false;
   Timer? _updateCopiedRevertTimer;
 
+  /// コピーのフィードバック表示中は連打で再トリガーされないよう塞ぐ
+  /// （CopyIconButton の _busy と同じ考え方）。
+  bool _updateButtonBusy = false;
+
   /// 更新ボタン: brew 導入なら更新コマンドをコピー（成功はアイコンの
   /// 緑チェックで示す）、手動導入ならリリースページを開く（Issue #12）。
   Future<void> _onUpdateTapped(UpdateInfo update) async {
+    if (_updateButtonBusy) {
+      return;
+    }
     final isBrew =
         (widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged)();
     if (isBrew) {
+      setState(() => _updateButtonBusy = true);
       await Clipboard.setData(
         const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
       );
@@ -179,7 +187,10 @@ class _RootScreenState extends State<RootScreen> {
       _updateCopiedRevertTimer = Timer(
           CopyFeedbackTiming.hold(const Duration(milliseconds: 400)), () {
         if (mounted) {
-          setState(() => _updateCommandCopied = false);
+          setState(() {
+            _updateCommandCopied = false;
+            _updateButtonBusy = false;
+          });
         }
       });
     } else {
@@ -414,7 +425,9 @@ class _RootScreenState extends State<RootScreen> {
               ),
               label:
                   Text(l10n.updateAvailable('v${_availableUpdate!.version}')),
-              onPressed: () => _onUpdateTapped(_availableUpdate!),
+              onPressed: _updateButtonBusy
+                  ? null
+                  : () => _onUpdateTapped(_availableUpdate!),
             ),
           const Spacer(),
           TextButton.icon(

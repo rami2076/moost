@@ -3,7 +3,7 @@ description: Moost desktop app — session memos and one-click resume (macOS fir
 publish_to: 'none'
 
 # バージョンの単一情報源（RELEASE.md 1.2）。設定画面の表示もここから取得する
-version: 1.5.0+6
+version: 1.6.0+7
 
 environment:
   sdk: ^3.12.2

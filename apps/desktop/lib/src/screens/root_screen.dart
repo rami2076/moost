@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../update/brew_updater.dart';
 import '../update/update_checker.dart';
 import '../widgets/copy_icon_button.dart';
 import 'memo_form_screen.dart';
@@ -83,6 +83,12 @@ class RootScreen extends StatefulWidget {
   /// URL を既定ブラウザで開く。null なら `open` コマンドを使う。
   final Future<void> Function(Uri url)? openUrl;
 
+  /// brew 経由の自己更新実行。null なら実際に `brew` を呼ぶ実装を使う。
+  final BrewUpdater? brewUpdater;
+
+  /// 更新完了後の再起動。null なら実際にアプリを再起動する。
+  final Future<void> Function()? onRestart;
+
   const RootScreen({
     super.key,
     required this.registry,
@@ -92,6 +98,8 @@ class RootScreen extends StatefulWidget {
     this.updateChecker,
     this.isBrewManaged,
     this.openUrl,
+    this.brewUpdater,
+    this.onRestart,
   });
 
   static bool defaultIsBrewManaged() =>
@@ -100,6 +108,15 @@ class RootScreen extends StatefulWidget {
 
   static Future<void> defaultOpenUrl(Uri url) async {
     await Process.run('open', [url.toString()]);
+  }
+
+  /// cask の install 先は固定パス（Casks/moost.rb の `app "Moost.app"`）。
+  /// この関数は isBrewManaged が true のときだけ呼ばれるので、
+  /// 通常インストールならこのパスに実体がある前提で問題ない。
+  static Future<void> defaultRestart() async {
+    await Process.start('open', ['/Applications/Moost.app'],
+        mode: ProcessStartMode.detached);
+    exit(0);
   }
 
   @override
@@ -137,7 +154,6 @@ class _RootScreenState extends State<RootScreen> {
   @override
   void dispose() {
     widget.windowShown?.removeListener(_onWindowShown);
-    _updateCopiedRevertTimer?.cancel();
     super.dispose();
   }
 
@@ -158,44 +174,6 @@ class _RootScreenState extends State<RootScreen> {
       return;
     }
     setState(() => _availableUpdate = update);
-  }
-
-  /// 更新ボタンの brew コマンドコピー成功表示（緑チェック）。
-  bool _updateCommandCopied = false;
-  Timer? _updateCopiedRevertTimer;
-
-  /// コピーのフィードバック表示中は連打で再トリガーされないよう塞ぐ
-  /// （CopyIconButton の _busy と同じ考え方）。
-  bool _updateButtonBusy = false;
-
-  /// 更新ボタン: brew 導入なら更新コマンドをコピー（成功はアイコンの
-  /// 緑チェックで示す）、手動導入ならリリースページを開く（Issue #12）。
-  Future<void> _onUpdateTapped(UpdateInfo update) async {
-    if (_updateButtonBusy) {
-      return;
-    }
-    final isBrew =
-        (widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged)();
-    if (isBrew) {
-      setState(() => _updateButtonBusy = true);
-      await Clipboard.setData(
-        const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
-      );
-      if (!mounted) return;
-      setState(() => _updateCommandCopied = true);
-      _updateCopiedRevertTimer?.cancel();
-      _updateCopiedRevertTimer = Timer(
-          CopyFeedbackTiming.hold(const Duration(milliseconds: 400)), () {
-        if (mounted) {
-          setState(() {
-            _updateCommandCopied = false;
-            _updateButtonBusy = false;
-          });
-        }
-      });
-    } else {
-      await (widget.openUrl ?? RootScreen.defaultOpenUrl)(update.releaseUrl);
-    }
   }
 
   /// 一覧の再読込。開いたとき・タブ切替時・フォームから戻ったときに呼ぶ
@@ -417,17 +395,15 @@ class _RootScreenState extends State<RootScreen> {
                 setState(() => _screen = const NotesMenuScreen()),
           ),
           if (_availableUpdate != null)
-            TextButton.icon(
-              icon: Icon(
-                _updateCommandCopied ? Icons.check : Icons.arrow_circle_up,
-                size: 16,
-                color: _updateCommandCopied ? Colors.green : null,
-              ),
-              label:
-                  Text(l10n.updateAvailable('v${_availableUpdate!.version}')),
-              // busy 判定は _onUpdateTapped 冒頭で行う（CopyIconButton と同じ
-              // 理由: onPressed を null にするとタップが親へ素通りしうる）
-              onPressed: () => _onUpdateTapped(_availableUpdate!),
+            // バージョンが変わったら内部状態（確認中/実行中等）をリセット
+            _UpdateButton(
+              key: ValueKey(_availableUpdate!.version),
+              update: _availableUpdate!,
+              isBrewManaged:
+                  widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged,
+              openUrl: widget.openUrl ?? RootScreen.defaultOpenUrl,
+              brewUpdater: widget.brewUpdater ?? BrewUpdater(),
+              onRestart: widget.onRestart ?? RootScreen.defaultRestart,
             ),
           const Spacer(),
           TextButton.icon(
@@ -815,5 +791,146 @@ class _AgentBadge extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// フッターの更新ボタン。状態遷移:
+/// idle（"アップデート" + ツールチップにバージョン）
+///   → タップ:
+///     - brew 導入: confirming（インライン Yes/No）
+///     - 手動導入: リリースページを開く（確認なし。ローカルへの変更を伴わないため）
+///   confirming → はい: running / いいえ: idle
+///   running（不確定インジケーター。brew の CLI 出力には % がなく実数の
+///   進捗は取得できない）→ 成功: done / 失敗: failed
+///   done（"再起動" ボタン）→ タップでアプリを終了し新版を起動
+///   failed（エラーアイコン。ツールチップにメッセージ）→ タップで confirming に戻る
+class _UpdateButton extends StatefulWidget {
+  final UpdateInfo update;
+  final bool Function() isBrewManaged;
+  final Future<void> Function(Uri url) openUrl;
+  final BrewUpdater brewUpdater;
+  final Future<void> Function() onRestart;
+
+  const _UpdateButton({
+    super.key,
+    required this.update,
+    required this.isBrewManaged,
+    required this.openUrl,
+    required this.brewUpdater,
+    required this.onRestart,
+  });
+
+  @override
+  State<_UpdateButton> createState() => _UpdateButtonState();
+}
+
+enum _UpdatePhase { idle, confirming, running, done, failed }
+
+class _UpdateButtonState extends State<_UpdateButton> {
+  var _phase = _UpdatePhase.idle;
+  String? _error;
+
+  Future<void> _handleIdleOrFailedTap() async {
+    if (_phase == _UpdatePhase.failed) {
+      setState(() {
+        _phase = _UpdatePhase.confirming;
+        _error = null;
+      });
+      return;
+    }
+    if (widget.isBrewManaged()) {
+      setState(() => _phase = _UpdatePhase.confirming);
+    } else {
+      // ローカルに変更を加えない操作なので確認は挟まない
+      await widget.openUrl(widget.update.releaseUrl);
+    }
+  }
+
+  void _cancelConfirm() => setState(() => _phase = _UpdatePhase.idle);
+
+  Future<void> _runUpdate() async {
+    setState(() {
+      _phase = _UpdatePhase.running;
+      _error = null;
+    });
+    try {
+      await widget.brewUpdater.run();
+      if (!mounted) return;
+      setState(() => _phase = _UpdatePhase.done);
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _phase = _UpdatePhase.failed;
+        _error = '$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final compactStyle = FilledButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      minimumSize: const Size(0, 28),
+      textStyle: const TextStyle(fontSize: 12),
+    );
+
+    return switch (_phase) {
+      _UpdatePhase.idle => Tooltip(
+          message: l10n.updateAvailable('v${widget.update.version}'),
+          child: TextButton.icon(
+            icon: const Icon(Icons.arrow_circle_up, size: 16),
+            label: Text(l10n.update),
+            onPressed: _handleIdleOrFailedTap,
+          ),
+        ),
+      _UpdatePhase.confirming => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(l10n.updateConfirmQuestion, style: theme.textTheme.bodySmall),
+            const SizedBox(width: 6),
+            FilledButton(
+              style: compactStyle,
+              onPressed: _runUpdate,
+              child: Text(l10n.yes),
+            ),
+            const SizedBox(width: 4),
+            FilledButton.tonal(
+              style: compactStyle,
+              onPressed: _cancelConfirm,
+              child: Text(l10n.no),
+            ),
+          ],
+        ),
+      _UpdatePhase.running => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            Text(l10n.updateRunning, style: theme.textTheme.bodySmall),
+          ],
+        ),
+      _UpdatePhase.done => FilledButton.tonalIcon(
+          style: compactStyle,
+          icon: const Icon(Icons.check, size: 14, color: Colors.green),
+          label: Text(l10n.updateRestart),
+          onPressed: () => widget.onRestart(),
+        ),
+      _UpdatePhase.failed => Tooltip(
+          message: l10n.updateFailed(_error ?? ''),
+          child: TextButton.icon(
+            icon: Icon(Icons.error_outline,
+                size: 16, color: theme.colorScheme.error),
+            label: Text(l10n.update),
+            onPressed: _handleIdleOrFailedTap,
+          ),
+        ),
+    };
   }
 }

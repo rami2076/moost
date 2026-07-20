@@ -63,6 +63,13 @@
   "resumeInTerminal": "ターミナルで再開",
   "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}",
   "unknownAgent": "不明なエージェント: {agent}",
+  "update": "アップデート",
   "updateAvailable": "{version} が利用可能",
+  "updateConfirmQuestion": "アップデートしますか?",
+  "yes": "はい",
+  "no": "いいえ",
+  "updateRunning": "更新中…",
+  "updateRestart": "再起動",
+  "updateFailed": "更新に失敗しました: {error}",
   "listUpdatedAt": "{month}月{day}日 {time}"
 }

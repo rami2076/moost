@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moost_core/moost_core.dart';
 import 'package:moost_desktop/main.dart';
+import 'package:moost_desktop/src/update/brew_updater.dart';
 import 'package:moost_desktop/src/update/update_checker.dart';
 
 /// runAsync の中で実 I/O の完了を待ちながらフレームを進める。
@@ -267,11 +268,12 @@ void main() {
     });
   });
 
-  testWidgets('update notice appears in the footer and copies brew command',
+  testWidgets(
+      'update notice: brew flow goes idle -> confirm -> running -> restart',
       (tester) async {
     final tempDir = createTempDir();
 
-    final openedUrls = <Uri>[];
+    var restarted = false;
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
@@ -284,19 +286,101 @@ void main() {
               Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
         )),
         isBrewManaged: () => true,
-        openUrl: (url) async => openedUrls.add(url),
+        brewUpdater: _FakeBrewUpdater(),
+        onRestart: () async => restarted = true,
       ));
       await settle(tester);
 
-      // フッターに更新ボタンが出る
-      expect(find.text('v9.9.9 available'), findsOneWidget);
+      // idle: 固定ラベル「Update」+ ツールチップにバージョン
+      expect(find.text('Update'), findsOneWidget);
+      expect(find.byTooltip('v9.9.9 available'), findsOneWidget);
 
-      // brew 導入なので、タップでコマンドがコピーされ
-      // アイコンが緑のチェックに変わる（スナックバーは出さない）
-      await tester.tap(find.text('v9.9.9 available'));
+      // タップで確認（Yes/No）に切り替わる
+      await tester.tap(find.text('Update'));
+      await tester.pump();
+      expect(find.text('Update now?'), findsOneWidget);
+      expect(find.text('Yes'), findsOneWidget);
+      expect(find.text('No'), findsOneWidget);
+
+      // Yes → 実行中（不確定インジケーター）→ 完了で再起動ボタン
+      await tester.tap(find.text('Yes'));
+      await tester.pump();
+      expect(find.text('Updating…'), findsOneWidget);
       await settle(tester);
-      expect(greenCheckIcon(), findsOneWidget);
-      expect(openedUrls, isEmpty);
+      expect(find.text('Restart'), findsOneWidget);
+
+      // 再起動ボタンは押すまで自動実行されない
+      expect(restarted, isFalse);
+      await tester.tap(find.text('Restart'));
+      await tester.pump();
+      expect(restarted, isTrue);
+    });
+  });
+
+  testWidgets('update notice: No cancels back to idle without running',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    await tester.runAsync(() async {
+      final brewUpdater = _FakeBrewUpdater();
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        updateChecker: _FakeUpdateChecker(UpdateInfo(
+          version: '9.9.9',
+          releaseUrl:
+              Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
+        )),
+        isBrewManaged: () => true,
+        brewUpdater: brewUpdater,
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Update'));
+      await tester.pump();
+      await tester.tap(find.text('No'));
+      await tester.pump();
+
+      expect(find.text('Update'), findsOneWidget);
+      expect(brewUpdater.runCalls, 0);
+    });
+  });
+
+  testWidgets('update notice: brew failure shows a retry-capable error',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        updateChecker: _FakeUpdateChecker(UpdateInfo(
+          version: '9.9.9',
+          releaseUrl:
+              Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
+        )),
+        isBrewManaged: () => true,
+        brewUpdater: _FakeBrewUpdater(shouldFail: true),
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Update'));
+      await tester.pump();
+      await tester.tap(find.text('Yes'));
+      await settle(tester);
+
+      // 失敗するとエラーアイコン付きで「Update」に戻る（再試行できる）
+      expect(find.text('Update'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+      // 再タップで確認画面に戻れる（再試行導線）
+      await tester.tap(find.text('Update'));
+      await tester.pump();
+      expect(find.text('Update now?'), findsOneWidget);
     });
   });
 
@@ -321,7 +405,8 @@ void main() {
       ));
       await settle(tester);
 
-      await tester.tap(find.text('v9.9.9 available'));
+      // 手動導入は確認を挟まず、タップで直接リリースページを開く
+      await tester.tap(find.text('Update'));
       await settle(tester);
       expect(openedUrls, [
         Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
@@ -468,6 +553,23 @@ class _FakeUpdateChecker extends UpdateChecker {
 
   @override
   Future<UpdateInfo?> check() async => _info;
+}
+
+/// テスト用の BrewUpdater。実際の brew は呼ばない。
+class _FakeBrewUpdater extends BrewUpdater {
+  final bool shouldFail;
+  int runCalls = 0;
+
+  _FakeBrewUpdater({this.shouldFail = false});
+
+  @override
+  Future<void> run() async {
+    runCalls++;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    if (shouldFail) {
+      throw const BrewUpdateException('boom');
+    }
+  }
 }
 
 /// テスト用の AgentAdapter。要約はセッションID・範囲を埋め込んだ固定文字列を返す。

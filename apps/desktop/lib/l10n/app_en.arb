@@ -127,11 +127,32 @@
       }
     }
   },
+  "update": "Update",
+  "@update": {
+    "description": "Static footer button label shown when a newer release exists"
+  },
   "updateAvailable": "{version} available",
   "@updateAvailable": {
-    "description": "Footer button shown when a newer release exists",
+    "description": "Tooltip on the update button showing the available version",
     "placeholders": {
       "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateConfirmQuestion": "Update now?",
+  "@updateConfirmQuestion": {
+    "description": "Shown inline in the footer after tapping Update (brew-managed installs)"
+  },
+  "yes": "Yes",
+  "no": "No",
+  "updateRunning": "Updating…",
+  "updateRestart": "Restart",
+  "updateFailed": "Update failed: {error}",
+  "@updateFailed": {
+    "description": "Tooltip on the error icon when the brew update/upgrade fails",
+    "placeholders": {
+      "error": {
         "type": "String"
       }
     }

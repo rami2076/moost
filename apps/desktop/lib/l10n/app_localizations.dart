@@ -476,11 +476,53 @@ abstract class AppLocalizations {
   /// **'Unknown agent: {agent}'**
   String unknownAgent(String agent);
 
-  /// Footer button shown when a newer release exists
+  /// Static footer button label shown when a newer release exists
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get update;
+
+  /// Tooltip on the update button showing the available version
   ///
   /// In en, this message translates to:
   /// **'{version} available'**
   String updateAvailable(String version);
+
+  /// Shown inline in the footer after tapping Update (brew-managed installs)
+  ///
+  /// In en, this message translates to:
+  /// **'Update now?'**
+  String get updateConfirmQuestion;
+
+  /// No description provided for @yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get no;
+
+  /// No description provided for @updateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating…'**
+  String get updateRunning;
+
+  /// No description provided for @updateRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get updateRestart;
+
+  /// Tooltip on the error icon when the brew update/upgrade fails
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: {error}'**
+  String updateFailed(String error);
 
   /// Last-used/updated date shown at the right of each list row
   ///

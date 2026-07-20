@@ -221,8 +221,31 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get update => 'Update';
+
+  @override
   String updateAvailable(String version) {
     return '$version available';
+  }
+
+  @override
+  String get updateConfirmQuestion => 'Update now?';
+
+  @override
+  String get yes => 'Yes';
+
+  @override
+  String get no => 'No';
+
+  @override
+  String get updateRunning => 'Updating…';
+
+  @override
+  String get updateRestart => 'Restart';
+
+  @override
+  String updateFailed(String error) {
+    return 'Update failed: $error';
   }
 
   @override

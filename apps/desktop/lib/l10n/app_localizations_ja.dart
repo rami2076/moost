@@ -144,6 +144,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsTitle => '設定';
 
   @override
+  String settingVersion(String version) {
+    return 'バージョン $version';
+  }
+
+  @override
   String get settingTerminal => '復帰先ターミナル';
 
   @override

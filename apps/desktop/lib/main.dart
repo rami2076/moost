@@ -49,6 +49,7 @@ Future<void> main() async {
     settingsStore: SettingsStore.defaultLocation(),
     windowShown: tray.shownCount,
     updateChecker: UpdateChecker(currentVersion: packageInfo.version),
+    appVersion: packageInfo.version,
   ));
 }
 
@@ -66,6 +67,9 @@ class MoostApp extends StatelessWidget {
   final BrewUpdater? brewUpdater;
   final Future<void> Function()? onRestart;
 
+  /// 設定画面に表示するアプリバージョン。
+  final String? appVersion;
+
   /// トレイからウィンドウが表示されたことを知らせる通知（null なら常駐なし）。
   final ValueListenable<int>? windowShown;
 
@@ -80,6 +84,7 @@ class MoostApp extends StatelessWidget {
     this.openUrl,
     this.brewUpdater,
     this.onRestart,
+    this.appVersion,
   });
 
   @override
@@ -104,6 +109,7 @@ class MoostApp extends StatelessWidget {
         openUrl: openUrl,
         brewUpdater: brewUpdater,
         onRestart: onRestart,
+        appVersion: appVersion,
       ),
     );
   }

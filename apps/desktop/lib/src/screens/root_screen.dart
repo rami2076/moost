@@ -89,6 +89,10 @@ class RootScreen extends StatefulWidget {
   /// 更新完了後の再起動。null なら実際にアプリを再起動する。
   final Future<void> Function()? onRestart;
 
+  /// 設定画面に表示するアプリバージョン（Issue: アップデート後に反映されたか
+  /// 分かりにくい問題への対処）。null なら行ごと非表示。
+  final String? appVersion;
+
   const RootScreen({
     super.key,
     required this.registry,
@@ -100,6 +104,7 @@ class RootScreen extends StatefulWidget {
     this.openUrl,
     this.brewUpdater,
     this.onRestart,
+    this.appVersion,
   });
 
   static bool defaultIsBrewManaged() =>
@@ -209,6 +214,7 @@ class _RootScreenState extends State<RootScreen> {
           settingsStore: widget.settingsStore,
           pathResolver: _pathResolver,
           onBack: () => _showList(_tab),
+          appVersion: widget.appVersion,
         ),
       NotesMenuScreen() => NotesScreen(onBack: () => _showList(_tab)),
     };

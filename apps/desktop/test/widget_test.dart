@@ -498,6 +498,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
       await settle(tester);
       expect(find.text('Resume terminal'), findsOneWidget);
+      // appVersion 未指定なのでバージョン行は出ない
+      expect(find.textContaining('Version'), findsNothing);
       await tester.tap(find.widgetWithText(TextButton, 'Back'));
       await settle(tester);
 
@@ -508,6 +510,28 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Back'));
       await settle(tester);
       expect(find.text('No sessions found'), findsOneWidget);
+    });
+  });
+
+  testWidgets('settings screen shows the app version when provided',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        appVersion: '1.5.0',
+      ));
+      await settle(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      await settle(tester);
+      expect(find.text('Version 1.5.0'), findsOneWidget);
     });
   });
 

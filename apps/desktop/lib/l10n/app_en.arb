@@ -84,6 +84,15 @@
   "footerNotes": "Notes",
   "footerQuit": "Quit",
   "settingsTitle": "Settings",
+  "settingVersion": "Version {version}",
+  "@settingVersion": {
+    "description": "Shown near the top of Settings so users can tell whether an update actually applied",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingTerminal": "Resume terminal",
   "settingRecentLimit": "Recent sessions shown",
   "settingClaudePath": "claude command path (for summaries)",

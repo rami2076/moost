@@ -145,6 +145,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTitle => 'Settings';
 
   @override
+  String settingVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
   String get settingTerminal => 'Resume terminal';
 
   @override

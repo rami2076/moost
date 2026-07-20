@@ -344,6 +344,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settingsTitle;
 
+  /// Shown near the top of Settings so users can tell whether an update actually applied
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String settingVersion(String version);
+
   /// No description provided for @settingTerminal.
   ///
   /// In en, this message translates to:

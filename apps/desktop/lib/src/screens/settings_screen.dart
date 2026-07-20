@@ -16,11 +16,16 @@ class SettingsScreen extends StatefulWidget {
   final ClaudePathResolver pathResolver;
   final VoidCallback onBack;
 
+  /// 表示中のアプリバージョン（例: "1.5.0"）。null なら行ごと非表示
+  /// （widget テスト等、package_info_plus を解決できない環境向け）。
+  final String? appVersion;
+
   const SettingsScreen({
     super.key,
     required this.settingsStore,
     required this.pathResolver,
     required this.onBack,
+    this.appVersion,
   });
 
   @override
@@ -89,6 +94,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              // アップデート実行後に反映されたか一目で分かるよう、
+              // スクロールなしで常に見える見出し直下に置く
+              if (widget.appVersion != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    l10n.settingVersion(widget.appVersion!),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
               const Divider(height: 24),
               if (settings == null)
                 const Center(child: CircularProgressIndicator())

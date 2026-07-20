@@ -41,6 +41,7 @@
   "footerNotes": "注意",
   "footerQuit": "終了",
   "settingsTitle": "設定",
+  "settingVersion": "バージョン {version}",
   "settingTerminal": "復帰先ターミナル",
   "settingRecentLimit": "直近セッション表示件数",
   "settingClaudePath": "claude コマンドのパス（要約用）",

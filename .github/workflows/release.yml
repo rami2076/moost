@@ -94,7 +94,8 @@ jobs:
           open ~/Downloads/Moost.dmg
           \`\`\`
 
-          開いたウィンドウの Moost.app を Applications へドラッグしてください。
+          開いたウィンドウの Moost.app を Applications へドラッグしてください
+          （完了後、マウントされたディスクイメージは取り出して構いません）。
           EOF
 
       - name: Create GitHub Release

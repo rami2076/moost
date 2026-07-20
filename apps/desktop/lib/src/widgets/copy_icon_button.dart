@@ -21,6 +21,10 @@ class CopyFeedbackTiming {
   /// 起動時（RootScreen の設定読込）と設定画面のトグルで同期される。
   static final ValueNotifier<bool> animationEnabled = ValueNotifier(true);
 
+  /// アニメーション OFF 時、円周スイープがない分チェック表示を長く見せる
+  /// ための固定時間。
+  static const noAnimationHold = Duration(milliseconds: 1000);
+
   /// アニメーションを再生すべきか。
   static bool get animate => animationEnabled.value;
 
@@ -29,9 +33,14 @@ class CopyFeedbackTiming {
       ? Duration(milliseconds: sweepMs.value)
       : release;
 
-  static Duration hold(Duration release) => kDebugMode
-      ? Duration(milliseconds: holdMs.value)
-      : release;
+  /// アニメーション OFF なら [noAnimationHold]、ON なら
+  /// デバッグビルドは調整値、リリースビルドは [release] を返す。
+  static Duration hold(Duration release) {
+    if (!animate) {
+      return noAnimationHold;
+    }
+    return kDebugMode ? Duration(milliseconds: holdMs.value) : release;
+  }
 }
 
 /// コピー操作のアイコンボタン。成功すると

@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import 'l10n/app_localizations.dart';
 import 'src/screens/root_screen.dart';
 import 'src/tray/tray_service.dart';
+import 'src/update/brew_updater.dart';
 import 'src/update/update_checker.dart';
 
 Future<void> main() async {
@@ -48,6 +49,7 @@ Future<void> main() async {
     settingsStore: SettingsStore.defaultLocation(),
     windowShown: tray.shownCount,
     updateChecker: UpdateChecker(currentVersion: packageInfo.version),
+    appVersion: packageInfo.version,
   ));
 }
 
@@ -62,6 +64,11 @@ class MoostApp extends StatelessWidget {
   /// テスト用の注入ポイント（null なら実環境の既定動作）。
   final bool Function()? isBrewManaged;
   final Future<void> Function(Uri url)? openUrl;
+  final BrewUpdater? brewUpdater;
+  final Future<void> Function()? onRestart;
+
+  /// 設定画面に表示するアプリバージョン。
+  final String? appVersion;
 
   /// トレイからウィンドウが表示されたことを知らせる通知（null なら常駐なし）。
   final ValueListenable<int>? windowShown;
@@ -75,6 +82,9 @@ class MoostApp extends StatelessWidget {
     this.updateChecker,
     this.isBrewManaged,
     this.openUrl,
+    this.brewUpdater,
+    this.onRestart,
+    this.appVersion,
   });
 
   @override
@@ -97,6 +107,9 @@ class MoostApp extends StatelessWidget {
         updateChecker: updateChecker,
         isBrewManaged: isBrewManaged,
         openUrl: openUrl,
+        brewUpdater: brewUpdater,
+        onRestart: onRestart,
+        appVersion: appVersion,
       ),
     );
   }

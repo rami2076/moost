@@ -81,14 +81,21 @@ jobs:
 
           ## インストール
 
+          ### Homebrew を使っている場合
+
           \`\`\`bash
-          gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.dmg' -O /tmp/Moost.dmg
-          hdiutil attach /tmp/Moost.dmg -nobrowse
-          cp -R "/Volumes/Moost $VERSION/Moost.app" /Applications/
-          hdiutil detach "/Volumes/Moost $VERSION"
-          rm /tmp/Moost.dmg
-          open /Applications/Moost.app
+          brew upgrade --cask moost
           \`\`\`
+
+          ### 使っていない場合
+
+          \`\`\`bash
+          gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.dmg' -O ~/Downloads/Moost.dmg
+          open ~/Downloads/Moost.dmg
+          \`\`\`
+
+          開いたウィンドウの Moost.app を Applications へドラッグしてください
+          （完了後、マウントされたディスクイメージは取り出して構いません）。
           EOF
 
       - name: Create GitHub Release

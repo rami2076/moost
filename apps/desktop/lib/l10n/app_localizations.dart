@@ -344,6 +344,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settingsTitle;
 
+  /// Shown near the top of Settings so users can tell whether an update actually applied
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String settingVersion(String version);
+
   /// No description provided for @settingTerminal.
   ///
   /// In en, this message translates to:
@@ -476,11 +482,65 @@ abstract class AppLocalizations {
   /// **'Unknown agent: {agent}'**
   String unknownAgent(String agent);
 
-  /// Footer button shown when a newer release exists
+  /// Static footer button label shown when a newer release exists
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get update;
+
+  /// Tooltip on the update button showing the available version
   ///
   /// In en, this message translates to:
   /// **'{version} available'**
   String updateAvailable(String version);
+
+  /// Shown inline in the footer after tapping Update (brew-managed installs)
+  ///
+  /// In en, this message translates to:
+  /// **'Update now?'**
+  String get updateConfirmQuestion;
+
+  /// Shown after answering No to updateConfirmQuestion, offering the manual copy-command fallback
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the update command instead?'**
+  String get updateConfirmCopyQuestion;
+
+  /// No description provided for @yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get no;
+
+  /// Shown briefly after the upgrade command is copied to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Command copied'**
+  String get updateCommandCopied;
+
+  /// No description provided for @updateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating…'**
+  String get updateRunning;
+
+  /// No description provided for @updateRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get updateRestart;
+
+  /// Tooltip on the error icon when the brew update/upgrade fails
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: {error}'**
+  String updateFailed(String error);
 
   /// Last-used/updated date shown at the right of each list row
   ///

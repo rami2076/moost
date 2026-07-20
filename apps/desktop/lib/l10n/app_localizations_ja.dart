@@ -144,6 +144,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsTitle => '設定';
 
   @override
+  String settingVersion(String version) {
+    return 'バージョン $version';
+  }
+
+  @override
   String get settingTerminal => '復帰先ターミナル';
 
   @override
@@ -220,8 +225,37 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get update => 'アップデート';
+
+  @override
   String updateAvailable(String version) {
     return '$version が利用可能';
+  }
+
+  @override
+  String get updateConfirmQuestion => 'アップデートしますか?';
+
+  @override
+  String get updateConfirmCopyQuestion => 'アップデートコマンドをコピーしますか?';
+
+  @override
+  String get yes => 'はい';
+
+  @override
+  String get no => 'いいえ';
+
+  @override
+  String get updateCommandCopied => 'コマンドをコピーしました';
+
+  @override
+  String get updateRunning => '更新中…';
+
+  @override
+  String get updateRestart => '再起動';
+
+  @override
+  String updateFailed(String error) {
+    return '更新に失敗しました: $error';
   }
 
   @override

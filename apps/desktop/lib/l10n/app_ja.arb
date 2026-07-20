@@ -41,6 +41,7 @@
   "footerNotes": "注意",
   "footerQuit": "終了",
   "settingsTitle": "設定",
+  "settingVersion": "バージョン {version}",
   "settingTerminal": "復帰先ターミナル",
   "settingRecentLimit": "直近セッション表示件数",
   "settingClaudePath": "claude コマンドのパス（要約用）",
@@ -63,6 +64,15 @@
   "resumeInTerminal": "ターミナルで再開",
   "terminalLaunchFailed": "ターミナルの起動に失敗しました: {error}",
   "unknownAgent": "不明なエージェント: {agent}",
+  "update": "アップデート",
   "updateAvailable": "{version} が利用可能",
+  "updateConfirmQuestion": "アップデートしますか?",
+  "updateConfirmCopyQuestion": "アップデートコマンドをコピーしますか?",
+  "yes": "はい",
+  "no": "いいえ",
+  "updateCommandCopied": "コマンドをコピーしました",
+  "updateRunning": "更新中…",
+  "updateRestart": "再起動",
+  "updateFailed": "更新に失敗しました: {error}",
   "listUpdatedAt": "{month}月{day}日 {time}"
 }

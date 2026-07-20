@@ -25,6 +25,11 @@ class CopyFeedbackTiming {
   /// ための固定時間。
   static const noAnimationHold = Duration(milliseconds: 1000);
 
+  /// アップデートボタンの「コピーしました」表示時間（ms）。
+  /// 連打前提の [sweepMs]/[holdMs] とは意図的に別枠（一度きりの確認
+  /// メッセージなので、じっくり読める長さが必要で用途が異なる）。
+  static final ValueNotifier<int> updateCopiedHoldMs = ValueNotifier(3000);
+
   /// アニメーションを再生すべきか。
   static bool get animate => animationEnabled.value;
 
@@ -41,6 +46,12 @@ class CopyFeedbackTiming {
     }
     return kDebugMode ? Duration(milliseconds: holdMs.value) : release;
   }
+
+  /// デバッグビルドなら [updateCopiedHoldMs] の調整値、リリースビルドなら
+  /// [release] を返す。
+  static Duration updateCopiedHold(Duration release) => kDebugMode
+      ? Duration(milliseconds: updateCopiedHoldMs.value)
+      : release;
 }
 
 /// コピー操作のアイコンボタン。成功すると
@@ -66,6 +77,12 @@ class CopyIconButton extends StatefulWidget {
   /// チェックマーク表示を維持する時間。
   final Duration feedbackDuration;
 
+  /// フィードバック表示（スイープ + チェック保持）が完全に終わり、
+  /// 通常のコピーアイコンへ戻ったタイミングで呼ばれる。
+  /// 呼び出し元がこのボタンをきっかけに別の状態遷移をしたい場合に使う
+  /// （例: 確認ダイアログをこのボタンで確定させ、完了後に自動で閉じる）。
+  final VoidCallback? onFeedbackComplete;
+
   const CopyIconButton({
     super.key,
     required this.onCopy,
@@ -74,6 +91,7 @@ class CopyIconButton extends StatefulWidget {
     this.compact = false,
     this.sweepDuration = const Duration(milliseconds: 250),
     this.feedbackDuration = const Duration(milliseconds: 400),
+    this.onFeedbackComplete,
   });
 
   @override
@@ -144,6 +162,7 @@ class _CopyIconButtonState extends State<CopyIconButton>
         _copied = false;
         _busy = false;
       });
+      widget.onFeedbackComplete?.call();
     });
   }
 

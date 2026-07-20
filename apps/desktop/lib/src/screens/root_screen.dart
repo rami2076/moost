@@ -425,9 +425,9 @@ class _RootScreenState extends State<RootScreen> {
               ),
               label:
                   Text(l10n.updateAvailable('v${_availableUpdate!.version}')),
-              onPressed: _updateButtonBusy
-                  ? null
-                  : () => _onUpdateTapped(_availableUpdate!),
+              // busy 判定は _onUpdateTapped 冒頭で行う（CopyIconButton と同じ
+              // 理由: onPressed を null にするとタップが親へ素通りしうる）
+              onPressed: () => _onUpdateTapped(_availableUpdate!),
             ),
           const Spacer(),
           TextButton.icon(

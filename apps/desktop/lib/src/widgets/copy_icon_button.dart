@@ -183,7 +183,11 @@ class _CopyIconButtonState extends State<CopyIconButton>
       icon: icon,
       iconSize: arcExtent,
       tooltip: widget.tooltip,
-      onPressed: _busy ? null : _handlePressed,
+      // onPressed を null にすると（連打対策の busy 中）IconButton が
+      // タップを消費しなくなり、親の ListTile.onTap（行タップ＝メモ登録/編集
+      // 画面への遷移）へ素通りしてしまう。busy 判定は _handlePressed の
+      // 冒頭ですでに行っているので、ハンドラは常に渡してタップを吸収する
+      onPressed: _handlePressed,
       padding: widget.compact ? EdgeInsets.zero : null,
       constraints: widget.compact ? const BoxConstraints() : null,
     );

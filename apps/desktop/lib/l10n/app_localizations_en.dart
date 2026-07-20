@@ -27,9 +27,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get copyResumeCommand => 'Copy resume command';
 
   @override
-  String get resumeCommandCopied => 'Resume command copied';
-
-  @override
   String loadFailed(String error) {
     return 'Failed to load: $error';
   }
@@ -136,9 +133,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get copiedToClipboard => 'Copied';
-
-  @override
   String get footerSettings => 'Settings';
 
   @override
@@ -169,6 +163,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingClaudePathNotFound => 'Auto-detect: not found';
+
+  @override
+  String get settingCopyAnimation => 'Copy success animation';
 
   @override
   String get notesTitle => 'Notes';
@@ -227,10 +224,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String updateAvailable(String version) {
     return '$version available';
   }
-
-  @override
-  String get updateCommandCopied =>
-      'Update command copied — run it in a terminal';
 
   @override
   String listUpdatedAt(int month, int day, String time) {

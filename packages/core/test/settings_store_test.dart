@@ -22,6 +22,7 @@ void main() {
     expect(settings.recentSessionLimit, 20);
     expect(settings.claudePath, '');
     expect(settings.summaryRallyCount, 1);
+    expect(settings.copyAnimation, isTrue);
   });
 
   test('save and load roundtrip', () async {
@@ -30,6 +31,7 @@ void main() {
       recentSessionLimit: 50,
       claudePath: '~/.local/bin/claude',
       summaryRallyCount: 5,
+      copyAnimation: false,
     ));
 
     final settings = await store.load();
@@ -37,6 +39,7 @@ void main() {
     expect(settings.recentSessionLimit, 50);
     expect(settings.claudePath, '~/.local/bin/claude');
     expect(settings.summaryRallyCount, 5);
+    expect(settings.copyAnimation, isFalse);
   });
 
   test('unknown or missing keys fall back to defaults', () async {
@@ -47,6 +50,8 @@ void main() {
     final settings = await store.load();
     expect(settings.terminalApp, 'iTerm2');
     expect(settings.recentSessionLimit, 20);
+    // 旧バージョンの settings.json に copyAnimation はない → デフォルト true
+    expect(settings.copyAnimation, isTrue);
   });
 
   test('wrong value types fall back to defaults without crashing', () async {

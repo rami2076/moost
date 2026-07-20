@@ -18,6 +18,14 @@ Future<void> settle(WidgetTester tester) async {
   }
 }
 
+/// コピー成功フィードバックの緑チェックアイコン。
+/// （SegmentedButton の選択中タブにも Icons.check が出るため色で絞る）
+Finder greenCheckIcon() => find.byWidgetPredicate(
+    (widget) =>
+        widget is Icon &&
+        widget.icon == Icons.check &&
+        widget.color == Colors.green);
+
 /// テスト用の一時ディレクトリを作り、競合に耐える teardown を登録する。
 ///
 /// ストアの保存は「.tmp 書き込み → rename」のアトミック方式のため、
@@ -90,6 +98,53 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       await tester.pump();
       expect(find.text('No memos found'), findsOneWidget);
+    });
+  });
+
+  testWidgets(
+      'tapping the copy icon while its feedback is busy does not fall '
+      'through to the row tap (navigate to memo form)', (tester) async {
+    // 回帰テスト: onPressed を null にして busy を表現すると IconButton が
+    // タップを消費しなくなり、親の ListTile.onTap（メモ登録画面への遷移）
+    // へ素通りしてしまうバグがあった
+    final tempDir = createTempDir();
+
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+    File('${claudeHome.path}/history.jsonl').writeAsStringSync(jsonEncode({
+      'display': 'test prompt',
+      'timestamp': 1700000000000,
+      'project': '/tmp/proj',
+      'sessionId': 'sess-1',
+    }));
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+      ));
+      await settle(tester);
+
+      final copyButton = find.byTooltip('Copy resume command');
+
+      // 1 回目: コピー実行 → スイープ開始（busy）
+      await tester.tap(copyButton);
+      await tester.pump();
+
+      // 2 回目: busy 中に同じアイコンを連打しても、行の onTap（メモ登録
+      // 画面への遷移）へは伝播しない
+      await tester.tap(copyButton);
+      await tester.pump();
+      expect(find.text('Register Memo'), findsNothing);
+      expect(find.text('test prompt'), findsOneWidget);
+
+      // フィードバックが完全に終わってから行をタップすると、通常どおり
+      // メモ登録画面へ遷移する（誤検知でないことの確認）
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.tap(find.text('test prompt'));
+      await tester.pump();
+      expect(find.text('Register Memo'), findsOneWidget);
     });
   });
 
@@ -236,13 +291,11 @@ void main() {
       // フッターに更新ボタンが出る
       expect(find.text('v9.9.9 available'), findsOneWidget);
 
-      // brew 導入なので、タップで更新コマンドコピーの通知が出る
+      // brew 導入なので、タップでコマンドがコピーされ
+      // アイコンが緑のチェックに変わる（スナックバーは出さない）
       await tester.tap(find.text('v9.9.9 available'));
       await settle(tester);
-      expect(
-        find.textContaining('Update command copied'),
-        findsOneWidget,
-      );
+      expect(greenCheckIcon(), findsOneWidget);
       expect(openedUrls, isEmpty);
     });
   });
@@ -300,6 +353,14 @@ void main() {
 
       // セッション行にターミナル起動ボタンが並ぶ
       expect(find.byTooltip('Open in terminal'), findsOneWidget);
+
+      // 復帰コマンドのコピー成功 → 円周スイープが完了するとアイコンが
+      // 緑のチェックに変わる
+      await tester.tap(find.byTooltip('Copy resume command'));
+      await settle(tester); // 非同期のコピー完了・スイープ開始
+      await tester.pump(const Duration(milliseconds: 600)); // スイープ完了
+      await tester.pump();
+      expect(greenCheckIcon(), findsOneWidget);
 
       // 最終利用日時がサブタイトル行に出る（表示はローカル時刻・en ロケール）
       final localUpdated = DateTime.utc(2026, 7, 9).toLocal();

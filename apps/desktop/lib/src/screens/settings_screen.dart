@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,9 +10,10 @@ import '../widgets/copy_icon_button.dart';
 
 /// 設定画面（design.md 6.6）。
 ///
-/// ログイン時自動起動とバージョン表示はプラグイン依存（launch_at_startup /
-/// package_info_plus）のため、このスライスでは扱わない。
-/// 変更は onChanged で即 SettingsStore に保存する。
+/// ログイン時自動起動はプラグイン依存（launch_at_startup）のため、
+/// このスライスでは扱わない。変更は onChanged で即 SettingsStore に保存する。
+/// 終了ボタンはフッターから移動してきたもの（更新ボタンの確認 UI と
+/// 幅を取り合わないようにするため）。
 class SettingsScreen extends StatefulWidget {
   final SettingsStore settingsStore;
   final ClaudePathResolver pathResolver;
@@ -227,6 +230,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      // フッターから移動（更新ボタンの確認 UI と幅を
+                      // 取り合わないようにするため）
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.power_settings_new,
+                              size: 16),
+                          label: Text(l10n.footerQuit),
+                          onPressed: () => exit(0),
+                        ),
+                      ),
                     ],
                   ),
                 ),

@@ -390,7 +390,7 @@ void main() {
 
       // しばらくすると自動で idle に戻る（_copiedRevertTimer は実時間の
       // Timer なので、pump(duration) ではなく実際に待つ）
-      await Future<void>.delayed(const Duration(milliseconds: 1300));
+      await Future<void>.delayed(const Duration(milliseconds: 3100));
       await tester.pump();
       expect(find.text('Update'), findsOneWidget);
     });
@@ -542,12 +542,17 @@ void main() {
       ));
       await settle(tester);
 
+      // フッターに Quit はない（設定画面に移動した）
+      expect(find.widgetWithText(TextButton, 'Quit'), findsNothing);
+
       // 設定を開く → 復帰先ターミナルの項目が見える
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
       await settle(tester);
       expect(find.text('Resume terminal'), findsOneWidget);
       // appVersion 未指定なのでバージョン行は出ない
       expect(find.textContaining('Version'), findsNothing);
+      // Quit はここにある
+      expect(find.widgetWithText(TextButton, 'Quit'), findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, 'Back'));
       await settle(tester);
 

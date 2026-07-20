@@ -426,31 +426,19 @@ class _RootScreenState extends State<RootScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          // 更新ボタンが確認/実行中で横幅を要求している間は、他のフッター
-          // ボタンを一時的に隠して確認文言 + Yes/No が収まる余地を作る
-          // （長めの文言だと同居しきれずオーバーフローするため）
-          if (!_updateExpanded) ...[
-            TextButton.icon(
-              icon: const Icon(Icons.settings, size: 16),
-              label: Text(l10n.footerSettings),
-              onPressed: () =>
-                  setState(() => _screen = const SettingsMenuScreen()),
-            ),
-            TextButton.icon(
-              icon: const Icon(Icons.info_outline, size: 16),
-              label: Text(l10n.footerNotes),
-              onPressed: () =>
-                  setState(() => _screen = const NotesMenuScreen()),
-            ),
-          ],
+          TextButton.icon(
+            icon: const Icon(Icons.settings, size: 16),
+            label: Text(l10n.footerSettings),
+            onPressed: () =>
+                setState(() => _screen = const SettingsMenuScreen()),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.info_outline, size: 16),
+            label: Text(l10n.footerNotes),
+            onPressed: () =>
+                setState(() => _screen = const NotesMenuScreen()),
+          ),
           ?updateButton,
-          if (!_updateExpanded) const Spacer(),
-          if (!_updateExpanded)
-            TextButton.icon(
-              icon: const Icon(Icons.power_settings_new, size: 16),
-              label: Text(l10n.footerQuit),
-              onPressed: () => exit(0),
-            ),
         ],
       ),
     );
@@ -931,6 +919,12 @@ class _UpdateButtonState extends State<_UpdateButton> {
   /// コピー確認の「いいえ」→ 最初（idle）に戻る。
   void _declineCopy() => _setPhase(_UpdatePhase.idle);
 
+  /// 「コピーしました」の表示時間。他のコピーアイコン（復帰コマンド等）と
+  /// 共有の CopyFeedbackTiming は使わない。あちらは連打前提の短い
+  /// スイープ演出用で、こちらは一度きりの確認メッセージなので
+  /// じっくり読めるだけの長さを独立して確保する。
+  static const _copiedHoldDuration = Duration(seconds: 3);
+
   Future<void> _copyCommand() async {
     await Clipboard.setData(
       const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
@@ -938,8 +932,7 @@ class _UpdateButtonState extends State<_UpdateButton> {
     if (!mounted) return;
     _setPhase(_UpdatePhase.copied);
     _copiedRevertTimer?.cancel();
-    _copiedRevertTimer = Timer(
-        CopyFeedbackTiming.hold(const Duration(milliseconds: 1200)), () {
+    _copiedRevertTimer = Timer(_copiedHoldDuration, () {
       if (mounted) {
         _setPhase(_UpdatePhase.idle);
       }

@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-20
+
 ### Added
 
 - 設定に「コピー成功アニメーション」の ON/OFF を追加（`settings.json` に永続化）

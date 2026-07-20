@@ -48,3 +48,7 @@ dart run bin/moost.dart --help   # CLI サンプル
 
 要求・要件・設計資料は docs リポジトリの `project/moost/` を正とする。
 リリース手順は [RELEASE.md](./RELEASE.md)。
+
+## ライセンス
+
+[MIT](./LICENSE)

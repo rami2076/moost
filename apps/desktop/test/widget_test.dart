@@ -381,6 +381,9 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('No'));
       await tester.pump();
+      expect(find.text('Copy the update command instead?'), findsOneWidget);
+
+      // 「はい」は他のミニボタンと同じテキストボタン（アイコンではない）
       await tester.tap(find.text('Yes'));
       await settle(tester); // Clipboard.setData の非同期完了を待つ
 
@@ -388,8 +391,8 @@ void main() {
       expect(greenCheckIcon(), findsOneWidget);
       expect(brewUpdater.runCalls, 0); // brew は実行しない、コピーのみ
 
-      // しばらくすると自動で idle に戻る（_copiedRevertTimer は実時間の
-      // Timer なので、pump(duration) ではなく実際に待つ）
+      // しばらくすると自動で idle に戻る（実時間の Timer なので、
+      // pump(duration) ではなく実際に待つ）
       await Future<void>.delayed(const Duration(milliseconds: 3100));
       await tester.pump();
       expect(find.text('Update'), findsOneWidget);
@@ -551,8 +554,15 @@ void main() {
       expect(find.text('Resume terminal'), findsOneWidget);
       // appVersion 未指定なのでバージョン行は出ない
       expect(find.textContaining('Version'), findsNothing);
-      // Quit はここにある
-      expect(find.widgetWithText(TextButton, 'Quit'), findsOneWidget);
+      // Quit はここにある（デバッグ欄の分、ListView が遅延ビルドする
+      // 範囲外になっていることがあるため、見えるまでスクロールする）
+      final quitButton = find.widgetWithText(TextButton, 'Quit');
+      await tester.dragUntilVisible(
+        quitButton,
+        find.byType(ListView),
+        const Offset(0, -50),
+      );
+      expect(quitButton, findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, 'Back'));
       await settle(tester);
 

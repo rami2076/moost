@@ -859,7 +859,15 @@ class _UpdateButton extends StatefulWidget {
   State<_UpdateButton> createState() => _UpdateButtonState();
 }
 
-enum _UpdatePhase { idle, confirming, confirmCopy, copied, running, done, failed }
+enum _UpdatePhase {
+  idle,
+  confirming,
+  confirmCopy,
+  copied,
+  running,
+  done,
+  failed,
+}
 
 /// 確認文言や実行中表示など、コンパクトな idle/done/failed より
 /// 横幅を要求する状態（フッターの他ボタンを一時的に隠す対象）。
@@ -919,10 +927,15 @@ class _UpdateButtonState extends State<_UpdateButton> {
   /// コピー確認の「いいえ」→ 最初（idle）に戻る。
   void _declineCopy() => _setPhase(_UpdatePhase.idle);
 
-  /// 「コピーしました」の表示時間。他のコピーアイコン（復帰コマンド等）と
-  /// 共有の CopyFeedbackTiming は使わない。あちらは連打前提の短い
-  /// スイープ演出用で、こちらは一度きりの確認メッセージなので
-  /// じっくり読めるだけの長さを独立して確保する。
+  /// コマンドをコピーする。フィードバック表示は他のコピーボタンと同じ
+  /// [CopyIconButton]（円周スイープ + 緑チェック）に統一し、この Row 独自の
+  /// 見た目は持たない。完了後の idle への復帰は onFeedbackComplete で行う。
+  /// 「コピーしました」の表示時間（リリースビルドの既定値）。他のコピー
+  /// アイコン（復帰コマンド等）と共有の sweep/hold は使わない。あちらは
+  /// 連打前提の短いスイープ演出用で、こちらは一度きりの確認メッセージ
+  /// なのでじっくり読めるだけの長さを独立して確保する。デバッグビルドでは
+  /// 設定画面から専用の ms フィールド（CopyFeedbackTiming.updateCopiedHoldMs）
+  /// で調整できる。
   static const _copiedHoldDuration = Duration(seconds: 3);
 
   Future<void> _copyCommand() async {
@@ -932,7 +945,8 @@ class _UpdateButtonState extends State<_UpdateButton> {
     if (!mounted) return;
     _setPhase(_UpdatePhase.copied);
     _copiedRevertTimer?.cancel();
-    _copiedRevertTimer = Timer(_copiedHoldDuration, () {
+    _copiedRevertTimer = Timer(
+        CopyFeedbackTiming.updateCopiedHold(_copiedHoldDuration), () {
       if (mounted) {
         _setPhase(_UpdatePhase.idle);
       }
@@ -971,62 +985,58 @@ class _UpdateButtonState extends State<_UpdateButton> {
             onPressed: _handleIdleOrFailedTap,
           ),
         ),
-      // 確認文言は Expanded + 省略記号にして、長い翻訳文でもボタンの
-      // タップ領域を必ず確保する（フッター側で他ボタンを隠して幅を
-      // 確保した上での、さらなる安全弁）
-      _UpdatePhase.confirming => Row(
+      // 「アップデート」ボタンがそのまま「アップデートしますか?」という
+      // 1 つの丸い容器（ピル型）に変化し、Yes/No はその中の小さなボタンで
+      // 表現する（フッターに Row 単体を裸で置くより「ボタンが変化した」
+      // という一体感が出る）。確認文言は Expanded + 省略記号にして、
+      // 長い翻訳文でもボタンのタップ領域を必ず確保する
+      _UpdatePhase.confirming => _ConfirmPill(
+          question: l10n.updateConfirmQuestion,
           children: [
-            Expanded(
-              child: Text(
-                l10n.updateConfirmQuestion,
-                style: theme.textTheme.bodySmall,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 6),
-            FilledButton(
-              style: compactStyle,
+            _MiniChoiceButton(
+              label: l10n.yes,
+              primary: true,
               onPressed: _runUpdate,
-              child: Text(l10n.yes),
             ),
-            const SizedBox(width: 4),
-            FilledButton.tonal(
-              style: compactStyle,
+            _MiniChoiceButton(
+              label: l10n.no,
               onPressed: _declineUpdate,
-              child: Text(l10n.no),
             ),
           ],
         ),
-      _UpdatePhase.confirmCopy => Row(
+      _UpdatePhase.confirmCopy => _ConfirmPill(
+          question: l10n.updateConfirmCopyQuestion,
           children: [
-            Expanded(
-              child: Text(
-                l10n.updateConfirmCopyQuestion,
-                style: theme.textTheme.bodySmall,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 6),
-            FilledButton(
-              style: compactStyle,
+            _MiniChoiceButton(
+              label: l10n.yes,
+              primary: true,
               onPressed: _copyCommand,
-              child: Text(l10n.yes),
             ),
-            const SizedBox(width: 4),
-            FilledButton.tonal(
-              style: compactStyle,
+            _MiniChoiceButton(
+              label: l10n.no,
               onPressed: _declineCopy,
-              child: Text(l10n.no),
             ),
           ],
         ),
-      _UpdatePhase.copied => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check, size: 16, color: Colors.green),
-            const SizedBox(width: 6),
-            Text(l10n.updateCommandCopied, style: theme.textTheme.bodySmall),
-          ],
+      _UpdatePhase.copied => Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check, size: 16, color: Colors.green),
+              const SizedBox(width: 6),
+              Text(
+                l10n.updateCommandCopied,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+              ),
+            ],
+          ),
         ),
       _UpdatePhase.running => Row(
           mainAxisSize: MainAxisSize.min,
@@ -1056,5 +1066,86 @@ class _UpdateButtonState extends State<_UpdateButton> {
           ),
         ),
     };
+  }
+}
+
+/// 更新ボタンの確認状態を包む丸い容器（ピル型）。中に質問文 + 小さな
+/// ボタン（Yes/No やコピーアイコン）を並べ、「ボタン自体が変化した」
+/// という一体感を出す。
+class _ConfirmPill extends StatelessWidget {
+  final String question;
+  final List<Widget> children;
+
+  const _ConfirmPill({required this.question, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.only(left: 12, right: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              question,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+/// ピルの中に収める小さな選択ボタン（Yes/No 等）。
+class _MiniChoiceButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  /// はい寄りの強調表示にするか（塗りつぶし + primary 色）。
+  final bool primary;
+
+  const _MiniChoiceButton({
+    required this.label,
+    required this.onPressed,
+    this.primary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Material(
+        color: primary ? theme.colorScheme.primary : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: primary
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSecondaryContainer,
+                fontWeight: primary ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

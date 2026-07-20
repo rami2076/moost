@@ -229,6 +229,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        // アップデートボタンの「コピーしました」表示時間。
+                        // 上の sweep/hold とは独立した別枠（意図的に非連動）
+                        _DebugMsField(
+                          label: 'update copied',
+                          notifier: CopyFeedbackTiming.updateCopiedHoldMs,
+                        ),
                       ],
                       const SizedBox(height: 24),
                       const Divider(),

@@ -89,4 +89,42 @@ void main() {
     await tester.pump();
     expect(copyCount, 2);
   });
+
+  testWidgets('onFeedbackComplete fires exactly when the icon reverts',
+      (tester) async {
+    var completeCount = 0;
+    await tester.pumpWidget(wrap(CopyIconButton(
+      onCopy: () async {},
+      onFeedbackComplete: () => completeCount++,
+    )));
+
+    await tester.tap(find.byType(IconButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300)); // スイープ完了
+    expect(greenCheckIcon(), findsOneWidget);
+    expect(completeCount, 0); // チェック表示中はまだ呼ばれない
+
+    await tester.pump(const Duration(milliseconds: 450)); // hold 完了・復帰
+    expect(greenCheckIcon(), findsNothing);
+    expect(completeCount, 1);
+  });
+
+  testWidgets(
+      'onFeedbackComplete fires on the immediate reduce-motion/no-animation '
+      'path too', (tester) async {
+    CopyFeedbackTiming.animationEnabled.value = false;
+    var completeCount = 0;
+    await tester.pumpWidget(wrap(CopyIconButton(
+      onCopy: () async {},
+      onFeedbackComplete: () => completeCount++,
+    )));
+
+    await tester.tap(find.byType(IconButton));
+    await tester.pump();
+    expect(greenCheckIcon(), findsOneWidget);
+    expect(completeCount, 0);
+
+    await tester.pump(const Duration(milliseconds: 1100)); // 固定 1s hold
+    expect(completeCount, 1);
+  });
 }

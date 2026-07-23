@@ -1,5 +1,5 @@
 ---
-name: 質問
+name: 質問・使い方
 about: 使い方や仕組みについての質問
 title: ''
 labels: question

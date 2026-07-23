@@ -76,10 +76,10 @@ String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
 /// Claude は anthropic.com のアクセントカラー、Codex は
 /// github.com/openai/codex の CLI スプラッシュ画像の配色。
 Color _agentColor(String agentId) => switch (agentId) {
-      ClaudeCodeAdapter.id => const Color(0xFFD97757),
-      CodexAdapter.id => const Color(0xFF6867AA),
-      _ => Colors.grey,
-    };
+  ClaudeCodeAdapter.id => const Color(0xFFD97757),
+  CodexAdapter.id => const Color(0xFF6867AA),
+  _ => Colors.grey,
+};
 
 class RootScreen extends StatefulWidget {
   final AdapterRegistry registry;
@@ -158,8 +158,9 @@ class RootScreen extends StatefulWidget {
   /// この関数は isBrewManaged が true のときだけ呼ばれるので、
   /// 通常インストールならこのパスに実体がある前提で問題ない。
   static Future<void> defaultRestart() async {
-    await Process.start('open', ['/Applications/Moost.app'],
-        mode: ProcessStartMode.detached);
+    await Process.start('open', [
+      '/Applications/Moost.app',
+    ], mode: ProcessStartMode.detached);
     exit(0);
   }
 
@@ -256,8 +257,7 @@ class _RootScreenState extends State<RootScreen> {
     _summaryRallies = settings.summaryRallyCount;
     // 永続化されたアニメーション設定を実行時キャリアへ反映する
     CopyFeedbackTiming.animationEnabled.value = settings.copyAnimation;
-    return widget.registry
-        .recentSessions(limit: settings.recentSessionLimit);
+    return widget.registry.recentSessions(limit: settings.recentSessionLimit);
   }
 
   /// バッジ表示用のエージェント名。未知の agentId は生の id をそのまま出す。
@@ -272,11 +272,11 @@ class _RootScreenState extends State<RootScreen> {
       EditMemoScreen(:final memo) => _buildEditMemo(memo),
       SessionDetailMenuScreen(:final session) => _buildSessionDetail(session),
       SettingsMenuScreen() => SettingsScreen(
-          settingsStore: widget.settingsStore,
-          pathResolver: _pathResolver,
-          onBack: () => _showList(_tab),
-          appVersion: widget.appVersion,
-        ),
+        settingsStore: widget.settingsStore,
+        pathResolver: _pathResolver,
+        onBack: () => _showList(_tab),
+        appVersion: widget.appVersion,
+      ),
       NotesMenuScreen() => NotesScreen(onBack: () => _showList(_tab)),
     };
   }
@@ -292,8 +292,7 @@ class _RootScreenState extends State<RootScreen> {
       initialRallies: _summaryRallies,
       onBack: () => _showList(ListTab.recent),
       // セッション詳細からメモ登録へ（一覧を経由しない直接遷移）
-      onRegisterMemo: () =>
-          setState(() => _screen = NewMemoScreen(session)),
+      onRegisterMemo: () => setState(() => _screen = NewMemoScreen(session)),
       onOpenTerminal: () => _openInTerminal(
         agent: session.agentId,
         projectPath: session.projectPath,
@@ -320,17 +319,19 @@ class _RootScreenState extends State<RootScreen> {
       isEdit: false,
       onSave: ({required title, required tags, required body}) async {
         final now = DateTime.now().toUtc();
-        await widget.memoStore.add(Memo(
-          id: generateUuidV4(),
-          agent: session.agentId,
-          sessionId: session.sessionId,
-          title: title,
-          tags: tags,
-          body: body,
-          projectPath: session.projectPath,
-          createdAt: now,
-          updatedAt: now,
-        ));
+        await widget.memoStore.add(
+          Memo(
+            id: generateUuidV4(),
+            agent: session.agentId,
+            sessionId: session.sessionId,
+            title: title,
+            tags: tags,
+            body: body,
+            projectPath: session.projectPath,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
         // 登録したメモを確認できるようメモ一覧タブへ戻す
         _showList(ListTab.memos);
       },
@@ -348,8 +349,12 @@ class _RootScreenState extends State<RootScreen> {
       initialBody: memo.body,
       isEdit: true,
       onSave: ({required title, required tags, required body}) async {
-        await widget.memoStore
-            .update(memo.id, title: title, tags: tags, body: body);
+        await widget.memoStore.update(
+          memo.id,
+          title: title,
+          tags: tags,
+          body: body,
+        );
         _showList(ListTab.memos);
       },
       onCancel: () => _showList(ListTab.memos),
@@ -395,41 +400,42 @@ class _RootScreenState extends State<RootScreen> {
             Expanded(
               child: switch (_tab) {
                 ListTab.recent => _SessionList(
-                    sessions: _sessions,
-                    agentLabel: _agentLabel,
-                    onCopyResumeCommand: _copyResumeCommand,
-                    onOpenInTerminal: _openInTerminal,
-                    onTapSession: (session) =>
-                        setState(() => _screen = NewMemoScreen(session)),
-                    onOpenDetail: (session) => setState(
-                        () => _screen = SessionDetailMenuScreen(session)),
+                  sessions: _sessions,
+                  agentLabel: _agentLabel,
+                  onCopyResumeCommand: _copyResumeCommand,
+                  onOpenInTerminal: _openInTerminal,
+                  onTapSession: (session) =>
+                      setState(() => _screen = NewMemoScreen(session)),
+                  onOpenDetail: (session) => setState(
+                    () => _screen = SessionDetailMenuScreen(session),
                   ),
+                ),
                 ListTab.memos => _MemoList(
-                    memos: _memos,
-                    agentLabel: _agentLabel,
-                    pendingDeleteMemoId: _pendingDeleteMemo?.id,
-                    onCopyResumeCommand: _copyResumeCommand,
-                    onOpenInTerminal: _openInTerminal,
-                    onTapMemo: (memo) =>
-                        setState(() => _screen = EditMemoScreen(memo)),
-                    onDeleteMemo: (memo) =>
-                        setState(() => _pendingDeleteMemo = memo),
-                    onCancelDelete: () =>
-                        setState(() => _pendingDeleteMemo = null),
-                    onConfirmDelete: _deleteMemoConfirmed,
-                  ),
+                  memos: _memos,
+                  agentLabel: _agentLabel,
+                  pendingDeleteMemoId: _pendingDeleteMemo?.id,
+                  onCopyResumeCommand: _copyResumeCommand,
+                  onOpenInTerminal: _openInTerminal,
+                  onTapMemo: (memo) =>
+                      setState(() => _screen = EditMemoScreen(memo)),
+                  onDeleteMemo: (memo) =>
+                      setState(() => _pendingDeleteMemo = memo),
+                  onCancelDelete: () =>
+                      setState(() => _pendingDeleteMemo = null),
+                  onConfirmDelete: _deleteMemoConfirmed,
+                ),
                 ListTab.projects => _ProjectList(
-                    projects: _projects,
-                    adapters: widget.registry.adapters,
-                    pendingDeleteProjectId: _pendingDeleteProject?.id,
-                    onRegister: _registerProject,
-                    onLaunch: _openNewSession,
-                    onDeleteProject: (project) =>
-                        setState(() => _pendingDeleteProject = project),
-                    onCancelDelete: () =>
-                        setState(() => _pendingDeleteProject = null),
-                    onConfirmDelete: _deleteProjectConfirmed,
-                  ),
+                  projects: _projects,
+                  adapters: widget.registry.adapters,
+                  pendingDeleteProjectId: _pendingDeleteProject?.id,
+                  onRegister: _registerProject,
+                  onLaunch: _openNewSession,
+                  onDeleteProject: (project) =>
+                      setState(() => _pendingDeleteProject = project),
+                  onCancelDelete: () =>
+                      setState(() => _pendingDeleteProject = null),
+                  onConfirmDelete: _deleteProjectConfirmed,
+                ),
               },
             ),
             _buildFooter(context),
@@ -481,11 +487,13 @@ class _RootScreenState extends State<RootScreen> {
       _showList(ListTab.projects);
       return;
     }
-    await widget.projectStore.add(Project(
-      id: generateUuidV4(),
-      projectPath: path,
-      createdAt: DateTime.now().toUtc(),
-    ));
+    await widget.projectStore.add(
+      Project(
+        id: generateUuidV4(),
+        projectPath: path,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    );
     if (!mounted) {
       return;
     }
@@ -553,8 +561,7 @@ class _RootScreenState extends State<RootScreen> {
           TextButton.icon(
             icon: const Icon(Icons.info_outline, size: 16),
             label: Text(l10n.footerNotes),
-            onPressed: () =>
-                setState(() => _screen = const NotesMenuScreen()),
+            onPressed: () => setState(() => _screen = const NotesMenuScreen()),
           ),
           ?updateButton,
         ],
@@ -568,9 +575,9 @@ class _RootScreenState extends State<RootScreen> {
     final adapter = widget.registry.byId(agent);
     if (adapter == null && mounted) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.unknownAgent(agent))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.unknownAgent(agent))));
     }
     return adapter;
   }
@@ -616,9 +623,9 @@ class _RootScreenState extends State<RootScreen> {
       );
     } on Object catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.terminalLaunchFailed('$e'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.terminalLaunchFailed('$e'))));
     }
   }
 
@@ -642,9 +649,9 @@ class _RootScreenState extends State<RootScreen> {
       );
     } on Object catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.terminalLaunchFailed('$e'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.terminalLaunchFailed('$e'))));
     }
   }
 }
@@ -656,12 +663,14 @@ class _SessionList extends StatelessWidget {
     required String agent,
     required String projectPath,
     required String sessionId,
-  }) onCopyResumeCommand;
+  })
+  onCopyResumeCommand;
   final Future<void> Function({
     required String agent,
     required String projectPath,
     required String sessionId,
-  }) onOpenInTerminal;
+  })
+  onOpenInTerminal;
   final void Function(RecentSession session) onTapSession;
   final void Function(RecentSession session) onOpenDetail;
 
@@ -681,9 +690,7 @@ class _SessionList extends StatelessWidget {
       future: sessions,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Text(l10n.loadFailed('${snapshot.error}')),
-          );
+          return Center(child: Text(l10n.loadFailed('${snapshot.error}')));
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -692,74 +699,79 @@ class _SessionList extends StatelessWidget {
         if (items.isEmpty) {
           return Center(child: Text(l10n.noSessionsFound));
         }
-        return ListView.builder(
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final session = items[index];
-            final updatedAtText =
-                _formatListUpdatedAt(l10n, session.updatedAt);
-            return ListTile(
-              onTap: () => onTapSession(session),
-              title: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      session.displayTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+        return Scrollbar(
+          thumbVisibility: true,
+          child: ListView.builder(
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final session = items[index];
+              final updatedAtText = _formatListUpdatedAt(
+                l10n,
+                session.updatedAt,
+              );
+              return ListTile(
+                onTap: () => onTapSession(session),
+                title: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        session.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  _AgentBadge(agentLabel(session.agentId)),
-                ],
-              ),
-              // 最終利用日時はサブタイトル行の右端（プロジェクトパスと同じ行）
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      session.projectPath,
+                    const SizedBox(width: 6),
+                    _AgentBadge(agentLabel(session.agentId)),
+                  ],
+                ),
+                // 最終利用日時はサブタイトル行の右端（プロジェクトパスと同じ行）
+                subtitle: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        session.projectPath,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      updatedAtText,
                       style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    updatedAtText,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.terminal, size: 18),
-                    tooltip: l10n.openInTerminal,
-                    onPressed: () => onOpenInTerminal(
-                      agent: session.agentId,
-                      projectPath: session.projectPath,
-                      sessionId: session.sessionId,
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.terminal, size: 18),
+                      tooltip: l10n.openInTerminal,
+                      onPressed: () => onOpenInTerminal(
+                        agent: session.agentId,
+                        projectPath: session.projectPath,
+                        sessionId: session.sessionId,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.article_outlined, size: 18),
-                    tooltip: l10n.sessionDetailTitle,
-                    onPressed: () => onOpenDetail(session),
-                  ),
-                  CopyIconButton(
-                    tooltip: l10n.copyResumeCommand,
-                    onCopy: () => onCopyResumeCommand(
-                      agent: session.agentId,
-                      projectPath: session.projectPath,
-                      sessionId: session.sessionId,
+                    IconButton(
+                      icon: const Icon(Icons.article_outlined, size: 18),
+                      tooltip: l10n.sessionDetailTitle,
+                      onPressed: () => onOpenDetail(session),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    CopyIconButton(
+                      tooltip: l10n.copyResumeCommand,
+                      onCopy: () => onCopyResumeCommand(
+                        agent: session.agentId,
+                        projectPath: session.projectPath,
+                        sessionId: session.sessionId,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -773,12 +785,14 @@ class _MemoList extends StatelessWidget {
     required String agent,
     required String projectPath,
     required String sessionId,
-  }) onCopyResumeCommand;
+  })
+  onCopyResumeCommand;
   final Future<void> Function({
     required String agent,
     required String projectPath,
     required String sessionId,
-  }) onOpenInTerminal;
+  })
+  onOpenInTerminal;
   final void Function(Memo memo) onTapMemo;
   final void Function(Memo memo) onDeleteMemo;
 
@@ -806,9 +820,7 @@ class _MemoList extends StatelessWidget {
       future: memos,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Text(l10n.loadFailed('${snapshot.error}')),
-          );
+          return Center(child: Text(l10n.loadFailed('${snapshot.error}')));
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -817,79 +829,82 @@ class _MemoList extends StatelessWidget {
         if (items.isEmpty) {
           return Center(child: Text(l10n.noMemosFound));
         }
-        return ListView.builder(
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final memo = items[index];
-            if (memo.id == pendingDeleteMemoId) {
-              return _buildConfirmRow(context, l10n, memo);
-            }
-            return ListTile(
-              onTap: () => onTapMemo(memo),
-              title: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      memo.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+        return Scrollbar(
+          thumbVisibility: true,
+          child: ListView.builder(
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final memo = items[index];
+              if (memo.id == pendingDeleteMemoId) {
+                return _buildConfirmRow(context, l10n, memo);
+              }
+              return ListTile(
+                onTap: () => onTapMemo(memo),
+                title: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        memo.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  _AgentBadge(agentLabel(memo.agent)),
-                ],
-              ),
-              // 最終更新日時はサブタイトル行の右端（セッション一覧と同じ配置）
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      memo.tags.isEmpty
-                          ? memo.projectPath
-                          : '${memo.tags.join(', ')} — ${memo.projectPath}',
+                    const SizedBox(width: 6),
+                    _AgentBadge(agentLabel(memo.agent)),
+                  ],
+                ),
+                // 最終更新日時はサブタイトル行の右端（セッション一覧と同じ配置）
+                subtitle: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        memo.tags.isEmpty
+                            ? memo.projectPath
+                            : '${memo.tags.join(', ')} — ${memo.projectPath}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatListUpdatedAt(l10n, memo.updatedAt),
                       style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatListUpdatedAt(l10n, memo.updatedAt),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // メモは復帰情報を自己完結で持つので、元セッションが一覧から
-                  // 消えていてもここから再開できる（ADR-003）
-                  IconButton(
-                    icon: const Icon(Icons.terminal, size: 18),
-                    tooltip: l10n.resumeInTerminal,
-                    onPressed: () => onOpenInTerminal(
-                      agent: memo.agent,
-                      projectPath: memo.projectPath,
-                      sessionId: memo.sessionId,
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // メモは復帰情報を自己完結で持つので、元セッションが一覧から
+                    // 消えていてもここから再開できる（ADR-003）
+                    IconButton(
+                      icon: const Icon(Icons.terminal, size: 18),
+                      tooltip: l10n.resumeInTerminal,
+                      onPressed: () => onOpenInTerminal(
+                        agent: memo.agent,
+                        projectPath: memo.projectPath,
+                        sessionId: memo.sessionId,
+                      ),
                     ),
-                  ),
-                  CopyIconButton(
-                    tooltip: l10n.copyResumeCommand,
-                    onCopy: () => onCopyResumeCommand(
-                      agent: memo.agent,
-                      projectPath: memo.projectPath,
-                      sessionId: memo.sessionId,
+                    CopyIconButton(
+                      tooltip: l10n.copyResumeCommand,
+                      onCopy: () => onCopyResumeCommand(
+                        agent: memo.agent,
+                        projectPath: memo.projectPath,
+                        sessionId: memo.sessionId,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    tooltip: l10n.delete,
-                    onPressed: () => onDeleteMemo(memo),
-                  ),
-                ],
-              ),
-            );
-          },
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      tooltip: l10n.delete,
+                      onPressed: () => onDeleteMemo(memo),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -948,7 +963,8 @@ class _ProjectList extends StatelessWidget {
   final Future<void> Function({
     required String agent,
     required String projectPath,
-  }) onLaunch;
+  })
+  onLaunch;
   final void Function(Project project) onDeleteProject;
 
   /// 削除確認中のプロジェクト id。該当行だけ確認表示に置き換える。
@@ -1011,56 +1027,59 @@ class _ProjectList extends StatelessWidget {
                 return Center(
                   child: Text(
                     l10n.noProjectsFound,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontSize: 16),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 16),
                   ),
                 );
               }
-              return ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final project = items[index];
-                  if (project.id == pendingDeleteProjectId) {
-                    return _buildConfirmRow(context, l10n, project);
-                  }
-                  return ListTile(
-                    title: Text(
-                      project.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      project.projectPath,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final adapter in adapters)
+              return Scrollbar(
+                thumbVisibility: true,
+                child: ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final project = items[index];
+                    if (project.id == pendingDeleteProjectId) {
+                      return _buildConfirmRow(context, l10n, project);
+                    }
+                    return ListTile(
+                      title: Text(
+                        project.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        project.projectPath,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final adapter in adapters)
+                            IconButton(
+                              icon: Icon(
+                                Icons.terminal,
+                                size: 18,
+                                color: _agentColor(adapter.agentId),
+                              ),
+                              tooltip: l10n.startNewSessionWith(
+                                adapter.displayName,
+                              ),
+                              onPressed: () => onLaunch(
+                                agent: adapter.agentId,
+                                projectPath: project.projectPath,
+                              ),
+                            ),
                           IconButton(
-                            icon: Icon(
-                              Icons.terminal,
-                              size: 18,
-                              color: _agentColor(adapter.agentId),
-                            ),
-                            tooltip:
-                                l10n.startNewSessionWith(adapter.displayName),
-                            onPressed: () => onLaunch(
-                              agent: adapter.agentId,
-                              projectPath: project.projectPath,
-                            ),
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            tooltip: l10n.delete,
+                            onPressed: () => onDeleteProject(project),
                           ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          tooltip: l10n.delete,
-                          onPressed: () => onDeleteProject(project),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               );
             },
           ),
@@ -1261,11 +1280,13 @@ class _UpdateButtonState extends State<_UpdateButton> {
     _setPhase(_UpdatePhase.copied);
     _copiedRevertTimer?.cancel();
     _copiedRevertTimer = Timer(
-        CopyFeedbackTiming.updateCopiedHold(_copiedHoldDuration), () {
-      if (mounted) {
-        _setPhase(_UpdatePhase.idle);
-      }
-    });
+      CopyFeedbackTiming.updateCopiedHold(_copiedHoldDuration),
+      () {
+        if (mounted) {
+          _setPhase(_UpdatePhase.idle);
+        }
+      },
+    );
   }
 
   Future<void> _runUpdate() async {
@@ -1293,93 +1314,91 @@ class _UpdateButtonState extends State<_UpdateButton> {
 
     return switch (_phase) {
       _UpdatePhase.idle => Tooltip(
-          message: l10n.updateAvailable('v${widget.update.version}'),
-          child: TextButton.icon(
-            icon: const Icon(Icons.arrow_circle_up, size: 16),
-            label: Text(l10n.update),
-            onPressed: _handleIdleOrFailedTap,
-          ),
+        message: l10n.updateAvailable('v${widget.update.version}'),
+        child: TextButton.icon(
+          icon: const Icon(Icons.arrow_circle_up, size: 16),
+          label: Text(l10n.update),
+          onPressed: _handleIdleOrFailedTap,
         ),
+      ),
       // 「アップデート」ボタンがそのまま「アップデートしますか?」という
       // 1 つの丸い容器（ピル型）に変化し、Yes/No はその中の小さなボタンで
       // 表現する（フッターに Row 単体を裸で置くより「ボタンが変化した」
       // という一体感が出る）。確認文言は Expanded + 省略記号にして、
       // 長い翻訳文でもボタンのタップ領域を必ず確保する
       _UpdatePhase.confirming => _ConfirmPill(
-          question: l10n.updateConfirmQuestion,
-          children: [
-            _MiniChoiceButton(
-              label: l10n.yes,
-              primary: true,
-              onPressed: _runUpdate,
-            ),
-            _MiniChoiceButton(
-              label: l10n.no,
-              onPressed: _declineUpdate,
-            ),
-          ],
-        ),
+        question: l10n.updateConfirmQuestion,
+        children: [
+          _MiniChoiceButton(
+            label: l10n.yes,
+            primary: true,
+            onPressed: _runUpdate,
+          ),
+          _MiniChoiceButton(label: l10n.no, onPressed: _declineUpdate),
+        ],
+      ),
       _UpdatePhase.confirmCopy => _ConfirmPill(
-          question: l10n.updateConfirmCopyQuestion,
-          children: [
-            _MiniChoiceButton(
-              label: l10n.yes,
-              primary: true,
-              onPressed: _copyCommand,
-            ),
-            _MiniChoiceButton(
-              label: l10n.no,
-              onPressed: _declineCopy,
-            ),
-          ],
-        ),
+        question: l10n.updateConfirmCopyQuestion,
+        children: [
+          _MiniChoiceButton(
+            label: l10n.yes,
+            primary: true,
+            onPressed: _copyCommand,
+          ),
+          _MiniChoiceButton(label: l10n.no, onPressed: _declineCopy),
+        ],
+      ),
       _UpdatePhase.copied => Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check, size: 16, color: Colors.green),
-              const SizedBox(width: 6),
-              Text(
-                l10n.updateCommandCopied,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
-              ),
-            ],
-          ),
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(16),
         ),
-      _UpdatePhase.running => Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
+            const Icon(Icons.check, size: 16, color: Colors.green),
+            const SizedBox(width: 6),
+            Text(
+              l10n.updateCommandCopied,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
             ),
-            const SizedBox(width: 8),
-            Text(l10n.updateRunning, style: theme.textTheme.bodySmall),
           ],
         ),
-      _UpdatePhase.done => FilledButton.tonalIcon(
-          style: compactStyle,
-          icon: const Icon(Icons.check, size: 14, color: Colors.green),
-          label: Text(l10n.updateRestart),
-          onPressed: () => widget.onRestart(),
-        ),
-      _UpdatePhase.failed => Tooltip(
-          message: l10n.updateFailed(_error ?? ''),
-          child: TextButton.icon(
-            icon: Icon(Icons.error_outline,
-                size: 16, color: theme.colorScheme.error),
-            label: Text(l10n.update),
-            onPressed: _handleIdleOrFailedTap,
+      ),
+      _UpdatePhase.running => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
+          const SizedBox(width: 8),
+          Text(l10n.updateRunning, style: theme.textTheme.bodySmall),
+        ],
+      ),
+      _UpdatePhase.done => FilledButton.tonalIcon(
+        style: compactStyle,
+        icon: const Icon(Icons.check, size: 14, color: Colors.green),
+        label: Text(l10n.updateRestart),
+        onPressed: () => widget.onRestart(),
+      ),
+      _UpdatePhase.failed => Tooltip(
+        message: l10n.updateFailed(_error ?? ''),
+        child: TextButton.icon(
+          icon: Icon(
+            Icons.error_outline,
+            size: 16,
+            color: theme.colorScheme.error,
+          ),
+          label: Text(l10n.update),
+          onPressed: _handleIdleOrFailedTap,
         ),
+      ),
     };
   }
 }

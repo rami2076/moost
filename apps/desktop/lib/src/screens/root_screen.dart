@@ -71,9 +71,12 @@ String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
 /// Claude / Codex は頭文字が同じ「C」で区別できず、公式ロゴは商標
 /// ガイドライン上使用できないため（Anthropic/OpenAI とも無提携の
 /// サードパーティアプリでの使用は許可されない）、色だけで区別する。
+/// 各社の公式サイト/リポジトリで実際に使われている色を採用:
+/// Claude は anthropic.com のアクセントカラー、Codex は
+/// github.com/openai/codex の CLI スプラッシュ画像の配色。
 Color _agentColor(String agentId) => switch (agentId) {
-      ClaudeCodeAdapter.id => Colors.deepPurple,
-      CodexAdapter.id => Colors.blue,
+      ClaudeCodeAdapter.id => const Color(0xFFD97757),
+      CodexAdapter.id => const Color(0xFF6867AA),
       _ => Colors.grey,
     };
 

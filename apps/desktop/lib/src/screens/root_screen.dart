@@ -82,9 +82,9 @@ Color _agentColor(String agentId) => switch (agentId) {
 
 class RootScreen extends StatefulWidget {
   final AdapterRegistry registry;
-  final MemoStore memoStore;
-  final ProjectStore projectStore;
-  final SettingsStore settingsStore;
+  final MemoRepository memoStore;
+  final ProjectRepository projectStore;
+  final SettingsRepository settingsStore;
 
   /// フォルダ選択ダイアログの実行。null なら実際に OS のダイアログを開く
   /// 実装（FolderPicker）を使う。テスト用の注入ポイント。

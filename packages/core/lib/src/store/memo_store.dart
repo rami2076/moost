@@ -3,11 +3,31 @@ import 'dart:io';
 import '../model/memo.dart';
 import 'json_file_store.dart';
 
+/// メモの CRUD インターフェース。
+///
+/// UI 層（widget テスト）が実ファイル I/O を伴わないフェイクを注入できる
+/// ように、[MemoStore] の実体から切り離してある（Issue #30: widget テストの
+/// 実ファイル I/O 依存が CI での flaky の温床になっていたため）。
+abstract interface class MemoRepository {
+  Future<List<Memo>> load();
+  Future<void> add(Memo memo);
+
+  /// 可変フィールドだけを更新する。対象が見つからなければ false。
+  Future<bool> update(
+    String id, {
+    String? title,
+    List<String>? tags,
+    String? body,
+  });
+
+  Future<bool> delete(String id);
+}
+
 /// `~/.moost/v1/memos.json` の CRUD。
 ///
 /// エンベロープ形式は `{"schemaVersion": 1, "memos": [...]}`。
 /// update で変更できるのは title / tags / body（+ updatedAt）のみ（ADR-003）。
-class MemoStore {
+class MemoStore implements MemoRepository {
   static const schemaVersion = 1;
 
   final JsonFileStore _store;
@@ -20,6 +40,7 @@ class MemoStore {
     return MemoStore(File('$home/.moost/v1/memos.json'));
   }
 
+  @override
   Future<List<Memo>> load() async {
     final json = await _store.read();
     if (json == null) {
@@ -44,13 +65,14 @@ class MemoStore {
     return memos;
   }
 
+  @override
   Future<void> add(Memo memo) async {
     final memos = await load();
     memos.add(memo);
     await _save(memos);
   }
 
-  /// 可変フィールドだけを更新する。対象が見つからなければ false。
+  @override
   Future<bool> update(
     String id, {
     String? title,
@@ -72,6 +94,7 @@ class MemoStore {
     return true;
   }
 
+  @override
   Future<bool> delete(String id) async {
     final memos = await load();
     final before = memos.length;

@@ -8,6 +8,8 @@ import 'package:moost_desktop/main.dart';
 import 'package:moost_desktop/src/update/brew_updater.dart';
 import 'package:moost_desktop/src/update/update_checker.dart';
 
+import 'fakes.dart';
+
 /// runAsync の中で実 I/O の完了を待ちながらフレームを進める。
 ///
 /// I/O が連鎖する操作（保存 → 画面遷移 → 再読込）の後、次のアクションに
@@ -35,8 +37,21 @@ Future<void> _pollUntil(
 ) async {
   final stopwatch = Stopwatch()..start();
   final deadline = DateTime.now().add(timeout);
-  while (true) {
+
+  // 高速フェーズ: 実時間を挟まずに数フレーム進めてみる。フェイクストアの
+  // ようにマイクロタスクだけで完結する処理は、ここで実時間ゼロのまま
+  // 見つかる（Issue #30 フォローアップ: フェイク化した効果を測定に出すため）。
+  for (var i = 0; i < 10; i++) {
     await tester.pump();
+    if (ready()) {
+      // ignore: avoid_print
+      print('[$label] ready after ${stopwatch.elapsedMilliseconds}ms (fast)');
+      return;
+    }
+  }
+
+  // 低速フェーズ: 実際の I/O やタイマーの完了を実時間待ちしながら待つ。
+  while (true) {
     if (ready()) {
       // ignore: avoid_print
       print('[$label] ready after ${stopwatch.elapsedMilliseconds}ms');
@@ -49,6 +64,7 @@ Future<void> _pollUntil(
       return;
     }
     await Future<void>.delayed(const Duration(milliseconds: 30));
+    await tester.pump();
   }
 }
 
@@ -139,9 +155,9 @@ void main() {
         // 存在しないディレクトリを指す adapter → 空一覧になる
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       // 空状態の文言が出る（英語ロケールがデフォルト）
       await waitFor(tester, find.text('No sessions found'));
@@ -176,9 +192,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -220,9 +236,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -280,31 +296,28 @@ void main() {
     final tempDir = createTempDir();
 
     // メモを 1 件持つストアを直接用意する（登録フローは別テストで担保済み）
-    final now = DateTime.utc(2026, 7, 16).toIso8601String();
-    File('${tempDir.path}/memos.json').writeAsStringSync(jsonEncode({
-      'schemaVersion': 1,
-      'memos': [
-        {
-          'id': 'memo-1',
-          'agent': 'claude-code',
-          'sessionId': 'sess-1',
-          'title': 'row memo',
-          'tags': <String>[],
-          'body': '',
-          'projectPath': '/tmp/proj',
-          'createdAt': now,
-          'updatedAt': now,
-        },
-      ],
-    }));
+    final now = DateTime.utc(2026, 7, 16);
+    final memoStore = FakeMemoStore([
+      Memo(
+        id: 'memo-1',
+        agent: 'claude-code',
+        sessionId: 'sess-1',
+        title: 'row memo',
+        tags: const [],
+        body: '',
+        projectPath: '/tmp/proj',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ]);
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: memoStore,
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -339,17 +352,13 @@ void main() {
     final tempDir = createTempDir();
 
     // 登録済みプロジェクトを1件持つストアを直接用意する
-    final now = DateTime.utc(2026, 7, 20).toIso8601String();
-    File('${tempDir.path}/projects.json').writeAsStringSync(jsonEncode({
-      'schemaVersion': 1,
-      'projects': [
-        {
-          'id': 'proj-1',
-          'projectPath': '/tmp/existing-project',
-          'createdAt': now,
-        },
-      ],
-    }));
+    final projectStore = FakeProjectStore([
+      Project(
+        id: 'proj-1',
+        projectPath: '/tmp/existing-project',
+        createdAt: DateTime.utc(2026, 7, 20),
+      ),
+    ]);
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
@@ -357,9 +366,9 @@ void main() {
           ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude'),
           CodexAdapter(codexHome: '${tempDir.path}/codex'),
         ]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: projectStore,
         pickFolder: () async => '/tmp/new-project',
       ));
       await settle(tester);
@@ -417,9 +426,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -467,9 +476,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -506,9 +515,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -550,9 +559,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -588,9 +597,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -611,8 +620,6 @@ void main() {
   });
 
   testWidgets('session detail runs summary and caches it', (tester) async {
-    final tempDir = createTempDir();
-
     final adapter = _FakeAdapter([
       RecentSession(
         agentId: 'fake',
@@ -627,9 +634,9 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry([adapter]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -686,9 +693,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -733,9 +740,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         appVersion: '1.5.0',
       ));
       await settle(tester);
@@ -761,9 +768,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
-        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 

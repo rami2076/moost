@@ -3,12 +3,22 @@ import 'dart:io';
 import '../model/project.dart';
 import 'json_file_store.dart';
 
+/// 登録プロジェクトの CRUD インターフェース。
+///
+/// UI 層（widget テスト）が実ファイル I/O を伴わないフェイクを注入できる
+/// ように、[ProjectStore] の実体から切り離してある（Issue #30）。
+abstract interface class ProjectRepository {
+  Future<List<Project>> load();
+  Future<void> add(Project project);
+  Future<bool> delete(String id);
+}
+
 /// `~/.moost/v1/projects.json` の CRUD。
 ///
 /// エンベロープ形式は `{"schemaVersion": 1, "projects": [...]}`。
 /// 登録プロジェクトは編集できるフィールドを持たないため、update はない
 /// （requirements.md 3.8）。
-class ProjectStore {
+class ProjectStore implements ProjectRepository {
   static const schemaVersion = 1;
 
   final JsonFileStore _store;
@@ -21,6 +31,7 @@ class ProjectStore {
     return ProjectStore(File('$home/.moost/v1/projects.json'));
   }
 
+  @override
   Future<List<Project>> load() async {
     final json = await _store.read();
     if (json == null) {
@@ -45,12 +56,14 @@ class ProjectStore {
     return projects;
   }
 
+  @override
   Future<void> add(Project project) async {
     final projects = await load();
     projects.add(project);
     await _save(projects);
   }
 
+  @override
   Future<bool> delete(String id) async {
     final projects = await load();
     final before = projects.length;

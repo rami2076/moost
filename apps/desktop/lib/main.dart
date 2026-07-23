@@ -56,9 +56,9 @@ Future<void> main() async {
 
 class MoostApp extends StatelessWidget {
   final AdapterRegistry registry;
-  final MemoStore memoStore;
-  final ProjectStore projectStore;
-  final SettingsStore settingsStore;
+  final MemoRepository memoStore;
+  final ProjectRepository projectStore;
+  final SettingsRepository settingsStore;
 
   /// 更新チェック（null なら通知機能なし。widget テストでは省略する）。
   final UpdateChecker? updateChecker;

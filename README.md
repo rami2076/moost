@@ -1,5 +1,8 @@
 # Moost
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/rami2076/moost)](https://github.com/rami2076/moost/releases)
+
 Memo + Roost — AI コーディングエージェント CLI のセッションにメモを付けて記録し、ワンクリックでセッションへ復帰できるシステムトレイ常駐アプリ。
 
 ## できること

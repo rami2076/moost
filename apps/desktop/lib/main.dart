@@ -55,6 +55,7 @@ Future<void> main() async {
     // 経由の一覧再読込を伴い、フォルダ選択ダイアログを閉じた直後に呼ぶと
     // 「配置し直し」と「再読込」が二重に走ってちらつく。ここでは今の位置の
     // まま show/focus するだけでよい（RootScreen.defaultShowWindow）
+    withoutWindowHide: tray.withoutBlurHide,
   ));
 }
 
@@ -74,6 +75,11 @@ class MoostApp extends StatelessWidget {
   final Future<void> Function()? onRestart;
   final Future<String?> Function()? pickFolder;
   final Future<void> Function()? showWindow;
+
+  /// 実行中は blur によるウィンドウの自動非表示を止める。フォルダ選択
+  /// ダイアログ表示中に呼び出し元をアクティブにされて隠れると、ダイアログの
+  /// ネイティブ側の状態が壊れる事故があったため。null なら抑制しない。
+  final Future<T> Function<T>(Future<T> Function() action)? withoutWindowHide;
 
   /// 設定画面に表示するアプリバージョン。
   final String? appVersion;
@@ -95,6 +101,7 @@ class MoostApp extends StatelessWidget {
     this.onRestart,
     this.pickFolder,
     this.showWindow,
+    this.withoutWindowHide,
     this.appVersion,
   });
 
@@ -123,6 +130,7 @@ class MoostApp extends StatelessWidget {
         onRestart: onRestart,
         pickFolder: pickFolder,
         showWindow: showWindow,
+        withoutWindowHide: withoutWindowHide,
         appVersion: appVersion,
       ),
     );

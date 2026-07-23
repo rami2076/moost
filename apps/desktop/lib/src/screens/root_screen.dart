@@ -91,12 +91,18 @@ class RootScreen extends StatefulWidget {
   /// 実装（FolderPicker）を使う。テスト用の注入ポイント。
   final Future<String?> Function()? pickFolder;
 
-  /// ポップオーバーを前面に戻す。null なら window_manager で直接
-  /// show/focus する実装を使う。フォルダ選択ダイアログ（osascript の
-  /// 別ウィンドウ）が前面に出ると、ポップオーバーは「フォーカスを失うと
-  /// 隠れる」挙動（design.md 6 章）により自分から隠れてしまうため、
-  /// ダイアログが閉じたタイミングで明示的に呼び戻す必要がある。
+  /// ポップオーバーを前面に戻す（show + focus）。null なら window_manager で
+  /// 直接行う実装を使う。フォルダ選択ダイアログの操作中に他アプリを触られて
+  /// フォーカスが移った後、ダイアログが閉じたら明示的に呼び戻す。
   final Future<void> Function()? showWindow;
+
+  /// 実行中は blur によるポップオーバーの自動非表示を止める。null なら
+  /// 何もしない（そのまま実行するだけ）。フォルダ選択ダイアログ
+  /// （NSOpenPanel のシート）を表示している間に、呼び出し元のポップオーバーが
+  /// 「フォーカスを失うと隠れる」挙動（design.md 6 章）で隠れてしまうと、
+  /// シートが開いたまま親ウィンドウが消えることになり、ダイアログの
+  /// ネイティブ側の状態が壊れて次回以降開かなくなる事故があったため。
+  final Future<T> Function<T>(Future<T> Function() action)? withoutWindowHide;
 
   /// トレイからウィンドウが再表示された通知。受けたら一覧を再読込する
   /// （design.md 6.1: ポップオーバーを開いたときに自動更新）。
@@ -130,6 +136,7 @@ class RootScreen extends StatefulWidget {
     required this.settingsStore,
     this.pickFolder,
     this.showWindow,
+    this.withoutWindowHide,
     this.windowShown,
     this.updateChecker,
     this.isBrewManaged,
@@ -456,10 +463,16 @@ class _RootScreenState extends State<RootScreen> {
   /// 保存する。登録・キャンセルのどちらでもプロジェクトタブへ戻す
   /// （design.md 6.3 と同じ「戻り先タブ制御」）。
   Future<void> _registerProject() async {
-    final path = await (widget.pickFolder ?? _folderPicker.pick)();
-    // ダイアログ（別ウィンドウ）にフォーカスが移ると、ポップオーバーは
-    // 「フォーカスを失うと隠れる」挙動により自分から隠れている。
-    // ダイアログが閉じたこのタイミングで明示的に呼び戻す
+    final pick = widget.pickFolder ?? _folderPicker.pick;
+    // ダイアログ（NSOpenPanel のシート）が開いている間に他アプリを触られて
+    // ポップオーバーがフォーカスを失っても、blur による自動非表示を止める。
+    // シートが開いたまま親ウィンドウを隠すと、ダイアログのネイティブ側の
+    // 状態が壊れて次回以降開かなくなるため
+    final path = widget.withoutWindowHide != null
+        ? await widget.withoutWindowHide!(pick)
+        : await pick();
+    // ダイアログの操作中に他アプリへフォーカスが移っていることがあるため、
+    // 閉じたこのタイミングでポップオーバーを明示的に前面へ呼び戻す
     await (widget.showWindow ?? RootScreen.defaultShowWindow)();
     if (!mounted) {
       return;

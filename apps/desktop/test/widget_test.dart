@@ -455,6 +455,49 @@ void main() {
   });
 
   testWidgets(
+      'project register: suppresses window auto-hide while the picker is open',
+      (tester) async {
+    final tempDir = createTempDir();
+    var suppressCalls = 0;
+    var pickCalledWhileSuppressed = false;
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        pickFolder: () async {
+          pickCalledWhileSuppressed = suppressCalls > 0;
+          return null;
+        },
+        showWindow: () async {},
+        withoutWindowHide: <T>(action) async {
+          suppressCalls++;
+          try {
+            return await action();
+          } finally {
+            suppressCalls--;
+          }
+        },
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Projects'));
+      await settle(tester);
+      await tester.tap(find.byTooltip('Register'));
+      await settle(tester);
+
+      // pickFolder はダイアログのシートに相当し、開いている間ずっと
+      // withoutWindowHide の抑制区間の中にいる必要がある
+      expect(pickCalledWhileSuppressed, isTrue);
+      // 呼び出し後は抑制を解除している（後片付け漏れがない）
+      expect(suppressCalls, 0);
+    });
+  });
+
+  testWidgets(
       'update notice: brew flow goes idle -> confirm -> running -> restart',
       (tester) async {
     final tempDir = createTempDir();

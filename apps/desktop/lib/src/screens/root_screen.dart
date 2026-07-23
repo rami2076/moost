@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../project/folder_picker.dart';
@@ -90,6 +91,13 @@ class RootScreen extends StatefulWidget {
   /// 実装（FolderPicker）を使う。テスト用の注入ポイント。
   final Future<String?> Function()? pickFolder;
 
+  /// ポップオーバーを前面に戻す。null なら window_manager で直接
+  /// show/focus する実装を使う。フォルダ選択ダイアログ（osascript の
+  /// 別ウィンドウ）が前面に出ると、ポップオーバーは「フォーカスを失うと
+  /// 隠れる」挙動（design.md 6 章）により自分から隠れてしまうため、
+  /// ダイアログが閉じたタイミングで明示的に呼び戻す必要がある。
+  final Future<void> Function()? showWindow;
+
   /// トレイからウィンドウが再表示された通知。受けたら一覧を再読込する
   /// （design.md 6.1: ポップオーバーを開いたときに自動更新）。
   final ValueListenable<int>? windowShown;
@@ -121,6 +129,7 @@ class RootScreen extends StatefulWidget {
     required this.projectStore,
     required this.settingsStore,
     this.pickFolder,
+    this.showWindow,
     this.windowShown,
     this.updateChecker,
     this.isBrewManaged,
@@ -145,6 +154,11 @@ class RootScreen extends StatefulWidget {
     await Process.start('open', ['/Applications/Moost.app'],
         mode: ProcessStartMode.detached);
     exit(0);
+  }
+
+  static Future<void> defaultShowWindow() async {
+    await windowManager.show();
+    await windowManager.focus();
   }
 
   @override
@@ -439,10 +453,19 @@ class _RootScreenState extends State<RootScreen> {
   }
 
   /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして
-  /// 保存する。キャンセル時は何もしない（requirements.md 3.8）。
+  /// 保存する。登録・キャンセルのどちらでもプロジェクトタブへ戻す
+  /// （design.md 6.3 と同じ「戻り先タブ制御」）。
   Future<void> _registerProject() async {
     final path = await (widget.pickFolder ?? _folderPicker.pick)();
-    if (path == null || !mounted) {
+    // ダイアログ（別ウィンドウ）にフォーカスが移ると、ポップオーバーは
+    // 「フォーカスを失うと隠れる」挙動により自分から隠れている。
+    // ダイアログが閉じたこのタイミングで明示的に呼び戻す
+    await (widget.showWindow ?? RootScreen.defaultShowWindow)();
+    if (!mounted) {
+      return;
+    }
+    if (path == null) {
+      _showList(ListTab.projects);
       return;
     }
     await widget.projectStore.add(Project(
@@ -453,7 +476,7 @@ class _RootScreenState extends State<RootScreen> {
     if (!mounted) {
       return;
     }
-    setState(_reload);
+    _showList(ListTab.projects);
   }
 
   /// 削除（登録解除）の実行中フラグ。_deletingMemo と同じ理由で直列化する。
@@ -934,17 +957,28 @@ class _ProjectList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              icon: const Icon(Icons.create_new_folder_outlined, size: 16),
-              label: Text(l10n.registerProject),
-              onPressed: onRegister,
-            ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.create_new_folder_outlined, size: 20),
+                tooltip: l10n.registerProject,
+                onPressed: onRegister,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  l10n.projectTabExplanation,
+                  style: theme.textTheme.bodyMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -961,7 +995,13 @@ class _ProjectList extends StatelessWidget {
               }
               final items = snapshot.data!;
               if (items.isEmpty) {
-                return Center(child: Text(l10n.noProjectsFound));
+                return Center(
+                  child: Text(
+                    l10n.noProjectsFound,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontSize: 16),
+                  ),
+                );
               }
               return ListView.builder(
                 itemCount: items.length,

@@ -370,6 +370,7 @@ void main() {
         settingsStore: FakeSettingsStore(),
         projectStore: projectStore,
         pickFolder: () async => '/tmp/new-project',
+        showWindow: () async {},
       ));
       await settle(tester);
 
@@ -398,7 +399,7 @@ void main() {
       expect(claudeIcon.color, isNot(codexIcon.color));
 
       // 登録: フォルダ選択（フェイク注入）→ 一覧に追加される
-      await tester.tap(find.text('Register'));
+      await tester.tap(find.byTooltip('Register'));
       await waitFor(tester, find.text('new-project'));
       expect(find.text('new-project'), findsOneWidget);
 
@@ -413,6 +414,43 @@ void main() {
       expect(find.text('new-project'), findsOneWidget);
 
       await drainPendingWrites(tempDir);
+    });
+  });
+
+  testWidgets(
+      'project register: cancelling the folder picker stays on the Projects tab',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    final projectStore = FakeProjectStore([
+      Project(
+        id: 'proj-1',
+        projectPath: '/tmp/existing-project',
+        createdAt: DateTime.utc(2026, 7, 20),
+      ),
+    ]);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: projectStore,
+        pickFolder: () async => null, // ユーザーがダイアログをキャンセル
+        showWindow: () async {},
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Projects'));
+      await waitFor(tester, find.text('existing-project'));
+
+      await tester.tap(find.byTooltip('Register'));
+      await settle(tester);
+
+      // キャンセルしても登録済み一覧が見えたまま（プロジェクトタブに留まる）
+      expect(find.text('existing-project'), findsOneWidget);
+      expect(find.byTooltip('Register'), findsOneWidget);
     });
   });
 

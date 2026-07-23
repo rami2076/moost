@@ -7,6 +7,7 @@
   "noSessionsFound": "No sessions found",
   "noMemosFound": "No memos found",
   "noProjectsFound": "No projects registered",
+  "projectTabExplanation": "Register a directory to start a new session from it",
   "copyResumeCommand": "Copy resume command",
   "loadFailed": "Failed to load: {error}",
   "@loadFailed": {

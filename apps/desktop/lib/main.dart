@@ -51,6 +51,10 @@ Future<void> main() async {
     windowShown: tray.shownCount,
     updateChecker: UpdateChecker(currentVersion: packageInfo.version),
     appVersion: packageInfo.version,
+    // tray.showWindow は使わない: トレイアイコン基準の再配置と shownCount
+    // 経由の一覧再読込を伴い、フォルダ選択ダイアログを閉じた直後に呼ぶと
+    // 「配置し直し」と「再読込」が二重に走ってちらつく。ここでは今の位置の
+    // まま show/focus するだけでよい（RootScreen.defaultShowWindow）
   ));
 }
 
@@ -69,6 +73,7 @@ class MoostApp extends StatelessWidget {
   final BrewUpdater? brewUpdater;
   final Future<void> Function()? onRestart;
   final Future<String?> Function()? pickFolder;
+  final Future<void> Function()? showWindow;
 
   /// 設定画面に表示するアプリバージョン。
   final String? appVersion;
@@ -89,6 +94,7 @@ class MoostApp extends StatelessWidget {
     this.brewUpdater,
     this.onRestart,
     this.pickFolder,
+    this.showWindow,
     this.appVersion,
   });
 
@@ -116,6 +122,7 @@ class MoostApp extends StatelessWidget {
         brewUpdater: brewUpdater,
         onRestart: onRestart,
         pickFolder: pickFolder,
+        showWindow: showWindow,
         appVersion: appVersion,
       ),
     );

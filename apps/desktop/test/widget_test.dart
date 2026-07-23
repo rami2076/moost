@@ -12,9 +12,15 @@ import 'package:moost_desktop/src/update/update_checker.dart';
 ///
 /// I/O が連鎖する操作（保存 → 画面遷移 → 再読込）は「実時間待ち + pump」を
 /// 複数サイクル回さないと最後の FutureBuilder までデータが届かない。
+///
+/// 合計待ち時間は 600ms（50ms × 12）。以前は 200ms（40ms × 5）だったが、
+/// CI（GitHub Actions の共有ランナー）でファイル書き込み → 再読込の完了が
+/// 200ms を超え、"No memos found" 等の文言が見つからず複数テストが
+/// 断続的に失敗する事例が実際にあったため広げた。ローカル実行では通常
+/// 数十ms で完了するため、体感の遅さにはほぼ影響しない。
 Future<void> settle(WidgetTester tester) async {
-  for (var i = 0; i < 5; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 40));
+  for (var i = 0; i < 12; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
     await tester.pump();
   }
 }

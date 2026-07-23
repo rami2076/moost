@@ -8,16 +8,87 @@ import 'package:moost_desktop/main.dart';
 import 'package:moost_desktop/src/update/brew_updater.dart';
 import 'package:moost_desktop/src/update/update_checker.dart';
 
+import 'fakes.dart';
+
 /// runAsync の中で実 I/O の完了を待ちながらフレームを進める。
 ///
-/// I/O が連鎖する操作（保存 → 画面遷移 → 再読込）は「実時間待ち + pump」を
-/// 複数サイクル回さないと最後の FutureBuilder までデータが届かない。
+/// I/O が連鎖する操作（保存 → 画面遷移 → 再読込）の後、次のアクションに
+/// 移る前に軽くフレームを進めておくための汎用ユーティリティ。
+/// 「特定の文言/ウィジェットが出るまで」を検証する箇所では、固定時間待ちの
+/// 代わりに [waitFor] / [waitForGone] を使うこと（Issue #30: 固定 200ms が
+/// CI の共有ランナーでは足りず断続的に失敗する事例があったため、
+/// ポーリング方式に置き換えた）。
 Future<void> settle(WidgetTester tester) async {
   for (var i = 0; i < 5; i++) {
     await Future<void>.delayed(const Duration(milliseconds: 40));
     await tester.pump();
   }
 }
+
+/// [waitFor] / [waitForGone] の共通実装。[ready] が true を返すまで
+/// ポーリングし、実際にかかった時間を必ず標準出力へ残す（Issue #30:
+/// CI でどのくらいの待ち時間が実際に必要だったかを次回の判断材料にするため。
+/// タイムアウトしても例外は投げず、直後の `expect` に判断を委ねる）。
+Future<void> _pollUntil(
+  WidgetTester tester,
+  String label,
+  bool Function() ready,
+  Duration timeout,
+) async {
+  final stopwatch = Stopwatch()..start();
+  final deadline = DateTime.now().add(timeout);
+
+  // 高速フェーズ: 実時間を挟まずに数フレーム進めてみる。フェイクストアの
+  // ようにマイクロタスクだけで完結する処理は、ここで実時間ゼロのまま
+  // 見つかる（Issue #30 フォローアップ: フェイク化した効果を測定に出すため）。
+  for (var i = 0; i < 10; i++) {
+    await tester.pump();
+    if (ready()) {
+      // ignore: avoid_print
+      print('[$label] ready after ${stopwatch.elapsedMilliseconds}ms (fast)');
+      return;
+    }
+  }
+
+  // 低速フェーズ: 実際の I/O やタイマーの完了を実時間待ちしながら待つ。
+  while (true) {
+    if (ready()) {
+      // ignore: avoid_print
+      print('[$label] ready after ${stopwatch.elapsedMilliseconds}ms');
+      return;
+    }
+    if (DateTime.now().isAfter(deadline)) {
+      // ignore: avoid_print
+      print('[$label] TIMED OUT after ${stopwatch.elapsedMilliseconds}ms '
+          '(budget: ${timeout.inMilliseconds}ms)');
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await tester.pump();
+  }
+}
+
+/// [finder] が最低1件見つかるまでポーリングする。
+///
+/// settle() の固定時間待ちと違い、条件が満たされた時点で即座に抜けるため
+/// 速いマシンでは無駄に待たない。CI の遅いランナーでも [timeout] まで
+/// 辛抱強く待つ。
+Future<void> waitFor(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 3),
+}) =>
+    _pollUntil(tester, 'waitFor $finder',
+        () => finder.evaluate().isNotEmpty, timeout);
+
+/// [finder] が消えるまでポーリングする（[waitFor] の逆）。
+Future<void> waitForGone(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 3),
+}) =>
+    _pollUntil(
+        tester, 'waitForGone $finder', () => finder.evaluate().isEmpty, timeout);
 
 /// コピー成功フィードバックの緑チェックアイコン。
 /// （SegmentedButton の選択中タブにも Icons.check が出るため色で絞る）
@@ -84,13 +155,12 @@ void main() {
         // 存在しないディレクトリを指す adapter → 空一覧になる
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      await tester.pump();
-
       // 空状態の文言が出る（英語ロケールがデフォルト）
+      await waitFor(tester, find.text('No sessions found'));
       expect(find.text('No sessions found'), findsOneWidget);
 
       // メモタブへ切替
@@ -122,8 +192,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -165,8 +236,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -179,7 +251,12 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), ' tag1, tag2 ,');
       await tester.enterText(find.byType(TextField).at(2), 'memo body');
       await tester.tap(find.text('Save'));
-      await settle(tester);
+      // find.text('test prompt') は保存前の TextField 自体の初期値
+      // （セッションタイトル由来）にも一致してしまい早期に抜けるため、
+      // 登録フォーム自体が消えたのを確認してから、一覧の再読込完了
+      // （'test prompt' の再表示）を別途待つ
+      await waitForGone(tester, find.text('Register Memo'));
+      await waitFor(tester, find.text('test prompt'));
 
       // 保存後はメモ一覧タブに戻る（design.md 6.3: 戻り先タブ制御）
       expect(find.text('test prompt'), findsOneWidget);
@@ -192,7 +269,11 @@ void main() {
       await tester.enterText(find.byType(TextField).at(0), 'renamed title');
       await tester.pump();
       await tester.tap(find.text('Save'));
-      await settle(tester);
+      // find.text('renamed title') は保存前の TextField 自体の入力値にも
+      // 一致してしまい早期に抜けるため、編集画面自体が消えたのを確認して
+      // から、一覧の再読込完了（'renamed title' の再表示）を別途待つ
+      await waitForGone(tester, find.text('Edit Memo'));
+      await waitFor(tester, find.text('renamed title'));
       expect(find.text('renamed title'), findsOneWidget);
 
       // --- 削除: インライン確認を経て削除（ダイアログは出さない）
@@ -202,7 +283,7 @@ void main() {
       await tester.pump();
       expect(find.text('Delete this memo?'), findsOneWidget);
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-      await settle(tester);
+      await waitFor(tester, find.text('No memos found'));
       expect(find.text('No memos found'), findsOneWidget);
 
       // 削除の保存 I/O が残ったまま teardown に入らないよう掃ける
@@ -215,35 +296,33 @@ void main() {
     final tempDir = createTempDir();
 
     // メモを 1 件持つストアを直接用意する（登録フローは別テストで担保済み）
-    final now = DateTime.utc(2026, 7, 16).toIso8601String();
-    File('${tempDir.path}/memos.json').writeAsStringSync(jsonEncode({
-      'schemaVersion': 1,
-      'memos': [
-        {
-          'id': 'memo-1',
-          'agent': 'claude-code',
-          'sessionId': 'sess-1',
-          'title': 'row memo',
-          'tags': <String>[],
-          'body': '',
-          'projectPath': '/tmp/proj',
-          'createdAt': now,
-          'updatedAt': now,
-        },
-      ],
-    }));
+    final now = DateTime.utc(2026, 7, 16);
+    final memoStore = FakeMemoStore([
+      Memo(
+        id: 'memo-1',
+        agent: 'claude-code',
+        sessionId: 'sess-1',
+        title: 'row memo',
+        tags: const [],
+        body: '',
+        projectPath: '/tmp/proj',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ]);
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: memoStore,
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
       await tester.tap(find.text('Memos'));
-      await settle(tester);
+      await waitFor(tester, find.text('row memo'));
       expect(find.text('row memo'), findsOneWidget);
 
       // ゴミ箱アイコン → 一覧上部にタイトル入りの確認バーが出る
@@ -261,8 +340,77 @@ void main() {
       await tester.tap(find.byTooltip('Delete'));
       await tester.pump();
       await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-      await settle(tester);
+      await waitFor(tester, find.text('No memos found'));
       expect(find.text('No memos found'), findsOneWidget);
+
+      await drainPendingWrites(tempDir);
+    });
+  });
+
+  testWidgets('project register / launch buttons / delete flow',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    // 登録済みプロジェクトを1件持つストアを直接用意する
+    final projectStore = FakeProjectStore([
+      Project(
+        id: 'proj-1',
+        projectPath: '/tmp/existing-project',
+        createdAt: DateTime.utc(2026, 7, 20),
+      ),
+    ]);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry([
+          ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude'),
+          CodexAdapter(codexHome: '${tempDir.path}/codex'),
+        ]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: projectStore,
+        pickFolder: () async => '/tmp/new-project',
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Projects'));
+      await waitFor(tester, find.text('existing-project'));
+      expect(find.text('existing-project'), findsOneWidget);
+      expect(find.text('/tmp/existing-project'), findsOneWidget);
+
+      // エージェントごとの起動ボタンと削除ボタンが1行に並ぶ（ADR-004）
+      expect(find.byTooltip('Start new session with Claude'), findsOneWidget);
+      expect(find.byTooltip('Start new session with Codex'), findsOneWidget);
+      expect(find.byTooltip('Delete'), findsOneWidget);
+
+      // Claude/Codex は頭文字が同じで見分けが付かず、公式ロゴも使えないため
+      // 色で区別する（商標ガイドライン: 各社とも無提携の第三者利用は不許可）
+      final claudeIcon = tester.widget<Icon>(find.descendant(
+        of: find.byTooltip('Start new session with Claude'),
+        matching: find.byType(Icon),
+      ));
+      final codexIcon = tester.widget<Icon>(find.descendant(
+        of: find.byTooltip('Start new session with Codex'),
+        matching: find.byType(Icon),
+      ));
+      expect(claudeIcon.color, isNotNull);
+      expect(codexIcon.color, isNotNull);
+      expect(claudeIcon.color, isNot(codexIcon.color));
+
+      // 登録: フォルダ選択（フェイク注入）→ 一覧に追加される
+      await tester.tap(find.text('Register'));
+      await waitFor(tester, find.text('new-project'));
+      expect(find.text('new-project'), findsOneWidget);
+
+      // 削除（登録解除）: インライン確認を経由する
+      await tester.tap(find.byTooltip('Delete').first);
+      await tester.pump();
+      expect(find.text('Unregister "existing-project"?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await waitForGone(tester, find.text('existing-project'));
+      expect(find.text('existing-project'), findsNothing);
+      expect(find.text('new-project'), findsOneWidget);
 
       await drainPendingWrites(tempDir);
     });
@@ -278,8 +426,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -306,7 +455,7 @@ void main() {
       await tester.tap(find.text('Yes'));
       await tester.pump();
       expect(find.text('Updating…'), findsOneWidget);
-      await settle(tester);
+      await waitFor(tester, find.text('Restart'));
       expect(find.text('Restart'), findsOneWidget);
 
       // 再起動ボタンは押すまで自動実行されない
@@ -327,8 +476,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -365,8 +515,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -385,7 +536,8 @@ void main() {
 
       // 「はい」は他のミニボタンと同じテキストボタン（アイコンではない）
       await tester.tap(find.text('Yes'));
-      await settle(tester); // Clipboard.setData の非同期完了を待つ
+      // Clipboard.setData の非同期完了を待つ
+      await waitFor(tester, find.text('Command copied'));
 
       expect(find.text('Command copied'), findsOneWidget);
       expect(greenCheckIcon(), findsOneWidget);
@@ -407,8 +559,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -444,8 +597,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry(
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -466,8 +620,6 @@ void main() {
   });
 
   testWidgets('session detail runs summary and caches it', (tester) async {
-    final tempDir = createTempDir();
-
     final adapter = _FakeAdapter([
       RecentSession(
         agentId: 'fake',
@@ -482,8 +634,9 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
         registry: AdapterRegistry([adapter]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -516,7 +669,7 @@ void main() {
 
       // 要約実行 → フェイクの要約結果が出る
       await tester.tap(find.text('Summarize with Claude'));
-      await settle(tester);
+      await waitFor(tester, find.text('SUMMARY: sess-1 recent 1'));
       expect(find.text('SUMMARY: sess-1 recent 1'), findsOneWidget);
       expect(adapter.summarizeCalls, 1);
 
@@ -540,8 +693,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -550,7 +704,7 @@ void main() {
 
       // 設定を開く → 復帰先ターミナルの項目が見える
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
-      await settle(tester);
+      await waitFor(tester, find.text('Resume terminal'));
       expect(find.text('Resume terminal'), findsOneWidget);
       // appVersion 未指定なのでバージョン行は出ない
       expect(find.textContaining('Version'), findsNothing);
@@ -571,7 +725,7 @@ void main() {
       await tester.pump();
       expect(find.text('About summaries'), findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, 'Back'));
-      await settle(tester);
+      await waitFor(tester, find.text('No sessions found'));
       expect(find.text('No sessions found'), findsOneWidget);
     });
   });
@@ -586,14 +740,15 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
         appVersion: '1.5.0',
       ));
       await settle(tester);
 
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
-      await settle(tester);
+      await waitFor(tester, find.text('Version 1.5.0'));
       expect(find.text('Version 1.5.0'), findsOneWidget);
     });
   });
@@ -613,8 +768,9 @@ void main() {
       await tester.pumpWidget(MoostApp(
         registry:
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
-        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
-        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
       ));
       await settle(tester);
 
@@ -682,6 +838,10 @@ class _FakeAdapter implements AgentAdapter {
     required String sessionId,
   }) =>
       'cd $projectPath && claude --resume $sessionId';
+
+  @override
+  String buildNewSessionCommand({required String projectPath}) =>
+      'cd $projectPath && claude';
 
   @override
   Future<String> summarize({

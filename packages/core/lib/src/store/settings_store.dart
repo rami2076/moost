@@ -79,7 +79,16 @@ class Settings {
   }
 }
 
-class SettingsStore {
+/// 設定の永続化インターフェース。
+///
+/// UI 層（widget テスト）が実ファイル I/O を伴わないフェイクを注入できる
+/// ように、[SettingsStore] の実体から切り離してある（Issue #30）。
+abstract interface class SettingsRepository {
+  Future<Settings> load();
+  Future<void> save(Settings settings);
+}
+
+class SettingsStore implements SettingsRepository {
   static const schemaVersion = 1;
 
   final JsonFileStore _store;
@@ -91,6 +100,7 @@ class SettingsStore {
     return SettingsStore(File('$home/.moost/v1/settings.json'));
   }
 
+  @override
   Future<Settings> load() async {
     final json = await _store.read();
     if (json == null) {
@@ -99,6 +109,7 @@ class SettingsStore {
     return Settings.fromJson(json);
   }
 
+  @override
   Future<void> save(Settings settings) => _store.write({
         'schemaVersion': schemaVersion,
         ...settings.toJson(),

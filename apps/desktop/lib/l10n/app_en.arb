@@ -3,8 +3,10 @@
   "appTitle": "Moost",
   "tabRecentSessions": "Recent Sessions",
   "tabMemos": "Memos",
+  "tabProjects": "Projects",
   "noSessionsFound": "No sessions found",
   "noMemosFound": "No memos found",
+  "noProjectsFound": "No projects registered",
   "copyResumeCommand": "Copy resume command",
   "loadFailed": "Failed to load: {error}",
   "@loadFailed": {
@@ -30,6 +32,28 @@
     "description": "Inline confirmation shown above the memo list when deleting from a row",
     "placeholders": {
       "title": {
+        "type": "String"
+      }
+    }
+  },
+  "unregisterProjectConfirmTitled": "Unregister \"{title}\"?",
+  "@unregisterProjectConfirmTitled": {
+    "description": "Inline confirmation shown when removing a registered project from a row",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "registerProject": "Register",
+  "@registerProject": {
+    "description": "Button at the top of the Projects tab that opens the folder picker"
+  },
+  "startNewSessionWith": "Start new session with {agent}",
+  "@startNewSessionWith": {
+    "description": "Tooltip on a registered project's per-agent launch button",
+    "placeholders": {
+      "agent": {
         "type": "String"
       }
     }

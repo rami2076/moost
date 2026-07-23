@@ -15,7 +15,7 @@ import '../widgets/copy_icon_button.dart';
 /// 終了ボタンはフッターから移動してきたもの（更新ボタンの確認 UI と
 /// 幅を取り合わないようにするため）。
 class SettingsScreen extends StatefulWidget {
-  final SettingsStore settingsStore;
+  final SettingsRepository settingsStore;
   final ClaudePathResolver pathResolver;
   final VoidCallback onBack;
 

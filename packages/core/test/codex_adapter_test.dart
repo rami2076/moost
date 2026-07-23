@@ -111,4 +111,11 @@ void main() {
     );
     expect(command, "codex resume '$uuid1'");
   });
+
+  test('buildNewSessionCommand escapes and cds into the project, no resume',
+      () {
+    final command =
+        adapter.buildNewSessionCommand(projectPath: '/Users/u/my proj');
+    expect(command, "cd '/Users/u/my proj' && codex");
+  });
 }

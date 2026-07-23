@@ -140,6 +140,12 @@ abstract class AppLocalizations {
   /// **'No projects registered'**
   String get noProjectsFound;
 
+  /// No description provided for @projectTabExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Register a directory to start a new session from it'**
+  String get projectTabExplanation;
+
   /// No description provided for @copyResumeCommand.
   ///
   /// In en, this message translates to:

@@ -56,6 +56,9 @@ class TrayService with TrayListener, WindowListener {
 
   @override
   void onWindowClose() async {
+    if (_suppressHideCount > 0) {
+      return;
+    }
     // 常駐アプリなので閉じる = 隠す
     await windowManager.hide();
   }
@@ -65,9 +68,31 @@ class TrayService with TrayListener, WindowListener {
   /// トグルが再表示してしまうため）
   DateTime? _hiddenByBlurAt;
 
+  /// blur による自動非表示を一時的に止める段数。フォルダ選択ダイアログ
+  /// （NSOpenPanel のシート）を開いている間に呼び出し元をアクティブにされ
+  /// blur → hide が走ると、シートが開いたまま親ウィンドウが隠れてしまい、
+  /// ネイティブ側のパネルの状態が壊れて次回以降ダイアログが開かなくなる
+  /// 事故があったため。ネストする可能性を考えカウンタにする。
+  int _suppressHideCount = 0;
+
+  /// [action] の実行中は blur による自動非表示を止め、実行後に元に戻す。
+  Future<T> withoutBlurHide<T>(Future<T> Function() action) async {
+    _suppressHideCount++;
+    try {
+      return await action();
+    } finally {
+      _suppressHideCount--;
+    }
+  }
+
   @override
   void onWindowBlur() async {
-    // アプリ外を触ったら隠れる（ポップオーバー挙動。design.md 6 章）
+    // アプリ外を触ったら隠れる（ポップオーバー挙動。design.md 6 章）。
+    // ただし withoutBlurHide 実行中（フォルダ選択ダイアログ表示中等）は
+    // 隠さない
+    if (_suppressHideCount > 0) {
+      return;
+    }
     if (await windowManager.isVisible()) {
       _hiddenByBlurAt = DateTime.now();
       await windowManager.hide();
@@ -75,6 +100,15 @@ class TrayService with TrayListener, WindowListener {
   }
 
   Future<void> _toggleWindow() async {
+    // ダイアログ（NSOpenPanel のシート等）を表示中は、トレイクリックでも
+    // 隠さない。シートが開いたまま親ウィンドウを hide（= orderOut）すると
+    // シートの正規の終了手続き（endSheet）を経由しないため、ネイティブ側に
+    // 「まだシートがアタッチされている」状態が残り、次回以降ダイアログが
+    // 開かなくなる（ビープ音のみでエラーも出ない）事故があった
+    if (_suppressHideCount > 0) {
+      await showWindow();
+      return;
+    }
     final hiddenJustNow = _hiddenByBlurAt != null &&
         DateTime.now().difference(_hiddenByBlurAt!) <
             const Duration(milliseconds: 400);

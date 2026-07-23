@@ -370,6 +370,7 @@ void main() {
         settingsStore: FakeSettingsStore(),
         projectStore: projectStore,
         pickFolder: () async => '/tmp/new-project',
+        showWindow: () async {},
       ));
       await settle(tester);
 
@@ -398,7 +399,7 @@ void main() {
       expect(claudeIcon.color, isNot(codexIcon.color));
 
       // 登録: フォルダ選択（フェイク注入）→ 一覧に追加される
-      await tester.tap(find.text('Register'));
+      await tester.tap(find.byTooltip('Register'));
       await waitFor(tester, find.text('new-project'));
       expect(find.text('new-project'), findsOneWidget);
 
@@ -413,6 +414,86 @@ void main() {
       expect(find.text('new-project'), findsOneWidget);
 
       await drainPendingWrites(tempDir);
+    });
+  });
+
+  testWidgets(
+      'project register: cancelling the folder picker stays on the Projects tab',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    final projectStore = FakeProjectStore([
+      Project(
+        id: 'proj-1',
+        projectPath: '/tmp/existing-project',
+        createdAt: DateTime.utc(2026, 7, 20),
+      ),
+    ]);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: projectStore,
+        pickFolder: () async => null, // ユーザーがダイアログをキャンセル
+        showWindow: () async {},
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Projects'));
+      await waitFor(tester, find.text('existing-project'));
+
+      await tester.tap(find.byTooltip('Register'));
+      await settle(tester);
+
+      // キャンセルしても登録済み一覧が見えたまま（プロジェクトタブに留まる）
+      expect(find.text('existing-project'), findsOneWidget);
+      expect(find.byTooltip('Register'), findsOneWidget);
+    });
+  });
+
+  testWidgets(
+      'project register: suppresses window auto-hide while the picker is open',
+      (tester) async {
+    final tempDir = createTempDir();
+    var suppressCalls = 0;
+    var pickCalledWhileSuppressed = false;
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        pickFolder: () async {
+          pickCalledWhileSuppressed = suppressCalls > 0;
+          return null;
+        },
+        showWindow: () async {},
+        withoutWindowHide: <T>(action) async {
+          suppressCalls++;
+          try {
+            return await action();
+          } finally {
+            suppressCalls--;
+          }
+        },
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Projects'));
+      await settle(tester);
+      await tester.tap(find.byTooltip('Register'));
+      await settle(tester);
+
+      // pickFolder はダイアログのシートに相当し、開いている間ずっと
+      // withoutWindowHide の抑制区間の中にいる必要がある
+      expect(pickCalledWhileSuppressed, isTrue);
+      // 呼び出し後は抑制を解除している（後片付け漏れがない）
+      expect(suppressCalls, 0);
     });
   });
 

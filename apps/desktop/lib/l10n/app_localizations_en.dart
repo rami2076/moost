@@ -30,6 +30,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noProjectsFound => 'No projects registered';
 
   @override
+  String get projectTabExplanation =>
+      'Register a directory to start a new session from it';
+
+  @override
   String get copyResumeCommand => 'Copy resume command';
 
   @override

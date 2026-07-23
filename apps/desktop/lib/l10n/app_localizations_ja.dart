@@ -30,6 +30,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get noProjectsFound => '登録プロジェクトがありません';
 
   @override
+  String get projectTabExplanation => '登録したディレクトリから新規セッションを開始できます';
+
+  @override
   String get copyResumeCommand => '復帰コマンドをコピー';
 
   @override

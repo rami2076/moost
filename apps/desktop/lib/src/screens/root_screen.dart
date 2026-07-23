@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../project/folder_picker.dart';
@@ -90,6 +91,19 @@ class RootScreen extends StatefulWidget {
   /// 実装（FolderPicker）を使う。テスト用の注入ポイント。
   final Future<String?> Function()? pickFolder;
 
+  /// ポップオーバーを前面に戻す（show + focus）。null なら window_manager で
+  /// 直接行う実装を使う。フォルダ選択ダイアログの操作中に他アプリを触られて
+  /// フォーカスが移った後、ダイアログが閉じたら明示的に呼び戻す。
+  final Future<void> Function()? showWindow;
+
+  /// 実行中は blur によるポップオーバーの自動非表示を止める。null なら
+  /// 何もしない（そのまま実行するだけ）。フォルダ選択ダイアログ
+  /// （NSOpenPanel のシート）を表示している間に、呼び出し元のポップオーバーが
+  /// 「フォーカスを失うと隠れる」挙動（design.md 6 章）で隠れてしまうと、
+  /// シートが開いたまま親ウィンドウが消えることになり、ダイアログの
+  /// ネイティブ側の状態が壊れて次回以降開かなくなる事故があったため。
+  final Future<T> Function<T>(Future<T> Function() action)? withoutWindowHide;
+
   /// トレイからウィンドウが再表示された通知。受けたら一覧を再読込する
   /// （design.md 6.1: ポップオーバーを開いたときに自動更新）。
   final ValueListenable<int>? windowShown;
@@ -121,6 +135,8 @@ class RootScreen extends StatefulWidget {
     required this.projectStore,
     required this.settingsStore,
     this.pickFolder,
+    this.showWindow,
+    this.withoutWindowHide,
     this.windowShown,
     this.updateChecker,
     this.isBrewManaged,
@@ -145,6 +161,11 @@ class RootScreen extends StatefulWidget {
     await Process.start('open', ['/Applications/Moost.app'],
         mode: ProcessStartMode.detached);
     exit(0);
+  }
+
+  static Future<void> defaultShowWindow() async {
+    await windowManager.show();
+    await windowManager.focus();
   }
 
   @override
@@ -439,10 +460,25 @@ class _RootScreenState extends State<RootScreen> {
   }
 
   /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして
-  /// 保存する。キャンセル時は何もしない（requirements.md 3.8）。
+  /// 保存する。登録・キャンセルのどちらでもプロジェクトタブへ戻す
+  /// （design.md 6.3 と同じ「戻り先タブ制御」）。
   Future<void> _registerProject() async {
-    final path = await (widget.pickFolder ?? _folderPicker.pick)();
-    if (path == null || !mounted) {
+    final pick = widget.pickFolder ?? _folderPicker.pick;
+    // ダイアログ（NSOpenPanel のシート）が開いている間に他アプリを触られて
+    // ポップオーバーがフォーカスを失っても、blur による自動非表示を止める。
+    // シートが開いたまま親ウィンドウを隠すと、ダイアログのネイティブ側の
+    // 状態が壊れて次回以降開かなくなるため
+    final path = widget.withoutWindowHide != null
+        ? await widget.withoutWindowHide!(pick)
+        : await pick();
+    // ダイアログの操作中に他アプリへフォーカスが移っていることがあるため、
+    // 閉じたこのタイミングでポップオーバーを明示的に前面へ呼び戻す
+    await (widget.showWindow ?? RootScreen.defaultShowWindow)();
+    if (!mounted) {
+      return;
+    }
+    if (path == null) {
+      _showList(ListTab.projects);
       return;
     }
     await widget.projectStore.add(Project(
@@ -453,7 +489,7 @@ class _RootScreenState extends State<RootScreen> {
     if (!mounted) {
       return;
     }
-    setState(_reload);
+    _showList(ListTab.projects);
   }
 
   /// 削除（登録解除）の実行中フラグ。_deletingMemo と同じ理由で直列化する。
@@ -934,17 +970,28 @@ class _ProjectList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              icon: const Icon(Icons.create_new_folder_outlined, size: 16),
-              label: Text(l10n.registerProject),
-              onPressed: onRegister,
-            ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.create_new_folder_outlined, size: 20),
+                tooltip: l10n.registerProject,
+                onPressed: onRegister,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  l10n.projectTabExplanation,
+                  style: theme.textTheme.bodyMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -961,7 +1008,13 @@ class _ProjectList extends StatelessWidget {
               }
               final items = snapshot.data!;
               if (items.isEmpty) {
-                return Center(child: Text(l10n.noProjectsFound));
+                return Center(
+                  child: Text(
+                    l10n.noProjectsFound,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontSize: 16),
+                  ),
+                );
               }
               return ListView.builder(
                 itemCount: items.length,

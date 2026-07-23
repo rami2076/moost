@@ -7,6 +7,7 @@
   "noSessionsFound": "セッションがありません",
   "noMemosFound": "メモがありません",
   "noProjectsFound": "登録プロジェクトがありません",
+  "projectTabExplanation": "登録したディレクトリから新規セッションを開始できます",
   "copyResumeCommand": "復帰コマンドをコピー",
   "loadFailed": "読み込みに失敗しました: {error}",
   "settings": "設定",

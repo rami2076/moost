@@ -26,6 +26,12 @@ dependencies:
   # バージョン表示・更新チェックの自バージョン取得（RELEASE.md 1.2 の単一情報源）。
   # 10.2.1 は公開 7 日未満のため 10.2.0 に固定（supply-chain rules/dart.md）
   package_info_plus: 10.2.0
+  # 登録プロジェクトのフォルダ選択ダイアログ（Issue #29 フォローアップ）。
+  # publisher: flutter.dev（verified）。macOS 実装は NSOpenPanel を
+  # beginSheetModal(for:) でポップオーバー自身のウィンドウにシート表示する
+  # ため、osascript の別ウィンドウ方式と違いポップオーバーが隠れない。
+  # Windows/Linux 対応（Issue #15）でも同じ API が使える
+  file_selector: 1.1.0
 
 dev_dependencies:
   flutter_test:

@@ -1,32 +1,19 @@
-import 'dart:io';
+import 'package:file_selector/file_selector.dart';
 
-/// OS のフォルダ選択ダイアログを開く（macOS。osascript 経由）。
+/// OS のフォルダ選択ダイアログを開く。
 ///
-/// TerminalLauncher と同じ方式（追加の pub パッケージなしで AppleScript の
-/// `choose folder` を呼ぶ）。ダイアログは独立プロセスなので、常駐ポップオーバー
-/// を閉じてしまう心配はない。
+/// `file_selector`（publisher: flutter.dev）を使う。macOS 実装は
+/// `NSOpenPanel` をポップオーバー自身のウィンドウへ `beginSheetModal(for:)`
+/// でシート表示するため、外部プロセス（旧: osascript の `choose folder`）と
+/// 違い、ダイアログ表示中にポップオーバーがフォーカスを失って隠れることが
+/// ない。Windows/Linux 対応（Issue #15）でも同じ API がそのまま使える。
 class FolderPicker {
-  /// osascript 実行を差し替え可能にする（テスト用）。
-  final Future<ProcessResult> Function(List<String> args) runOsascript;
+  /// 実際のダイアログ呼び出しを差し替え可能にする（テスト用）。
+  final Future<String?> Function() getDirectoryPathFn;
 
-  FolderPicker({
-    Future<ProcessResult> Function(List<String> args)? runOsascript,
-  }) : runOsascript =
-            runOsascript ?? ((args) => Process.run('osascript', args));
+  FolderPicker({Future<String?> Function()? getDirectoryPathFn})
+      : getDirectoryPathFn = getDirectoryPathFn ?? getDirectoryPath;
 
   /// 選ばれたディレクトリの絶対パスを返す。ユーザーがキャンセルしたら null。
-  Future<String?> pick() async {
-    final result =
-        await runOsascript(['-e', 'POSIX path of (choose folder)']);
-    if (result.exitCode != 0) {
-      // ユーザーによるキャンセルもここに入る（osascript が非 0 で終了する）
-      return null;
-    }
-    final path = (result.stdout as String).trim();
-    if (path.isEmpty) {
-      return null;
-    }
-    // AppleScript の POSIX path はディレクトリ末尾に "/" を付けて返す
-    return path.endsWith('/') ? path.substring(0, path.length - 1) : path;
-  }
+  Future<String?> pick() => getDirectoryPathFn();
 }

@@ -66,6 +66,17 @@ String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
   );
 }
 
+/// 登録プロジェクトの起動ボタンをエージェントごとに色分けする。
+///
+/// Claude / Codex は頭文字が同じ「C」で区別できず、公式ロゴは商標
+/// ガイドライン上使用できないため（Anthropic/OpenAI とも無提携の
+/// サードパーティアプリでの使用は許可されない）、色だけで区別する。
+Color _agentColor(String agentId) => switch (agentId) {
+      ClaudeCodeAdapter.id => Colors.deepPurple,
+      CodexAdapter.id => Colors.blue,
+      _ => Colors.grey,
+    };
+
 class RootScreen extends StatefulWidget {
   final AdapterRegistry registry;
   final MemoStore memoStore;
@@ -973,7 +984,11 @@ class _ProjectList extends StatelessWidget {
                       children: [
                         for (final adapter in adapters)
                           IconButton(
-                            icon: const Icon(Icons.terminal, size: 18),
+                            icon: Icon(
+                              Icons.terminal,
+                              size: 18,
+                              color: _agentColor(adapter.agentId),
+                            ),
                             tooltip:
                                 l10n.startNewSessionWith(adapter.displayName),
                             onPressed: () => onLaunch(

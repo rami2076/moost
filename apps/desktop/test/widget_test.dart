@@ -291,8 +291,10 @@ void main() {
 
     await tester.runAsync(() async {
       await tester.pumpWidget(MoostApp(
-        registry: AdapterRegistry(
-            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        registry: AdapterRegistry([
+          ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude'),
+          CodexAdapter(codexHome: '${tempDir.path}/codex'),
+        ]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
         projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
@@ -307,7 +309,22 @@ void main() {
 
       // エージェントごとの起動ボタンと削除ボタンが1行に並ぶ（ADR-004）
       expect(find.byTooltip('Start new session with Claude'), findsOneWidget);
+      expect(find.byTooltip('Start new session with Codex'), findsOneWidget);
       expect(find.byTooltip('Delete'), findsOneWidget);
+
+      // Claude/Codex は頭文字が同じで見分けが付かず、公式ロゴも使えないため
+      // 色で区別する（商標ガイドライン: 各社とも無提携の第三者利用は不許可）
+      final claudeIcon = tester.widget<Icon>(find.descendant(
+        of: find.byTooltip('Start new session with Claude'),
+        matching: find.byType(Icon),
+      ));
+      final codexIcon = tester.widget<Icon>(find.descendant(
+        of: find.byTooltip('Start new session with Codex'),
+        matching: find.byType(Icon),
+      ));
+      expect(claudeIcon.color, isNotNull);
+      expect(codexIcon.color, isNotNull);
+      expect(claudeIcon.color, isNot(codexIcon.color));
 
       // 登録: フォルダ選択（フェイク注入）→ 一覧に追加される
       await tester.tap(find.text('Register'));

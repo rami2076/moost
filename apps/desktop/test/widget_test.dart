@@ -86,6 +86,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await Future<void>.delayed(const Duration(milliseconds: 100));
       await tester.pump();
@@ -124,6 +125,7 @@ void main() {
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await settle(tester);
 
@@ -167,6 +169,7 @@ void main() {
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await settle(tester);
 
@@ -239,6 +242,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await settle(tester);
 
@@ -268,6 +272,62 @@ void main() {
     });
   });
 
+  testWidgets('project register / launch buttons / delete flow',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    // 登録済みプロジェクトを1件持つストアを直接用意する
+    final now = DateTime.utc(2026, 7, 20).toIso8601String();
+    File('${tempDir.path}/projects.json').writeAsStringSync(jsonEncode({
+      'schemaVersion': 1,
+      'projects': [
+        {
+          'id': 'proj-1',
+          'projectPath': '/tmp/existing-project',
+          'createdAt': now,
+        },
+      ],
+    }));
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: MemoStore(File('${tempDir.path}/memos.json')),
+        settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
+        pickFolder: () async => '/tmp/new-project',
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Projects'));
+      await settle(tester);
+      expect(find.text('existing-project'), findsOneWidget);
+      expect(find.text('/tmp/existing-project'), findsOneWidget);
+
+      // エージェントごとの起動ボタンと削除ボタンが1行に並ぶ（ADR-004）
+      expect(find.byTooltip('Start new session with Claude'), findsOneWidget);
+      expect(find.byTooltip('Delete'), findsOneWidget);
+
+      // 登録: フォルダ選択（フェイク注入）→ 一覧に追加される
+      await tester.tap(find.text('Register'));
+      await settle(tester);
+      expect(find.text('new-project'), findsOneWidget);
+
+      // 削除（登録解除）: インライン確認を経由する
+      await tester.tap(find.byTooltip('Delete').first);
+      await tester.pump();
+      expect(find.text('Unregister "existing-project"?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await settle(tester);
+      expect(find.text('existing-project'), findsNothing);
+      expect(find.text('new-project'), findsOneWidget);
+
+      await drainPendingWrites(tempDir);
+    });
+  });
+
   testWidgets(
       'update notice: brew flow goes idle -> confirm -> running -> restart',
       (tester) async {
@@ -280,6 +340,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -329,6 +390,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -367,6 +429,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -409,6 +472,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -446,6 +510,7 @@ void main() {
             [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
         updateChecker: _FakeUpdateChecker(UpdateInfo(
           version: '9.9.9',
           releaseUrl:
@@ -484,6 +549,7 @@ void main() {
         registry: AdapterRegistry([adapter]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await settle(tester);
 
@@ -542,6 +608,7 @@ void main() {
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await settle(tester);
 
@@ -588,6 +655,7 @@ void main() {
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
         appVersion: '1.5.0',
       ));
       await settle(tester);
@@ -615,6 +683,7 @@ void main() {
             AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
         memoStore: MemoStore(File('${tempDir.path}/memos.json')),
         settingsStore: SettingsStore(File('${tempDir.path}/settings.json')),
+        projectStore: ProjectStore(File('${tempDir.path}/projects.json')),
       ));
       await settle(tester);
 
@@ -682,6 +751,10 @@ class _FakeAdapter implements AgentAdapter {
     required String sessionId,
   }) =>
       'cd $projectPath && claude --resume $sessionId';
+
+  @override
+  String buildNewSessionCommand({required String projectPath}) =>
+      'cd $projectPath && claude';
 
   @override
   Future<String> summarize({

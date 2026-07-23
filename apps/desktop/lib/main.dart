@@ -46,6 +46,7 @@ Future<void> main() async {
       CodexAdapter(),
     ]),
     memoStore: MemoStore.defaultLocation(),
+    projectStore: ProjectStore.defaultLocation(),
     settingsStore: SettingsStore.defaultLocation(),
     windowShown: tray.shownCount,
     updateChecker: UpdateChecker(currentVersion: packageInfo.version),
@@ -56,6 +57,7 @@ Future<void> main() async {
 class MoostApp extends StatelessWidget {
   final AdapterRegistry registry;
   final MemoStore memoStore;
+  final ProjectStore projectStore;
   final SettingsStore settingsStore;
 
   /// 更新チェック（null なら通知機能なし。widget テストでは省略する）。
@@ -66,6 +68,7 @@ class MoostApp extends StatelessWidget {
   final Future<void> Function(Uri url)? openUrl;
   final BrewUpdater? brewUpdater;
   final Future<void> Function()? onRestart;
+  final Future<String?> Function()? pickFolder;
 
   /// 設定画面に表示するアプリバージョン。
   final String? appVersion;
@@ -77,6 +80,7 @@ class MoostApp extends StatelessWidget {
     super.key,
     required this.registry,
     required this.memoStore,
+    required this.projectStore,
     required this.settingsStore,
     this.windowShown,
     this.updateChecker,
@@ -84,6 +88,7 @@ class MoostApp extends StatelessWidget {
     this.openUrl,
     this.brewUpdater,
     this.onRestart,
+    this.pickFolder,
     this.appVersion,
   });
 
@@ -102,6 +107,7 @@ class MoostApp extends StatelessWidget {
       home: RootScreen(
         registry: registry,
         memoStore: memoStore,
+        projectStore: projectStore,
         settingsStore: settingsStore,
         windowShown: windowShown,
         updateChecker: updateChecker,
@@ -109,6 +115,7 @@ class MoostApp extends StatelessWidget {
         openUrl: openUrl,
         brewUpdater: brewUpdater,
         onRestart: onRestart,
+        pickFolder: pickFolder,
         appVersion: appVersion,
       ),
     );

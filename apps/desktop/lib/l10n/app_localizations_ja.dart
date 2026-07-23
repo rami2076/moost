@@ -18,10 +18,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tabMemos => 'メモ一覧';
 
   @override
+  String get tabProjects => 'プロジェクト';
+
+  @override
   String get noSessionsFound => 'セッションがありません';
 
   @override
   String get noMemosFound => 'メモがありません';
+
+  @override
+  String get noProjectsFound => '登録プロジェクトがありません';
 
   @override
   String get copyResumeCommand => '復帰コマンドをコピー';
@@ -67,6 +73,19 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String deleteConfirmTitled(String title) {
     return '「$title」を削除しますか？';
+  }
+
+  @override
+  String unregisterProjectConfirmTitled(String title) {
+    return '「$title」の登録を解除しますか？';
+  }
+
+  @override
+  String get registerProject => '登録';
+
+  @override
+  String startNewSessionWith(String agent) {
+    return '$agent で新規セッションを開始';
   }
 
   @override

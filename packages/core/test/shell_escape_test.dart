@@ -43,4 +43,20 @@ void main() {
       expect(command, contains("'/tmp/we`ird path'"));
     });
   });
+
+  group('buildNewSessionCommand (via ClaudeCodeAdapter)', () {
+    final adapter = ClaudeCodeAdapter(claudeHome: '/nonexistent');
+
+    test('builds cd && claude without --resume', () {
+      final command =
+          adapter.buildNewSessionCommand(projectPath: '/Users/foo/project');
+      expect(command, "cd '/Users/foo/project' && claude");
+    });
+
+    test('keeps backquoted path intact inside quotes', () {
+      final command =
+          adapter.buildNewSessionCommand(projectPath: '/tmp/we`ird path');
+      expect(command, contains("'/tmp/we`ird path'"));
+    });
+  });
 }

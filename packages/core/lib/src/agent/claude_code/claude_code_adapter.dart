@@ -71,6 +71,11 @@ class ClaudeCodeAdapter implements AgentAdapter {
   }
 
   @override
+  String buildNewSessionCommand({required String projectPath}) {
+    return 'cd ${shellEscape(projectPath)} && claude';
+  }
+
+  @override
   Future<String> summarize({
     required String sessionId,
     required String projectPath,

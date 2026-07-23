@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../project/folder_picker.dart';
 import '../update/brew_updater.dart';
 import '../update/update_checker.dart';
 import '../widgets/copy_icon_button.dart';
@@ -52,7 +53,7 @@ class NotesMenuScreen extends MenuScreen {
 }
 
 /// 一覧のタブ。遷移の「戻り先タブ」制御に使う（design.md 6.3）。
-enum ListTab { recent, memos }
+enum ListTab { recent, memos, projects }
 
 /// 一覧行のサブタイトル右端に出す最終更新日時（ローカル時刻）。
 String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
@@ -68,7 +69,12 @@ String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
 class RootScreen extends StatefulWidget {
   final AdapterRegistry registry;
   final MemoStore memoStore;
+  final ProjectStore projectStore;
   final SettingsStore settingsStore;
+
+  /// フォルダ選択ダイアログの実行。null なら実際に OS のダイアログを開く
+  /// 実装（FolderPicker）を使う。テスト用の注入ポイント。
+  final Future<String?> Function()? pickFolder;
 
   /// トレイからウィンドウが再表示された通知。受けたら一覧を再読込する
   /// （design.md 6.1: ポップオーバーを開いたときに自動更新）。
@@ -98,7 +104,9 @@ class RootScreen extends StatefulWidget {
     super.key,
     required this.registry,
     required this.memoStore,
+    required this.projectStore,
     required this.settingsStore,
+    this.pickFolder,
     this.windowShown,
     this.updateChecker,
     this.isBrewManaged,
@@ -137,14 +145,19 @@ class _RootScreenState extends State<RootScreen> {
   /// 確認表示に置き換える（Swift 版と同じ。他の行は動かさない）。
   Memo? _pendingDeleteMemo;
 
+  /// プロジェクト一覧の行から削除（登録解除）を押されたプロジェクト。
+  Project? _pendingDeleteProject;
+
   // 要約のメモリキャッシュはアプリ常駐中ずっと保持する（ADR-002）
   final SummaryCache _summaryCache = SummaryCache();
   final ClaudePathResolver _pathResolver = ClaudePathResolver();
   final TerminalLauncher _terminalLauncher = TerminalLauncher();
+  final FolderPicker _folderPicker = FolderPicker();
   int _summaryRallies = 1;
 
   late Future<List<RecentSession>> _sessions;
   late Future<List<Memo>> _memos;
+  late Future<List<Project>> _projects;
 
   /// 新バージョンの情報（null なら未検出）。フッターに表示する。
   UpdateInfo? _availableUpdate;
@@ -197,8 +210,10 @@ class _RootScreenState extends State<RootScreen> {
   void _reload() {
     _sessions = _loadSessions();
     _memos = widget.memoStore.load();
+    _projects = widget.projectStore.load();
     // 一覧が変わるタイミングで出しっぱなしの削除確認を引っ込める
     _pendingDeleteMemo = null;
+    _pendingDeleteProject = null;
   }
 
   Future<List<RecentSession>> _loadSessions() async {
@@ -328,6 +343,10 @@ class _RootScreenState extends State<RootScreen> {
                     value: ListTab.memos,
                     label: Text(l10n.tabMemos),
                   ),
+                  ButtonSegment(
+                    value: ListTab.projects,
+                    label: Text(l10n.tabProjects),
+                  ),
                 ],
                 selected: {_tab},
                 onSelectionChanged: (selection) {
@@ -364,6 +383,18 @@ class _RootScreenState extends State<RootScreen> {
                         setState(() => _pendingDeleteMemo = null),
                     onConfirmDelete: _deleteMemoConfirmed,
                   ),
+                ListTab.projects => _ProjectList(
+                    projects: _projects,
+                    adapters: widget.registry.adapters,
+                    pendingDeleteProjectId: _pendingDeleteProject?.id,
+                    onRegister: _registerProject,
+                    onLaunch: _openNewSession,
+                    onDeleteProject: (project) =>
+                        setState(() => _pendingDeleteProject = project),
+                    onCancelDelete: () =>
+                        setState(() => _pendingDeleteProject = null),
+                    onConfirmDelete: _deleteProjectConfirmed,
+                  ),
               },
             ),
             _buildFooter(context),
@@ -386,6 +417,43 @@ class _RootScreenState extends State<RootScreen> {
       await widget.memoStore.delete(memo.id);
     } finally {
       _deletingMemo = false;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(_reload);
+  }
+
+  /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして
+  /// 保存する。キャンセル時は何もしない（requirements.md 3.8）。
+  Future<void> _registerProject() async {
+    final path = await (widget.pickFolder ?? _folderPicker.pick)();
+    if (path == null || !mounted) {
+      return;
+    }
+    await widget.projectStore.add(Project(
+      id: generateUuidV4(),
+      projectPath: path,
+      createdAt: DateTime.now().toUtc(),
+    ));
+    if (!mounted) {
+      return;
+    }
+    setState(_reload);
+  }
+
+  /// 削除（登録解除）の実行中フラグ。_deletingMemo と同じ理由で直列化する。
+  bool _deletingProject = false;
+
+  Future<void> _deleteProjectConfirmed(Project project) async {
+    if (_deletingProject) {
+      return;
+    }
+    _deletingProject = true;
+    try {
+      await widget.projectStore.delete(project.id);
+    } finally {
+      _deletingProject = false;
     }
     if (!mounted) {
       return;
@@ -489,6 +557,32 @@ class _RootScreenState extends State<RootScreen> {
       projectPath: projectPath,
       sessionId: sessionId,
     );
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final settings = await widget.settingsStore.load();
+      await _terminalLauncher.launch(
+        terminal: TerminalApp.fromSetting(settings.terminalApp),
+        command: command,
+      );
+    } on Object catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.terminalLaunchFailed('$e'))),
+      );
+    }
+  }
+
+  /// 登録プロジェクトから新規セッションを開始する。`buildResumeCommand` と
+  /// 違い sessionId は取らない（ADR-004）。
+  Future<void> _openNewSession({
+    required String agent,
+    required String projectPath,
+  }) async {
+    final adapter = _adapterFor(agent);
+    if (adapter == null) {
+      return;
+    }
+    final command = adapter.buildNewSessionCommand(projectPath: projectPath);
     final l10n = AppLocalizations.of(context)!;
     try {
       final settings = await widget.settingsStore.load();
@@ -789,6 +883,156 @@ class _MemoList extends StatelessWidget {
               foregroundColor: WidgetStatePropertyAll(colorScheme.onError),
             ),
             onPressed: () => onConfirmDelete(memo),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProjectList extends StatelessWidget {
+  final Future<List<Project>> projects;
+  final List<AgentAdapter> adapters;
+  final Future<void> Function() onRegister;
+  final Future<void> Function({
+    required String agent,
+    required String projectPath,
+  }) onLaunch;
+  final void Function(Project project) onDeleteProject;
+
+  /// 削除確認中のプロジェクト id。該当行だけ確認表示に置き換える。
+  final String? pendingDeleteProjectId;
+  final VoidCallback onCancelDelete;
+  final void Function(Project project) onConfirmDelete;
+
+  const _ProjectList({
+    required this.projects,
+    required this.adapters,
+    required this.pendingDeleteProjectId,
+    required this.onRegister,
+    required this.onLaunch,
+    required this.onDeleteProject,
+    required this.onCancelDelete,
+    required this.onConfirmDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.create_new_folder_outlined, size: 16),
+              label: Text(l10n.registerProject),
+              onPressed: onRegister,
+            ),
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<List<Project>>(
+            future: projects,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(l10n.loadFailed('${snapshot.error}')),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final items = snapshot.data!;
+              if (items.isEmpty) {
+                return Center(child: Text(l10n.noProjectsFound));
+              }
+              return ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final project = items[index];
+                  if (project.id == pendingDeleteProjectId) {
+                    return _buildConfirmRow(context, l10n, project);
+                  }
+                  return ListTile(
+                    title: Text(
+                      project.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      project.projectPath,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final adapter in adapters)
+                          IconButton(
+                            icon: const Icon(Icons.terminal, size: 18),
+                            tooltip:
+                                l10n.startNewSessionWith(adapter.displayName),
+                            onPressed: () => onLaunch(
+                              agent: adapter.agentId,
+                              projectPath: project.projectPath,
+                            ),
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          tooltip: l10n.delete,
+                          onPressed: () => onDeleteProject(project),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 削除確認中の行。メモ一覧の確認行と同じ体裁。
+  Widget _buildConfirmRow(
+    BuildContext context,
+    AppLocalizations l10n,
+    Project project,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final compactStyle = FilledButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      minimumSize: const Size(0, 28),
+      textStyle: const TextStyle(fontSize: 12),
+    );
+    return ListTile(
+      title: Text(
+        l10n.unregisterProjectConfirmTitled(project.displayName),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: const Text(''),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton.tonal(
+            style: compactStyle,
+            onPressed: onCancelDelete,
+            child: Text(l10n.cancel),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            style: compactStyle.copyWith(
+              backgroundColor: WidgetStatePropertyAll(colorScheme.error),
+              foregroundColor: WidgetStatePropertyAll(colorScheme.onError),
+            ),
+            onPressed: () => onConfirmDelete(project),
             child: Text(l10n.delete),
           ),
         ],

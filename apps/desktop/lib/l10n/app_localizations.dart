@@ -116,6 +116,12 @@ abstract class AppLocalizations {
   /// **'Memos'**
   String get tabMemos;
 
+  /// No description provided for @tabProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects'**
+  String get tabProjects;
+
   /// No description provided for @noSessionsFound.
   ///
   /// In en, this message translates to:
@@ -127,6 +133,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No memos found'**
   String get noMemosFound;
+
+  /// No description provided for @noProjectsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No projects registered'**
+  String get noProjectsFound;
 
   /// No description provided for @copyResumeCommand.
   ///
@@ -211,6 +223,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete \"{title}\"?'**
   String deleteConfirmTitled(String title);
+
+  /// Inline confirmation shown when removing a registered project from a row
+  ///
+  /// In en, this message translates to:
+  /// **'Unregister \"{title}\"?'**
+  String unregisterProjectConfirmTitled(String title);
+
+  /// Button at the top of the Projects tab that opens the folder picker
+  ///
+  /// In en, this message translates to:
+  /// **'Register'**
+  String get registerProject;
+
+  /// Tooltip on a registered project's per-agent launch button
+  ///
+  /// In en, this message translates to:
+  /// **'Start new session with {agent}'**
+  String startNewSessionWith(String agent);
 
   /// No description provided for @sessionIdLabel.
   ///

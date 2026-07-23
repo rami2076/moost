@@ -11,11 +11,12 @@ enum SummaryScope {
 
 /// エージェント CLI ごとの差分を閉じ込める抽象インターフェース。
 ///
-/// 吸収する差分は 4 つ（design.md 2 章）:
+/// 吸収する差分は 5 つ（design.md 2 章）:
 /// 1. セッション履歴の場所とパース
 /// 2. セッションタイトル・メタデータ取得
 /// 3. 復帰コマンドの組み立て
 /// 4. 要約用ヘッドレス実行コマンド
+/// 5. 新規セッション起動コマンドの組み立て（登録プロジェクト用）
 ///
 /// このインターフェースに特定エージェント固有の概念
 /// （`~/.claude/` のパス構造、ai-title 等）を漏らさないこと。
@@ -34,6 +35,11 @@ abstract interface class AgentAdapter {
     required String projectPath,
     required String sessionId,
   });
+
+  /// 登録プロジェクトから新規セッションを開始するシェルコマンドを組み立てる。
+  /// `buildResumeCommand` と異なり、まだ存在しないセッションを対象にするため
+  /// `sessionId` は取らない（CONTEXT.md「登録プロジェクト」、ADR-004）。
+  String buildNewSessionCommand({required String projectPath});
 
   /// セッションを要約して結果テキストを返す。
   Future<String> summarize({

@@ -78,6 +78,10 @@ class _FakeAdapter implements AgentAdapter {
       '$agentId resume $sessionId';
 
   @override
+  String buildNewSessionCommand({required String projectPath}) =>
+      '$agentId new $projectPath';
+
+  @override
   Future<String> summarize({
     required String sessionId,
     required String projectPath,

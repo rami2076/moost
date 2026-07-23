@@ -106,6 +106,11 @@ class CodexAdapter implements AgentAdapter {
   }
 
   @override
+  String buildNewSessionCommand({required String projectPath}) {
+    return 'cd ${shellEscape(projectPath)} && codex';
+  }
+
+  @override
   Future<String> summarize({
     required String sessionId,
     required String projectPath,

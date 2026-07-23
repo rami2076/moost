@@ -18,10 +18,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabMemos => 'Memos';
 
   @override
+  String get tabProjects => 'Projects';
+
+  @override
   String get noSessionsFound => 'No sessions found';
 
   @override
   String get noMemosFound => 'No memos found';
+
+  @override
+  String get noProjectsFound => 'No projects registered';
 
   @override
   String get copyResumeCommand => 'Copy resume command';
@@ -67,6 +73,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String deleteConfirmTitled(String title) {
     return 'Delete \"$title\"?';
+  }
+
+  @override
+  String unregisterProjectConfirmTitled(String title) {
+    return 'Unregister \"$title\"?';
+  }
+
+  @override
+  String get registerProject => 'Register';
+
+  @override
+  String startNewSessionWith(String agent) {
+    return 'Start new session with $agent';
   }
 
   @override

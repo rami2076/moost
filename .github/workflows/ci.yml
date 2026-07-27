@@ -28,6 +28,26 @@ jobs:
         run: dart test
         working-directory: packages/core
 
+  mcp_server:
+    name: mcp_server (analyze + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+      - name: Enforce lockfile
+        run: dart pub get --enforce-lockfile
+        working-directory: apps/mcp_server
+      - name: Analyze
+        run: dart analyze
+        working-directory: apps/mcp_server
+      - name: Test
+        run: dart test
+        working-directory: apps/mcp_server
+
   desktop:
     name: desktop (analyze + widget test)
     runs-on: ubuntu-latest
@@ -59,3 +79,4 @@ jobs:
           scan-args: |-
             --lockfile=./packages/core/pubspec.lock
             --lockfile=./apps/desktop/pubspec.lock
+            --lockfile=./apps/mcp_server/pubspec.lock

@@ -1,0 +1,23 @@
+name: moost_mcp_server
+description: >-
+  Moost の直近セッション・メモ・登録プロジェクトを MCP ツールとして
+  公開するサーバー（stdio）。Issue #43。
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  moost_core:
+    path: ../../packages/core
+  # MCP SDK。publisher が labs.dart.dev（Dart チーム公式）。
+  # 公開 7 日超のバージョンに固定（supply-chain rules/dart.md）
+  dart_mcp: 0.5.2
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
+  # dart_mcp の推移的依存だが、test/test_utils.dart で直接 import するため
+  # 直接依存へ昇格（公開 7 日超のバージョンに固定。supply-chain rules/dart.md）
+  stream_channel: 2.1.4

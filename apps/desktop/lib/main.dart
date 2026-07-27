@@ -8,6 +8,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'l10n/app_localizations.dart';
+import 'src/mcp/mcp_binary_locator.dart';
+import 'src/mcp/mcp_setup_service.dart';
 import 'src/screens/root_screen.dart';
 import 'src/tray/tray_service.dart';
 import 'src/update/brew_updater.dart';
@@ -75,6 +77,8 @@ class MoostApp extends StatelessWidget {
   final Future<void> Function()? onRestart;
   final Future<String?> Function()? pickFolder;
   final Future<void> Function()? showWindow;
+  final McpSetupService? mcpSetupService;
+  final McpBinaryLocator? mcpBinaryLocator;
 
   /// 実行中は blur によるウィンドウの自動非表示を止める。フォルダ選択
   /// ダイアログ表示中に呼び出し元をアクティブにされて隠れると、ダイアログの
@@ -102,6 +106,8 @@ class MoostApp extends StatelessWidget {
     this.pickFolder,
     this.showWindow,
     this.withoutWindowHide,
+    this.mcpSetupService,
+    this.mcpBinaryLocator,
     this.appVersion,
   });
 
@@ -131,6 +137,8 @@ class MoostApp extends StatelessWidget {
         pickFolder: pickFolder,
         showWindow: showWindow,
         withoutWindowHide: withoutWindowHide,
+        mcpSetupService: mcpSetupService,
+        mcpBinaryLocator: mcpBinaryLocator,
         appVersion: appVersion,
       ),
     );

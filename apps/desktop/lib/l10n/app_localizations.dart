@@ -428,6 +428,78 @@ abstract class AppLocalizations {
   /// **'Copy success animation'**
   String get settingCopyAnimation;
 
+  /// No description provided for @settingMcpSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP integration'**
+  String get settingMcpSectionTitle;
+
+  /// No description provided for @settingMcpSectionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let Claude Code, Codex CLI, or Claude Desktop read your recent sessions, memos, and registered projects directly.'**
+  String get settingMcpSectionDescription;
+
+  /// No description provided for @settingMcpBinaryMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP server binary not found (only available in the distributed build).'**
+  String get settingMcpBinaryMissing;
+
+  /// No description provided for @settingMcpClaudeCodeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Claude Code'**
+  String get settingMcpClaudeCodeButton;
+
+  /// No description provided for @settingMcpCodexButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Codex CLI'**
+  String get settingMcpCodexButton;
+
+  /// No description provided for @settingMcpClaudeDesktopButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Claude Desktop'**
+  String get settingMcpClaudeDesktopButton;
+
+  /// No description provided for @settingMcpTestConnectionButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get settingMcpTestConnectionButton;
+
+  /// No description provided for @settingMcpActionRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get settingMcpActionRunning;
+
+  /// Shown after a successful MCP host registration
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to {target}'**
+  String settingMcpActionSuccess(String target);
+
+  /// Shown after a failed MCP host registration
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to connect to {target}: {error}'**
+  String settingMcpActionFailed(String target, String error);
+
+  /// No description provided for @settingMcpTestConnectionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test succeeded'**
+  String get settingMcpTestConnectionSuccess;
+
+  /// No description provided for @settingMcpTestConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test failed (timed out or errored)'**
+  String get settingMcpTestConnectionFailed;
+
   /// No description provided for @notesTitle.
   ///
   /// In en, this message translates to:

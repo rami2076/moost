@@ -8,6 +8,8 @@ import 'package:moost_core/moost_core.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../mcp/mcp_binary_locator.dart';
+import '../mcp/mcp_setup_service.dart';
 import '../project/folder_picker.dart';
 import '../update/brew_updater.dart';
 import '../update/update_checker.dart';
@@ -124,6 +126,15 @@ class RootScreen extends StatefulWidget {
   /// 更新完了後の再起動。null なら実際にアプリを再起動する。
   final Future<void> Function()? onRestart;
 
+  /// MCP 連携登録（Issue #45）。null なら実際に claude/codex CLI を
+  /// 呼ぶ・設定ファイルを書き換える実装を使う。テストで差し替えるための
+  /// 注入ポイント。
+  final McpSetupService? mcpSetupService;
+
+  /// 同梱された MCP サーバーバイナリの位置解決。null なら実行中のアプリ
+  /// 自身のパスから実際に解決する実装を使う。
+  final McpBinaryLocator? mcpBinaryLocator;
+
   /// 設定画面に表示するアプリバージョン（Issue: アップデート後に反映されたか
   /// 分かりにくい問題への対処）。null なら行ごと非表示。
   final String? appVersion;
@@ -143,6 +154,8 @@ class RootScreen extends StatefulWidget {
     this.openUrl,
     this.brewUpdater,
     this.onRestart,
+    this.mcpSetupService,
+    this.mcpBinaryLocator,
     this.appVersion,
   });
 
@@ -274,6 +287,8 @@ class _RootScreenState extends State<RootScreen> {
       SettingsMenuScreen() => SettingsScreen(
         settingsStore: widget.settingsStore,
         pathResolver: _pathResolver,
+        mcpSetupService: widget.mcpSetupService ?? McpSetupService(),
+        mcpBinaryLocator: widget.mcpBinaryLocator ?? McpBinaryLocator(),
         onBack: () => _showList(_tab),
         appVersion: widget.appVersion,
       ),

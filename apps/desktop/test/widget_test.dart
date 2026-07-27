@@ -834,6 +834,107 @@ void main() {
     });
   });
 
+  testWidgets(
+      'settings screen: MCP section shows guidance when the binary is missing',
+      (tester) async {
+    final tempDir = createTempDir();
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        mcpBinaryLocator: FakeMcpBinaryLocator(binaryExists: false),
+        mcpSetupService: FakeMcpSetupService(),
+      ));
+      await settle(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      await waitFor(tester, find.textContaining('MCP server binary'));
+      expect(find.textContaining('MCP server binary'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Connect Claude Code'),
+          findsNothing);
+    });
+  });
+
+  testWidgets(
+      'settings screen: MCP connect button reports success and records the call',
+      (tester) async {
+    final tempDir = createTempDir();
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+    final fakeMcpSetup = FakeMcpSetupService();
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        mcpBinaryLocator: FakeMcpBinaryLocator(),
+        mcpSetupService: fakeMcpSetup,
+      ));
+      await settle(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      await waitFor(tester, find.text('MCP integration'));
+
+      final connectButton =
+          find.widgetWithText(OutlinedButton, 'Connect Claude Code');
+      await tester.dragUntilVisible(
+        connectButton,
+        find.byType(ListView),
+        const Offset(0, -50),
+      );
+      await tester.tap(connectButton);
+      await waitFor(tester, find.textContaining('Connected to'));
+
+      expect(fakeMcpSetup.calls, ['claude-code']);
+      expect(find.textContaining('Connected to Connect Claude Code'),
+          findsOneWidget);
+    });
+  });
+
+  testWidgets('settings screen: MCP connect button surfaces failures',
+      (tester) async {
+    final tempDir = createTempDir();
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+    final fakeMcpSetup = FakeMcpSetupService(
+      failWith: const {'claude-code': 'claude command not found'},
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        mcpBinaryLocator: FakeMcpBinaryLocator(),
+        mcpSetupService: fakeMcpSetup,
+      ));
+      await settle(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      await waitFor(tester, find.text('MCP integration'));
+
+      final connectButton =
+          find.widgetWithText(OutlinedButton, 'Connect Claude Code');
+      await tester.dragUntilVisible(
+        connectButton,
+        find.byType(ListView),
+        const Offset(0, -50),
+      );
+      await tester.tap(connectButton);
+      await waitFor(tester, find.textContaining('claude command not found'));
+
+      expect(find.textContaining('Failed to connect'), findsOneWidget);
+    });
+  });
+
   testWidgets('save is disabled while title is empty', (tester) async {
     final tempDir = createTempDir();
 

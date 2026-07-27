@@ -132,6 +132,37 @@
   },
   "settingClaudePathNotFound": "Auto-detect: not found",
   "settingCopyAnimation": "Copy success animation",
+  "settingMcpSectionTitle": "MCP integration",
+  "settingMcpSectionDescription": "Let Claude Code, Codex CLI, or Claude Desktop read your recent sessions, memos, and registered projects directly.",
+  "settingMcpBinaryMissing": "MCP server binary not found (only available in the distributed build).",
+  "settingMcpClaudeCodeButton": "Connect Claude Code",
+  "settingMcpCodexButton": "Connect Codex CLI",
+  "settingMcpClaudeDesktopButton": "Connect Claude Desktop",
+  "settingMcpTestConnectionButton": "Test connection",
+  "settingMcpActionRunning": "Working…",
+  "settingMcpActionSuccess": "Connected to {target}",
+  "@settingMcpActionSuccess": {
+    "description": "Shown after a successful MCP host registration",
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "settingMcpActionFailed": "Failed to connect to {target}: {error}",
+  "@settingMcpActionFailed": {
+    "description": "Shown after a failed MCP host registration",
+    "placeholders": {
+      "target": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingMcpTestConnectionSuccess": "Connection test succeeded",
+  "settingMcpTestConnectionFailed": "Connection test failed (timed out or errored)",
   "notesTitle": "Notes",
   "noteAutomationTitle": "Terminal automation permission",
   "noteAutomationBody": "The first time you resume a session, macOS asks for automation permission. Allow it once and it won't ask again.",

@@ -1,4 +1,6 @@
 import 'package:moost_core/moost_core.dart';
+import 'package:moost_desktop/src/mcp/mcp_binary_locator.dart';
+import 'package:moost_desktop/src/mcp/mcp_setup_service.dart';
 
 /// メモリ上で完結する [MemoRepository] のフェイク（widget テスト用）。
 ///
@@ -80,5 +82,59 @@ class FakeSettingsStore implements SettingsRepository {
   @override
   Future<void> save(Settings settings) async {
     _settings = settings;
+  }
+}
+
+/// 実バイナリなしで「同梱バイナリが見つかった」状態を再現する
+/// [McpBinaryLocator] のフェイク（widget テスト用）。
+class FakeMcpBinaryLocator implements McpBinaryLocator {
+  final bool binaryExists;
+
+  FakeMcpBinaryLocator({this.binaryExists = true});
+
+  @override
+  String get binaryPath => '/fake/Moost.app/Contents/Resources/moost-mcp';
+
+  @override
+  Future<bool> exists() async => binaryExists;
+}
+
+/// 実プロセスを一切起動しない [McpSetupService] のフェイク（widget テスト用）。
+///
+/// 呼び出された対象を記録し、[failWith] が設定されていればその対象への
+/// 呼び出しだけ [McpSetupException] を投げる。
+class FakeMcpSetupService implements McpSetupService {
+  final List<String> calls = [];
+  final Map<String, String> failWith;
+  final bool testConnectionResult;
+
+  FakeMcpSetupService({
+    this.failWith = const {},
+    this.testConnectionResult = true,
+  });
+
+  Future<void> _record(String target) async {
+    calls.add(target);
+    final message = failWith[target];
+    if (message != null) {
+      throw McpSetupException(message);
+    }
+  }
+
+  @override
+  Future<void> registerClaudeCode(String binaryPath) => _record('claude-code');
+
+  @override
+  Future<void> registerCodex(String binaryPath) => _record('codex');
+
+  @override
+  Future<void> registerClaudeDesktop(String binaryPath) =>
+      _record('claude-desktop');
+
+  @override
+  Future<bool> testConnection(String binaryPath,
+      {Duration timeout = const Duration(seconds: 5)}) async {
+    calls.add('test-connection');
+    return testConnectionResult;
   }
 }

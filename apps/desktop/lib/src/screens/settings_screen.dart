@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:moost_core/moost_core.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../mcp/mcp_binary_locator.dart';
+import '../mcp/mcp_setup_service.dart';
 import '../widgets/copy_icon_button.dart';
 
 /// 設定画面（design.md 6.6）。
@@ -17,6 +19,8 @@ import '../widgets/copy_icon_button.dart';
 class SettingsScreen extends StatefulWidget {
   final SettingsRepository settingsStore;
   final ClaudePathResolver pathResolver;
+  final McpSetupService mcpSetupService;
+  final McpBinaryLocator mcpBinaryLocator;
   final VoidCallback onBack;
 
   /// 表示中のアプリバージョン（例: "1.5.0"）。null なら行ごと非表示
@@ -27,6 +31,8 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.settingsStore,
     required this.pathResolver,
+    required this.mcpSetupService,
+    required this.mcpBinaryLocator,
     required this.onBack,
     this.appVersion,
   });
@@ -39,6 +45,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Settings? _settings;
   late final TextEditingController _claudePath;
   String? _detectedPath;
+
+  bool _mcpBinaryExists = false;
+  bool _mcpActionRunning = false;
+  String? _mcpStatusMessage;
 
   static const _terminals = ['Terminal.app', 'iTerm2'];
 
@@ -53,11 +63,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = await widget.settingsStore.load();
     final detected =
         await widget.pathResolver.resolve(override: settings.claudePath);
+    final mcpBinaryExists = await widget.mcpBinaryLocator.exists();
     if (!mounted) return;
     setState(() {
       _settings = settings;
       _claudePath.text = settings.claudePath;
       _detectedPath = detected;
+      _mcpBinaryExists = mcpBinaryExists;
+    });
+  }
+
+  /// Claude Code / Codex CLI 連携ボタン共通の実行ラッパー。
+  /// バイナリ起動・外部プロセス実行を伴うため、二重押下を止め、
+  /// 成功/失敗を同じ場所にテキストで表示する。
+  Future<void> _runMcpAction(
+    String targetLabel,
+    Future<void> Function(String binaryPath) action,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _mcpActionRunning = true;
+      _mcpStatusMessage = l10n.settingMcpActionRunning;
+    });
+    try {
+      await action(widget.mcpBinaryLocator.binaryPath);
+      if (!mounted) return;
+      setState(() {
+        _mcpActionRunning = false;
+        _mcpStatusMessage = l10n.settingMcpActionSuccess(targetLabel);
+      });
+    } on McpSetupException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _mcpActionRunning = false;
+        _mcpStatusMessage = l10n.settingMcpActionFailed(targetLabel, e.message);
+      });
+    }
+  }
+
+  Future<void> _testMcpConnection() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _mcpActionRunning = true;
+      _mcpStatusMessage = l10n.settingMcpActionRunning;
+    });
+    bool success;
+    try {
+      success = await widget.mcpSetupService
+          .testConnection(widget.mcpBinaryLocator.binaryPath);
+    } on McpSetupException {
+      success = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _mcpActionRunning = false;
+      _mcpStatusMessage = success
+          ? l10n.settingMcpTestConnectionSuccess
+          : l10n.settingMcpTestConnectionFailed;
     });
   }
 
@@ -197,6 +259,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               settings.copyWith(copyAnimation: value));
                         },
                       ),
+
+                      // MCP 連携（Issue #45）: Claude Code / Codex CLI /
+                      // Claude Desktop へワンクリックで登録する。バイナリは
+                      // 配布ビルド（.app 同梱）にしか存在しないため、
+                      // 開発ビルドでは案内文だけを出す
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.settingMcpSectionTitle,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(l10n.settingMcpSectionDescription,
+                          style: theme.textTheme.bodySmall),
+                      const SizedBox(height: 8),
+                      if (!_mcpBinaryExists)
+                        Text(l10n.settingMcpBinaryMissing,
+                            style: theme.textTheme.bodySmall)
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _mcpActionRunning
+                                  ? null
+                                  : () => _runMcpAction(
+                                        l10n.settingMcpClaudeCodeButton,
+                                        widget.mcpSetupService
+                                            .registerClaudeCode,
+                                      ),
+                              child: Text(l10n.settingMcpClaudeCodeButton),
+                            ),
+                            OutlinedButton(
+                              onPressed: _mcpActionRunning
+                                  ? null
+                                  : () => _runMcpAction(
+                                        l10n.settingMcpCodexButton,
+                                        widget.mcpSetupService.registerCodex,
+                                      ),
+                              child: Text(l10n.settingMcpCodexButton),
+                            ),
+                            OutlinedButton(
+                              onPressed: _mcpActionRunning
+                                  ? null
+                                  : () => _runMcpAction(
+                                        l10n.settingMcpClaudeDesktopButton,
+                                        widget.mcpSetupService
+                                            .registerClaudeDesktop,
+                                      ),
+                              child: Text(l10n.settingMcpClaudeDesktopButton),
+                            ),
+                            OutlinedButton(
+                              onPressed: _mcpActionRunning
+                                  ? null
+                                  : _testMcpConnection,
+                              child: Text(l10n.settingMcpTestConnectionButton),
+                            ),
+                          ],
+                        ),
+                      if (_mcpStatusMessage != null) ...[
+                        const SizedBox(height: 4),
+                        Text(_mcpStatusMessage!,
+                            style: theme.textTheme.bodySmall),
+                      ],
 
                       // デバッグビルド限定: コピーフィードバックの時間調整。
                       // 開発者向けツールのため l10n は通さない・永続化しない

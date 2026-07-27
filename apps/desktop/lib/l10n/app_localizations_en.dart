@@ -196,6 +196,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingCopyAnimation => 'Copy success animation';
 
   @override
+  String get settingMcpSectionTitle => 'MCP integration';
+
+  @override
+  String get settingMcpSectionDescription =>
+      'Let Claude Code, Codex CLI, or Claude Desktop read your recent sessions, memos, and registered projects directly.';
+
+  @override
+  String get settingMcpBinaryMissing =>
+      'MCP server binary not found (only available in the distributed build).';
+
+  @override
+  String get settingMcpClaudeCodeButton => 'Connect Claude Code';
+
+  @override
+  String get settingMcpCodexButton => 'Connect Codex CLI';
+
+  @override
+  String get settingMcpClaudeDesktopButton => 'Connect Claude Desktop';
+
+  @override
+  String get settingMcpTestConnectionButton => 'Test connection';
+
+  @override
+  String get settingMcpActionRunning => 'Working…';
+
+  @override
+  String settingMcpActionSuccess(String target) {
+    return 'Connected to $target';
+  }
+
+  @override
+  String settingMcpActionFailed(String target, String error) {
+    return 'Failed to connect to $target: $error';
+  }
+
+  @override
+  String get settingMcpTestConnectionSuccess => 'Connection test succeeded';
+
+  @override
+  String get settingMcpTestConnectionFailed =>
+      'Connection test failed (timed out or errored)';
+
+  @override
   String get notesTitle => 'Notes';
 
   @override

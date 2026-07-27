@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-07-27
+
+### Added
+
+- MCP サーバー対応（読み取り専用）（#43）: Claude Desktop / Claude Code 等の
+  MCP ホストから、直近セッション・メモ・登録プロジェクトを読み取れる新パッケージ
+  `apps/mcp_server` を追加。誤書き換えリスクを避けるため v1 は読み取り専用の
+  4 ツール（`list_recent_sessions` / `list_memos` / `list_registered_projects` /
+  `get_resume_command`）のみ。`packages/core` の既存ロジックをそのまま再利用
+
 ## [1.7.1] - 2026-07-23
 
 ### Fixed

@@ -10,8 +10,21 @@ import 'dart:io';
 class ClaudePathResolver {
   final String home;
 
-  ClaudePathResolver({String? home})
-      : home = home ?? Platform.environment['HOME'] ?? '';
+  /// 対話ログインシェル経由の解決を差し替え可能にする（テスト用）。
+  final Future<ProcessResult> Function(List<String> args) runZsh;
+
+  /// 既知パスの実在確認を差し替え可能にする（テスト用。実マシンに
+  /// たまたま /opt/homebrew/bin/claude 等が存在すると、ログインシェル
+  /// フォールバックまでテストで到達できなくなるため）。
+  final Future<bool> Function(String path) fileExists;
+
+  ClaudePathResolver({
+    String? home,
+    Future<ProcessResult> Function(List<String> args)? runZsh,
+    Future<bool> Function(String path)? fileExists,
+  })  : home = home ?? Platform.environment['HOME'] ?? '',
+        runZsh = runZsh ?? ((args) => Process.run('zsh', args)),
+        fileExists = fileExists ?? ((path) => File(path).exists());
 
   static const _knownRelativePaths = [
     '.local/bin/claude',
@@ -31,12 +44,12 @@ class ClaudePathResolver {
 
     for (final relative in _knownRelativePaths) {
       final path = '$home/$relative';
-      if (await File(path).exists()) {
+      if (await fileExists(path)) {
         return path;
       }
     }
     for (final path in _knownAbsolutePaths) {
-      if (await File(path).exists()) {
+      if (await fileExists(path)) {
         return path;
       }
     }
@@ -46,14 +59,19 @@ class ClaudePathResolver {
 
   Future<String?> _resolveViaLoginShell() async {
     try {
-      final result = await Process.run(
-        'zsh',
-        ['-lc', 'command -v claude'],
-      );
+      // -i（対話シェル）を付けないと .zshrc を読まないため、nvm/pyenv/asdf
+      // 等が PATH を .zshrc 側で追加している環境では claude を見つけられ
+      // なかった（Issue #53）。-lc では原理的に解決できない
+      final result = await runZsh(['-lic', 'command -v claude']);
       if (result.exitCode != 0) {
         return null;
       }
-      final path = (result.stdout as String).trim();
+      // -i を付けたことで .zshrc 自体が実行され、その中の echo 等の出力が
+      // 標準出力に混ざることがある。最終行だけを実行結果として採用する
+      // （末尾の改行で split すると最後が空文字列になるため、先に
+      // trim してから split する）
+      final lines = (result.stdout as String).trim().split('\n');
+      final path = lines.last.trim();
       return path.isEmpty ? null : path;
     } on ProcessException {
       return null;

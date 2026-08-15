@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../claude_code_environment.dart';
 import '../summarize_exception.dart';
 
 /// `claude -p` によるセッション要約の実行。
@@ -8,6 +9,10 @@ import '../summarize_exception.dart';
 /// - モデルは haiku 固定（requirements.md 3.6）
 /// - 全体要約のフォークセッションが一覧に混ざらないよう、
 ///   プロンプト先頭にマーカーを入れる（design.md 5 章）
+/// - Moost 自身のプロセスが Claude Code 由来の環境変数
+///   （`CLAUDE_CODE_CHILD_SESSION` 等）を保持していると、そのまま子プロセス
+///   に継承され、この `claude -p` 自体が子セッションと誤認識されうるため
+///   除去してから起動する（Issue #52）
 /// - サブプロセスの stdout/stderr は終了待ちの前に EOF まで読み切る
 ///   （パイプバッファ詰まりでデッドロックするため。design.md 7 章ハマりどころ 2）
 class ClaudeSummarizer {
@@ -18,7 +23,14 @@ class ClaudeSummarizer {
 
   final String claudePath;
 
-  ClaudeSummarizer({required this.claudePath});
+  /// 除去処理のベースとなる環境変数（テスト用の注入ポイント。
+  /// null なら実際のプロセス環境 [Platform.environment] を使う）。
+  final Map<String, String> _baseEnvironment;
+
+  ClaudeSummarizer({
+    required this.claudePath,
+    Map<String, String>? environment,
+  }) : _baseEnvironment = environment ?? Platform.environment;
 
   /// 抜粋テキストを stdin で渡して要約する（直近要約）。
   Future<String> summarizeTranscript(
@@ -68,6 +80,11 @@ class ClaudeSummarizer {
         claudePath,
         arguments,
         workingDirectory: workingDirectory,
+        // includeParentEnvironment: true（既定）のままだと environment は
+        // 親環境に「追加」されるだけでキーを消せないため、明示的に false にし、
+        // フィルタ済みの環境そのものを渡す
+        environment: withoutClaudeCodeInternalEnv(_baseEnvironment),
+        includeParentEnvironment: false,
       );
     } on ProcessException catch (e) {
       throw SummarizeException('failed to start claude: ${e.message}');

@@ -23,6 +23,44 @@ void main() {
     return file.path;
   }
 
+  test(
+      'strips Claude Code internal env vars from the child process (Issue #52)',
+      () async {
+    // 実際のプロセス環境 (Platform.environment) に依存すると、汚染されて
+    // いない CI 環境ではフィルタが効いたことにならず偽陽性でパスして
+    // しまう。汚染された偽の環境を明示的に注入し、決定論的に検証する
+    final pollutedEnv = {
+      'PATH': Platform.environment['PATH'] ?? '/usr/bin:/bin',
+      'CLAUDE_CODE_CHILD_SESSION': '1',
+      'CLAUDE_PID': '999',
+      'HARMLESS_VAR': 'keep-me',
+    };
+
+    // env をそのままダンプするフェイク: 直接起動すると汚染変数が渡って
+    // しまうことをまず確認する（対策の効果を測る基準）
+    final path = await writeFakeClaude('env');
+    final unfiltered = await Process.run(
+      path,
+      [],
+      environment: pollutedEnv,
+      includeParentEnvironment: false,
+    );
+    expect(unfiltered.stdout, contains('CLAUDE_CODE_CHILD_SESSION'));
+
+    // ClaudeSummarizer 経由なら、汚染変数だけが消え、無関係な変数は残る
+    final summarizer = ClaudeSummarizer(
+      claudePath: path,
+      environment: pollutedEnv,
+    );
+    final output = await summarizer.summarizeTranscript(
+      'x',
+      workingDirectory: tempDir.path,
+    );
+    expect(output, isNot(contains('CLAUDE_CODE_CHILD_SESSION')));
+    expect(output, isNot(contains('CLAUDE_PID')));
+    expect(output, contains('HARMLESS_VAR'));
+  });
+
   test('summarizeTranscript passes stdin and returns stdout', () async {
     // stdin をそのまま echo するフェイク: stdin が渡ることと EOF まで
     // 読み切れることの両方を検証する

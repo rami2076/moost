@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../../claude_code_environment.dart';
 import '../../model/recent_session.dart';
 import '../../shell_escape.dart';
 import '../agent_adapter.dart';
@@ -66,13 +67,18 @@ class ClaudeCodeAdapter implements AgentAdapter {
     required String projectPath,
     required String sessionId,
   }) {
+    // Moost 自身のプロセスが Claude Code 由来の環境変数を保持していると
+    // ターミナルへそのまま引き継がれ、ここで開始する claude が子セッションと
+    // 誤認識されうるため、claude の直前だけ env -u で外す（Issue #52。
+    // cd はシェル組み込みコマンドなので env の対象にしない）
     return 'cd ${shellEscape(projectPath)} && '
-        'claude --resume ${shellEscape(sessionId)}';
+        '${claudeCodeEnvUnsetPrefix()}claude --resume ${shellEscape(sessionId)}';
   }
 
   @override
   String buildNewSessionCommand({required String projectPath}) {
-    return 'cd ${shellEscape(projectPath)} && claude';
+    return 'cd ${shellEscape(projectPath)} && '
+        '${claudeCodeEnvUnsetPrefix()}claude';
   }
 
   @override

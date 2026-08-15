@@ -5,14 +5,20 @@
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-08-15
+
 ### Added
 
-- 設定画面から MCP 連携をワンクリックで登録できるように（#45）:
-  Claude Code / Codex CLI は `mcp add` を内部的に実行、Claude Desktop は
-  `claude_desktop_config.json` の `mcpServers` を安全にマージ更新する。
-  接続テストボタンで実際にバイナリを起動し `initialize` ハンドシェイクの
-  自己診断ができる。同梱バイナリ（`moost-mcp`）を Moost.app に追加し、
-  Homebrew cask からも `moost-mcp` として直接呼べるようにした
+- 設定画面から MCP 連携をワンクリックで登録・解除できるように（#45）:
+  Claude Code / Codex CLI は `mcp add`/`mcp remove` を内部的に実行、
+  Claude Desktop は `claude_desktop_config.json` の `mcpServers` を安全に
+  マージ更新する。連携済みの相手は行ごとに「連携済み」表示＋解除ボタンに
+  切り替わり、誤って再登録することもない。連携状態の確認は外部プロセス
+  起動を伴い遅いため、設定画面本体の表示とは切り離して非同期に反映する。
+  同梱バイナリ（`moost-mcp`）を Moost.app に追加し、Homebrew cask からも
+  `moost-mcp` として直接呼べるようにした
+- （開発者向け）設定画面のデバッグ欄に、`moost-mcp` バイナリ自体の
+  自己診断（`initialize` ハンドシェイクの疎通確認）を追加
 
 ## [1.8.0] - 2026-07-27
 

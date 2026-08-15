@@ -194,6 +194,58 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingCopyAnimation => 'コピー成功アニメーション';
 
   @override
+  String get settingMcpSectionTitle => 'MCP 連携';
+
+  @override
+  String get settingMcpSectionDescription =>
+      'Claude Code / Codex CLI / Claude Desktop から、直近セッション・メモ・登録プロジェクトを直接読み取れるようにします。';
+
+  @override
+  String get settingMcpBinaryMissing =>
+      'MCP サーバーのバイナリが見つかりません（配布ビルドでのみ利用できます）。';
+
+  @override
+  String get settingMcpTargetClaudeCode => 'Claude Code';
+
+  @override
+  String get settingMcpTargetCodex => 'Codex CLI';
+
+  @override
+  String get settingMcpTargetClaudeDesktop => 'Claude Desktop';
+
+  @override
+  String get settingMcpConnectButton => '連携する';
+
+  @override
+  String get settingMcpConnectedLabel => '連携済み';
+
+  @override
+  String get settingMcpDisconnectButton => '解除';
+
+  @override
+  String get settingMcpActionRunning => '実行中…';
+
+  @override
+  String settingMcpActionSuccess(String target) {
+    return '$target との連携に成功しました';
+  }
+
+  @override
+  String settingMcpActionFailed(String target, String error) {
+    return '$target との連携に失敗しました: $error';
+  }
+
+  @override
+  String settingMcpDisconnectSuccess(String target) {
+    return '$target との連携を解除しました';
+  }
+
+  @override
+  String settingMcpDisconnectFailed(String target, String error) {
+    return '$target との連携解除に失敗しました: $error';
+  }
+
+  @override
   String get notesTitle => '注意';
 
   @override

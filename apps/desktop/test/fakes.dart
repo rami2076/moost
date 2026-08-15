@@ -1,4 +1,6 @@
 import 'package:moost_core/moost_core.dart';
+import 'package:moost_desktop/src/mcp/mcp_binary_locator.dart';
+import 'package:moost_desktop/src/mcp/mcp_setup_service.dart';
 
 /// メモリ上で完結する [MemoRepository] のフェイク（widget テスト用）。
 ///
@@ -80,5 +82,100 @@ class FakeSettingsStore implements SettingsRepository {
   @override
   Future<void> save(Settings settings) async {
     _settings = settings;
+  }
+}
+
+/// 実バイナリなしで「同梱バイナリが見つかった」状態を再現する
+/// [McpBinaryLocator] のフェイク（widget テスト用）。
+class FakeMcpBinaryLocator implements McpBinaryLocator {
+  final bool binaryExists;
+
+  FakeMcpBinaryLocator({this.binaryExists = true});
+
+  @override
+  String get binaryPath => '/fake/Moost.app/Contents/Resources/moost-mcp';
+
+  @override
+  Future<bool> exists() async => binaryExists;
+}
+
+/// 実プロセスを一切起動しない [McpSetupService] のフェイク（widget テスト用）。
+///
+/// 呼び出された対象を記録し、[failWith] が設定されていればその対象への
+/// 呼び出しだけ [McpSetupException] を投げる。
+class FakeMcpSetupService implements McpSetupService {
+  final List<String> calls = [];
+  final Map<String, String> failWith;
+  final bool testConnectionResult;
+
+  /// 実サービスと同様、register* が成功すると対応する is*Connected が
+  /// true を返すようになる（設定画面が「連携済み」表示へ切り替わる
+  /// 挙動をテストで再現するため）。
+  bool claudeCodeConnected;
+  bool codexConnected;
+  bool claudeDesktopConnected;
+
+  FakeMcpSetupService({
+    this.failWith = const {},
+    this.testConnectionResult = true,
+    this.claudeCodeConnected = false,
+    this.codexConnected = false,
+    this.claudeDesktopConnected = false,
+  });
+
+  Future<void> _record(String target, {required bool connectedAfter}) async {
+    calls.add(target);
+    final message = failWith[target];
+    if (message != null) {
+      throw McpSetupException(message);
+    }
+    switch (target) {
+      case 'claude-code':
+        claudeCodeConnected = connectedAfter;
+      case 'codex':
+        codexConnected = connectedAfter;
+      case 'claude-desktop':
+        claudeDesktopConnected = connectedAfter;
+    }
+  }
+
+  @override
+  Future<void> registerClaudeCode(String binaryPath) =>
+      _record('claude-code', connectedAfter: true);
+
+  @override
+  Future<void> registerCodex(String binaryPath) =>
+      _record('codex', connectedAfter: true);
+
+  @override
+  Future<void> registerClaudeDesktop(String binaryPath) =>
+      _record('claude-desktop', connectedAfter: true);
+
+  @override
+  Future<void> unregisterClaudeCode() =>
+      _record('claude-code', connectedAfter: false);
+
+  @override
+  Future<void> unregisterCodex() =>
+      _record('codex', connectedAfter: false);
+
+  @override
+  Future<void> unregisterClaudeDesktop() =>
+      _record('claude-desktop', connectedAfter: false);
+
+  @override
+  Future<bool> isClaudeCodeConnected() async => claudeCodeConnected;
+
+  @override
+  Future<bool> isCodexConnected() async => codexConnected;
+
+  @override
+  Future<bool> isClaudeDesktopConnected() async => claudeDesktopConnected;
+
+  @override
+  Future<bool> testConnection(String binaryPath,
+      {Duration timeout = const Duration(seconds: 5)}) async {
+    calls.add('test-connection');
+    return testConnectionResult;
   }
 }

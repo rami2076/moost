@@ -428,6 +428,90 @@ abstract class AppLocalizations {
   /// **'Copy success animation'**
   String get settingCopyAnimation;
 
+  /// No description provided for @settingMcpSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP integration'**
+  String get settingMcpSectionTitle;
+
+  /// No description provided for @settingMcpSectionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let Claude Code, Codex CLI, or Claude Desktop read your recent sessions, memos, and registered projects directly.'**
+  String get settingMcpSectionDescription;
+
+  /// No description provided for @settingMcpBinaryMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP server binary not found (only available in the distributed build).'**
+  String get settingMcpBinaryMissing;
+
+  /// No description provided for @settingMcpTargetClaudeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Code'**
+  String get settingMcpTargetClaudeCode;
+
+  /// No description provided for @settingMcpTargetCodex.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex CLI'**
+  String get settingMcpTargetCodex;
+
+  /// No description provided for @settingMcpTargetClaudeDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Desktop'**
+  String get settingMcpTargetClaudeDesktop;
+
+  /// No description provided for @settingMcpConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get settingMcpConnectButton;
+
+  /// No description provided for @settingMcpConnectedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get settingMcpConnectedLabel;
+
+  /// No description provided for @settingMcpDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get settingMcpDisconnectButton;
+
+  /// No description provided for @settingMcpActionRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get settingMcpActionRunning;
+
+  /// Shown after a successful MCP host registration
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to {target}'**
+  String settingMcpActionSuccess(String target);
+
+  /// Shown after a failed MCP host registration
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to connect to {target}: {error}'**
+  String settingMcpActionFailed(String target, String error);
+
+  /// Shown after successfully removing an MCP host registration
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected from {target}'**
+  String settingMcpDisconnectSuccess(String target);
+
+  /// Shown after failing to remove an MCP host registration
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to disconnect from {target}: {error}'**
+  String settingMcpDisconnectFailed(String target, String error);
+
   /// No description provided for @notesTitle.
   ///
   /// In en, this message translates to:

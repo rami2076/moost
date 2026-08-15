@@ -33,15 +33,30 @@ jobs:
         run: |
           (cd packages/core && dart pub get --enforce-lockfile)
           (cd apps/desktop && flutter pub get --enforce-lockfile)
+          (cd apps/mcp_server && dart pub get --enforce-lockfile)
 
       - name: Analyze and test
         run: |
           (cd packages/core && dart analyze && dart test)
           (cd apps/desktop && flutter analyze && flutter test)
+          (cd apps/mcp_server && dart analyze && dart test)
 
       - name: Build macOS app (release)
         run: flutter build macos --release
         working-directory: apps/desktop
+
+      # MCP サーバー（apps/mcp_server）を単体バイナリにビルドし、.app に
+      # 同梱する（Issue #45）。設定画面から Claude Code / Codex CLI /
+      # Claude Desktop へ連携登録する際、このバイナリの実パスを指定する。
+      # --deep 署名でこのバイナリも一緒に署名されるよう、署名ステップより
+      # 前に .app の中へ配置する
+      - name: Build and embed moost-mcp binary
+        run: |
+          dart compile exe bin/moost_mcp.dart -o moost-mcp
+          mkdir -p "../desktop/build/macos/Build/Products/Release/moost_desktop.app/Contents/Resources"
+          cp moost-mcp \
+            "../desktop/build/macos/Build/Products/Release/moost_desktop.app/Contents/Resources/moost-mcp"
+        working-directory: apps/mcp_server
 
       # 当面は ad-hoc 署名（RELEASE.md 4 章。Swift 版と同じ）。
       # 初回起動時の Gatekeeper 警告は README の回避手順で対応する
@@ -142,6 +157,11 @@ jobs:
             homepage "https://github.com/${{ github.repository }}"
 
             app "Moost.app"
+            # Moost.app に同梱した MCP サーバーを CLI からも直接叩けるように
+            # symlink する（Issue #45）。設定画面から連携登録する際は、
+            # インストール先アプリの中の実体パスを直接指定するため
+            # この symlink 自体は経由しない
+            binary "#{appdir}/Moost.app/Contents/Resources/moost-mcp"
 
             caveats <<~EOS
               Moost is currently ad-hoc signed. If Gatekeeper blocks the first launch,

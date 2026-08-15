@@ -251,6 +251,40 @@
       }
     }
   },
+  "copyErrorMessage": "Copy error message",
+  "@copyErrorMessage": {
+    "description": "Tooltip on the copy button next to the update-failed error icon"
+  },
+  "repair": "Repair",
+  "@repair": {
+    "description": "Static footer button label shown when the install is detected as broken"
+  },
+  "repairNeeded": "The app install can be repaired",
+  "@repairNeeded": {
+    "description": "Tooltip on the repair button explaining why it is shown"
+  },
+  "repairConfirmQuestion": "Repair the app now?",
+  "@repairConfirmQuestion": {
+    "description": "Shown inline in the footer after tapping Repair"
+  },
+  "repairConfirmCopyQuestion": "Copy the repair command instead?",
+  "@repairConfirmCopyQuestion": {
+    "description": "Shown after answering No to repairConfirmQuestion, offering the manual copy-command fallback"
+  },
+  "repairCommandCopied": "Command copied",
+  "@repairCommandCopied": {
+    "description": "Shown briefly after the repair command is copied to the clipboard"
+  },
+  "repairRunning": "Repairing…",
+  "repairFailed": "Repair failed: {error}",
+  "@repairFailed": {
+    "description": "Tooltip on the error icon when brew reinstall fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "listUpdatedAt": "{month}/{day} {time}",
   "@listUpdatedAt": {
     "description": "Last-used/updated date shown at the right of each list row",

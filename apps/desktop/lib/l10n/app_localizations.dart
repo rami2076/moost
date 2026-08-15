@@ -662,6 +662,54 @@ abstract class AppLocalizations {
   /// **'Update failed: {error}'**
   String updateFailed(String error);
 
+  /// Tooltip on the copy button next to the update-failed error icon
+  ///
+  /// In en, this message translates to:
+  /// **'Copy error message'**
+  String get copyErrorMessage;
+
+  /// Static footer button label shown when the install is detected as broken
+  ///
+  /// In en, this message translates to:
+  /// **'Repair'**
+  String get repair;
+
+  /// Tooltip on the repair button explaining why it is shown
+  ///
+  /// In en, this message translates to:
+  /// **'The app install can be repaired'**
+  String get repairNeeded;
+
+  /// Shown inline in the footer after tapping Repair
+  ///
+  /// In en, this message translates to:
+  /// **'Repair the app now?'**
+  String get repairConfirmQuestion;
+
+  /// Shown after answering No to repairConfirmQuestion, offering the manual copy-command fallback
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the repair command instead?'**
+  String get repairConfirmCopyQuestion;
+
+  /// Shown briefly after the repair command is copied to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Command copied'**
+  String get repairCommandCopied;
+
+  /// No description provided for @repairRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairing…'**
+  String get repairRunning;
+
+  /// Tooltip on the error icon when brew reinstall fails
+  ///
+  /// In en, this message translates to:
+  /// **'Repair failed: {error}'**
+  String repairFailed(String error);
+
   /// Last-used/updated date shown at the right of each list row
   ///
   /// In en, this message translates to:

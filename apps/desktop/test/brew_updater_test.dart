@@ -72,6 +72,79 @@ fi
       final calls = await logFile.readAsLines();
       expect(calls, ['update']); // upgrade は実行されない
     });
+
+    group('repair (Issue #58)', () {
+      test('succeeds on the first reinstall without touching removeBrokenApp',
+          () async {
+        final logFile = File('${tempDir.path}/calls.log');
+        final path =
+            await writeFakeBrew('echo "\$@" >> "${logFile.path}"');
+        var removeCalls = 0;
+        final updater = BrewUpdater(
+          pathResolver: _FixedPathResolver(path),
+          removeBrokenApp: () async => removeCalls++,
+        );
+
+        await updater.repair();
+
+        expect(await logFile.readAsLines(), ['reinstall --cask moost']);
+        expect(removeCalls, 0);
+      });
+
+      test(
+          'removes the leftover app and retries once when the first '
+          'reinstall fails (e.g. "already an App" error)', () async {
+        final logFile = File('${tempDir.path}/calls.log');
+        final markerFile = File('${tempDir.path}/attempted');
+        final path = await writeFakeBrew('''
+echo "\$@" >> "${logFile.path}"
+if [ ! -f "${markerFile.path}" ]; then
+  touch "${markerFile.path}"
+  echo "already an App" >&2
+  exit 1
+fi
+''');
+        var removeCalls = 0;
+        final updater = BrewUpdater(
+          pathResolver: _FixedPathResolver(path),
+          removeBrokenApp: () async => removeCalls++,
+        );
+
+        await updater.repair();
+
+        expect(await logFile.readAsLines(),
+            ['reinstall --cask moost', 'reinstall --cask moost']);
+        expect(removeCalls, 1);
+      });
+
+      test('propagates the exception when the retry also fails', () async {
+        final logFile = File('${tempDir.path}/calls.log');
+        final path = await writeFakeBrew('''
+echo "\$@" >> "${logFile.path}"
+echo "boom" >&2
+exit 1
+''');
+        var removeCalls = 0;
+        final updater = BrewUpdater(
+          pathResolver: _FixedPathResolver(path),
+          removeBrokenApp: () async => removeCalls++,
+        );
+
+        await expectLater(
+          updater.repair(),
+          throwsA(isA<BrewUpdateException>()
+              .having((e) => e.message, 'message', contains('boom'))),
+        );
+        expect(removeCalls, 1);
+      });
+
+      test('missing brew throws BrewUpdateException', () async {
+        final updater = BrewUpdater(pathResolver: _FixedPathResolver(null));
+
+        await expectLater(
+            updater.repair(), throwsA(isA<BrewUpdateException>()));
+      });
+    });
   });
 }
 

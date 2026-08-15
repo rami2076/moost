@@ -12,6 +12,7 @@ import '../mcp/mcp_binary_locator.dart';
 import '../mcp/mcp_setup_service.dart';
 import '../project/folder_picker.dart';
 import '../update/brew_updater.dart';
+import '../update/install_health_checker.dart';
 import '../update/update_checker.dart';
 import '../widgets/copy_icon_button.dart';
 import 'memo_form_screen.dart';
@@ -139,6 +140,10 @@ class RootScreen extends StatefulWidget {
   /// 分かりにくい問題への対処）。null なら行ごと非表示。
   final String? appVersion;
 
+  /// 中断された brew アップグレードによるインストール破損の検知
+  /// （Issue #58）。null なら実環境を見る実装を使う。
+  final InstallHealthChecker? installHealthChecker;
+
   const RootScreen({
     super.key,
     required this.registry,
@@ -157,6 +162,7 @@ class RootScreen extends StatefulWidget {
     this.mcpSetupService,
     this.mcpBinaryLocator,
     this.appVersion,
+    this.installHealthChecker,
   });
 
   static bool defaultIsBrewManaged() =>
@@ -211,6 +217,10 @@ class _RootScreenState extends State<RootScreen> {
   /// 新バージョンの情報（null なら未検出）。フッターに表示する。
   UpdateInfo? _availableUpdate;
 
+  /// 中断された brew アップグレードでインストールが壊れているか
+  /// （Issue #58）。フッターに修復ボタンを出すかの判定に使う。
+  bool _installBroken = false;
+
   /// 更新ボタンが確認/実行中で横幅を要求しているか（フッターの
   /// 他のボタンを一時的に隠すかの判定に使う。_UpdateButton から通知）。
   bool _updateExpanded = false;
@@ -220,6 +230,7 @@ class _RootScreenState extends State<RootScreen> {
     super.initState();
     _reload();
     _checkForUpdate();
+    _checkInstallHealth();
     widget.windowShown?.addListener(_onWindowShown);
   }
 
@@ -233,6 +244,29 @@ class _RootScreenState extends State<RootScreen> {
     if (!mounted) return;
     setState(_reload);
     _checkForUpdate();
+    _checkInstallHealth();
+  }
+
+  /// インストール破損チェック。壊れていなければフッターは通常表示のまま
+  /// （false のまま何もしない誤検知を避けるため、true → false の遷移は
+  /// 通知しない。壊れた状態を一度検知したらプロセスの生存中は
+  /// 修復ボタンを出し続ける）。
+  ///
+  /// updateChecker が未設定（widget テスト等でアップデート通知機能自体を
+  /// 無効化している場合）は実行しない。既定の [InstallHealthChecker] は
+  /// 実際の `/Applications/Moost.app` の有無を見に行くため、Moost が
+  /// インストールされていない開発環境やテスト環境でチェックすると
+  /// 誤って「壊れている」と判定してしまう。
+  Future<void> _checkInstallHealth() async {
+    if (widget.updateChecker == null) {
+      return;
+    }
+    final checker = widget.installHealthChecker ?? InstallHealthChecker();
+    final broken = await checker.isBroken();
+    if (!mounted || !broken) {
+      return;
+    }
+    setState(() => _installBroken = true);
   }
 
   /// 新バージョンのチェック。失敗は UpdateChecker 側で沈黙する。
@@ -538,7 +572,7 @@ class _RootScreenState extends State<RootScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     Widget? updateButton;
-    if (_availableUpdate != null) {
+    if (_availableUpdate != null || _installBroken) {
       // key は Row の直接の子である Flexible 側に付ける。内側の
       // _UpdateButton だけに付けても、Expanded/Flexible の有無を
       // 切り替えた際に Row の reconciliation では「別ウィジェット」と
@@ -546,12 +580,15 @@ class _RootScreenState extends State<RootScreen> {
       // 同じ直接の子要素上にないと、その要素をまたいだ状態保持ができない）。
       // flex/fit だけを切り替えることで、ウィジェット種別は変えずに
       // 「確認/実行中だけ幅を明け渡す」を実現する。
+      // _installBroken を含めるのは、false→true の遷移時に idle 表示へ
+      // 確実に切り替える（＝ _UpdateButtonState を作り直す）ため。
       updateButton = Flexible(
-        key: ValueKey(_availableUpdate!.version),
+        key: ValueKey('${_availableUpdate?.version}-$_installBroken'),
         flex: _updateExpanded ? 1 : 0,
         fit: _updateExpanded ? FlexFit.tight : FlexFit.loose,
         child: _UpdateButton(
-          update: _availableUpdate!,
+          update: _availableUpdate,
+          isInstallBroken: _installBroken,
           isBrewManaged:
               widget.isBrewManaged ?? RootScreen.defaultIsBrewManaged,
           openUrl: widget.openUrl ?? RootScreen.defaultOpenUrl,
@@ -1171,9 +1208,10 @@ class _AgentBadge extends StatelessWidget {
   }
 }
 
-/// フッターの更新ボタン。状態遷移:
-/// idle（"アップデート" + ツールチップにバージョン）
+/// フッターの更新/修復ボタン。状態遷移:
+/// idle（"アップデート"/"修復" + ツールチップ）
 ///   → タップ:
+///     - 破損検知中: confirming（インライン Yes/No。修復は必ず brew 経由）
 ///     - brew 導入: confirming（インライン Yes/No）
 ///     - 手動導入: リリースページを開く（確認なし。ローカルへの変更を伴わないため）
 ///   confirming → はい: running / いいえ: confirmCopy
@@ -1183,9 +1221,18 @@ class _AgentBadge extends StatelessWidget {
 ///   running（不確定インジケーター。brew の CLI 出力には % がなく実数の
 ///   進捗は取得できない）→ 成功: done / 失敗: failed
 ///   done（"再起動" ボタン）→ タップでアプリを終了し新版を起動
-///   failed（エラーアイコン。ツールチップにメッセージ）→ タップで confirming に戻る
+///   failed（エラーアイコン + コピーボタン。ツールチップにメッセージ）
+///     → アイコンタップで confirming に戻る
+///
+/// [update] が null でも [isInstallBroken] が true なら表示される
+/// （Issue #58: brew の内部状態的には最新版のままインストールが壊れて
+/// いることがあり、その場合 UpdateChecker は新バージョンを検出しない）。
+/// [isInstallBroken] が true のときは常に「修復」（brew reinstall）扱いを
+/// 優先する。壊れていれば新バージョンの有無にかかわらず reinstall が
+/// 最新版を入れ直すことになるため、通常の update フローと両立しない。
 class _UpdateButton extends StatefulWidget {
-  final UpdateInfo update;
+  final UpdateInfo? update;
+  final bool isInstallBroken;
   final bool Function() isBrewManaged;
   final Future<void> Function(Uri url) openUrl;
   final BrewUpdater brewUpdater;
@@ -1197,6 +1244,7 @@ class _UpdateButton extends StatefulWidget {
 
   const _UpdateButton({
     required this.update,
+    this.isInstallBroken = false,
     required this.isBrewManaged,
     required this.openUrl,
     required this.brewUpdater,
@@ -1261,11 +1309,14 @@ class _UpdateButtonState extends State<_UpdateButton> {
       _setPhase(_UpdatePhase.confirming);
       return;
     }
-    if (widget.isBrewManaged()) {
+    // 修復は常に brew reinstall 経由（手動導入では isInstallBroken 自体を
+    // 検知できない。実行ファイルの有無は brew 有無を問わず見ているが、
+    // 手動導入で壊れた場合の復旧はこのボタンの対象外）
+    if (widget.isInstallBroken || widget.isBrewManaged()) {
       _setPhase(_UpdatePhase.confirming);
     } else {
       // ローカルに変更を加えない操作なので確認は挟まない
-      await widget.openUrl(widget.update.releaseUrl);
+      await widget.openUrl(widget.update!.releaseUrl);
     }
   }
 
@@ -1288,9 +1339,10 @@ class _UpdateButtonState extends State<_UpdateButton> {
   static const _copiedHoldDuration = Duration(seconds: 3);
 
   Future<void> _copyCommand() async {
-    await Clipboard.setData(
-      const ClipboardData(text: 'brew update && brew upgrade --cask moost'),
-    );
+    final command = widget.isInstallBroken
+        ? 'brew reinstall --cask moost'
+        : 'brew update && brew upgrade --cask moost';
+    await Clipboard.setData(ClipboardData(text: command));
     if (!mounted) return;
     _setPhase(_UpdatePhase.copied);
     _copiedRevertTimer?.cancel();
@@ -1307,7 +1359,11 @@ class _UpdateButtonState extends State<_UpdateButton> {
   Future<void> _runUpdate() async {
     _setPhase(_UpdatePhase.running);
     try {
-      await widget.brewUpdater.run();
+      if (widget.isInstallBroken) {
+        await widget.brewUpdater.repair();
+      } else {
+        await widget.brewUpdater.run();
+      }
       if (!mounted) return;
       _setPhase(_UpdatePhase.done);
     } on Object catch (e) {
@@ -1327,12 +1383,20 @@ class _UpdateButtonState extends State<_UpdateButton> {
       textStyle: const TextStyle(fontSize: 12),
     );
 
+    final broken = widget.isInstallBroken;
+
     return switch (_phase) {
       _UpdatePhase.idle => Tooltip(
-        message: l10n.updateAvailable('v${widget.update.version}'),
+        message: broken
+            ? l10n.repairNeeded
+            : l10n.updateAvailable('v${widget.update!.version}'),
         child: TextButton.icon(
-          icon: const Icon(Icons.arrow_circle_up, size: 16),
-          label: Text(l10n.update),
+          icon: Icon(
+            broken ? Icons.warning_amber_outlined : Icons.arrow_circle_up,
+            size: 16,
+            color: broken ? theme.colorScheme.error : null,
+          ),
+          label: Text(broken ? l10n.repair : l10n.update),
           onPressed: _handleIdleOrFailedTap,
         ),
       ),
@@ -1342,7 +1406,8 @@ class _UpdateButtonState extends State<_UpdateButton> {
       // という一体感が出る）。確認文言は Expanded + 省略記号にして、
       // 長い翻訳文でもボタンのタップ領域を必ず確保する
       _UpdatePhase.confirming => _ConfirmPill(
-        question: l10n.updateConfirmQuestion,
+        question:
+            broken ? l10n.repairConfirmQuestion : l10n.updateConfirmQuestion,
         children: [
           _MiniChoiceButton(
             label: l10n.yes,
@@ -1353,7 +1418,9 @@ class _UpdateButtonState extends State<_UpdateButton> {
         ],
       ),
       _UpdatePhase.confirmCopy => _ConfirmPill(
-        question: l10n.updateConfirmCopyQuestion,
+        question: broken
+            ? l10n.repairConfirmCopyQuestion
+            : l10n.updateConfirmCopyQuestion,
         children: [
           _MiniChoiceButton(
             label: l10n.yes,
@@ -1376,7 +1443,7 @@ class _UpdateButtonState extends State<_UpdateButton> {
             const Icon(Icons.check, size: 16, color: Colors.green),
             const SizedBox(width: 6),
             Text(
-              l10n.updateCommandCopied,
+              broken ? l10n.repairCommandCopied : l10n.updateCommandCopied,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSecondaryContainer,
               ),
@@ -1393,7 +1460,10 @@ class _UpdateButtonState extends State<_UpdateButton> {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           const SizedBox(width: 8),
-          Text(l10n.updateRunning, style: theme.textTheme.bodySmall),
+          Text(
+            broken ? l10n.repairRunning : l10n.updateRunning,
+            style: theme.textTheme.bodySmall,
+          ),
         ],
       ),
       _UpdatePhase.done => FilledButton.tonalIcon(
@@ -1402,17 +1472,32 @@ class _UpdateButtonState extends State<_UpdateButton> {
         label: Text(l10n.updateRestart),
         onPressed: () => widget.onRestart(),
       ),
-      _UpdatePhase.failed => Tooltip(
-        message: l10n.updateFailed(_error ?? ''),
-        child: TextButton.icon(
-          icon: Icon(
-            Icons.error_outline,
-            size: 16,
-            color: theme.colorScheme.error,
+      _UpdatePhase.failed => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(
+            message: broken
+                ? l10n.repairFailed(_error ?? '')
+                : l10n.updateFailed(_error ?? ''),
+            child: TextButton.icon(
+              icon: Icon(
+                Icons.error_outline,
+                size: 16,
+                color: theme.colorScheme.error,
+              ),
+              label: Text(broken ? l10n.repair : l10n.update),
+              onPressed: _handleIdleOrFailedTap,
+            ),
           ),
-          label: Text(l10n.update),
-          onPressed: _handleIdleOrFailedTap,
-        ),
+          CopyIconButton(
+            compact: true,
+            iconSize: 14,
+            tooltip: l10n.copyErrorMessage,
+            onCopy: () => Clipboard.setData(
+              ClipboardData(text: _error ?? ''),
+            ),
+          ),
+        ],
       ),
     };
   }

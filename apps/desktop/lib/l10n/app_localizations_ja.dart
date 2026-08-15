@@ -333,6 +333,32 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get copyErrorMessage => 'エラーメッセージをコピー';
+
+  @override
+  String get repair => '修復';
+
+  @override
+  String get repairNeeded => 'アプリの状態を修復できます';
+
+  @override
+  String get repairConfirmQuestion => 'アプリの状態を修復しますか?';
+
+  @override
+  String get repairConfirmCopyQuestion => '修復コマンドをコピーしますか?';
+
+  @override
+  String get repairCommandCopied => 'コマンドをコピーしました';
+
+  @override
+  String get repairRunning => '修復中…';
+
+  @override
+  String repairFailed(String error) {
+    return '修復に失敗しました: $error';
+  }
+
+  @override
   String listUpdatedAt(int month, int day, String time) {
     return '$month月$day日 $time';
   }

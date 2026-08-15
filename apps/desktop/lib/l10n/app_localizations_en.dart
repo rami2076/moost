@@ -335,6 +335,32 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get copyErrorMessage => 'Copy error message';
+
+  @override
+  String get repair => 'Repair';
+
+  @override
+  String get repairNeeded => 'The app install can be repaired';
+
+  @override
+  String get repairConfirmQuestion => 'Repair the app now?';
+
+  @override
+  String get repairConfirmCopyQuestion => 'Copy the repair command instead?';
+
+  @override
+  String get repairCommandCopied => 'Command copied';
+
+  @override
+  String get repairRunning => 'Repairing…';
+
+  @override
+  String repairFailed(String error) {
+    return 'Repair failed: $error';
+  }
+
+  @override
   String listUpdatedAt(int month, int day, String time) {
     return '$month/$day $time';
   }

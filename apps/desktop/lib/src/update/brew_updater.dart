@@ -44,8 +44,22 @@ class BrewUpdateException implements Exception {
 class BrewUpdater {
   final BrewPathResolver _pathResolver;
 
-  BrewUpdater({BrewPathResolver? pathResolver})
-      : _pathResolver = pathResolver ?? BrewPathResolver();
+  /// 壊れて残った `/Applications/Moost.app` の削除を差し替え可能にする
+  /// （テスト用）。
+  final Future<void> Function() removeBrokenApp;
+
+  BrewUpdater({
+    BrewPathResolver? pathResolver,
+    Future<void> Function()? removeBrokenApp,
+  })  : _pathResolver = pathResolver ?? BrewPathResolver(),
+        removeBrokenApp = removeBrokenApp ?? _defaultRemoveBrokenApp;
+
+  static Future<void> _defaultRemoveBrokenApp() async {
+    final dir = Directory('/Applications/Moost.app');
+    if (await dir.exists()) {
+      await dir.delete(recursive: true);
+    }
+  }
 
   Future<void> run() async {
     final brewPath = await _pathResolver.resolve();
@@ -55,6 +69,24 @@ class BrewUpdater {
 
     await _runStep(brewPath, ['update']);
     await _runStep(brewPath, ['upgrade', '--cask', 'moost']);
+  }
+
+  /// 中断されたアップグレードで壊れた Caskroom 状態からの復旧
+  /// （Issue #58）。`brew reinstall --cask moost` を試し、空になった
+  /// `/Applications/Moost.app` が邪魔で失敗する場合はそれを取り除いて
+  /// 再試行する。
+  Future<void> repair() async {
+    final brewPath = await _pathResolver.resolve();
+    if (brewPath == null) {
+      throw const BrewUpdateException('brew command not found');
+    }
+
+    try {
+      await _runStep(brewPath, ['reinstall', '--cask', 'moost']);
+    } on BrewUpdateException {
+      await removeBrokenApp();
+      await _runStep(brewPath, ['reinstall', '--cask', 'moost']);
+    }
   }
 
   Future<void> _runStep(String brewPath, List<String> arguments) async {

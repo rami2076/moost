@@ -13,6 +13,7 @@ import 'src/mcp/mcp_setup_service.dart';
 import 'src/screens/root_screen.dart';
 import 'src/tray/tray_service.dart';
 import 'src/update/brew_updater.dart';
+import 'src/update/install_health_checker.dart';
 import 'src/update/update_checker.dart';
 
 Future<void> main() async {
@@ -91,6 +92,9 @@ class MoostApp extends StatelessWidget {
   /// トレイからウィンドウが表示されたことを知らせる通知（null なら常駐なし）。
   final ValueListenable<int>? windowShown;
 
+  /// テスト用の注入ポイント（null なら実環境の既定動作）。
+  final InstallHealthChecker? installHealthChecker;
+
   const MoostApp({
     super.key,
     required this.registry,
@@ -109,6 +113,7 @@ class MoostApp extends StatelessWidget {
     this.mcpSetupService,
     this.mcpBinaryLocator,
     this.appVersion,
+    this.installHealthChecker,
   });
 
   @override
@@ -140,6 +145,7 @@ class MoostApp extends StatelessWidget {
         mcpSetupService: mcpSetupService,
         mcpBinaryLocator: mcpBinaryLocator,
         appVersion: appVersion,
+        installHealthChecker: installHealthChecker,
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moost_core/moost_core.dart';
 import 'package:moost_desktop/main.dart';
 import 'package:moost_desktop/src/update/brew_updater.dart';
+import 'package:moost_desktop/src/update/install_health_checker.dart';
 import 'package:moost_desktop/src/update/update_checker.dart';
 
 import 'fakes.dart';
@@ -514,6 +515,95 @@ void main() {
   });
 
   testWidgets(
+      'install repair: broken install shows a repair button that recovers '
+      'after brew reinstall', (tester) async {
+    final tempDir = createTempDir();
+
+    var restarted = false;
+    await tester.runAsync(() async {
+      final brewUpdater = _FakeBrewUpdater();
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        // 新バージョン通知はなし。破損検知だけでボタンが単独表示される
+        // ことを確かめる（Issue #58: brew の内部状態は最新版のままでも
+        // インストールが壊れていることがある）。
+        updateChecker: _FakeUpdateChecker(null),
+        installHealthChecker: _brokenInstallChecker(),
+        isBrewManaged: () => true,
+        brewUpdater: brewUpdater,
+        onRestart: () async => restarted = true,
+      ));
+      await settle(tester);
+
+      // idle: 固定ラベル「Repair」+ ツールチップ
+      expect(find.text('Repair'), findsOneWidget);
+      expect(find.byTooltip('The app install can be repaired'),
+          findsOneWidget);
+
+      // タップで確認（Yes/No）に切り替わる
+      await tester.tap(find.text('Repair'));
+      await tester.pump();
+      expect(find.text('Repair the app now?'), findsOneWidget);
+      expect(find.text('Yes'), findsOneWidget);
+      expect(find.text('No'), findsOneWidget);
+
+      // Yes → 実行中（不確定インジケーター）→ 完了で再起動ボタン
+      await tester.tap(find.text('Yes'));
+      await tester.pump();
+      expect(find.text('Repairing…'), findsOneWidget);
+      await waitFor(tester, find.text('Restart'));
+      expect(find.text('Restart'), findsOneWidget);
+      expect(brewUpdater.repairCalls, 1);
+      expect(brewUpdater.runCalls, 0); // 通常の update フローは呼ばない
+
+      await tester.tap(find.text('Restart'));
+      await tester.pump();
+      expect(restarted, isTrue);
+    });
+  });
+
+  testWidgets(
+      'install repair: brew reinstall failure shows a retry-capable error',
+      (tester) async {
+    final tempDir = createTempDir();
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry: AdapterRegistry(
+            [ClaudeCodeAdapter(claudeHome: '${tempDir.path}/claude')]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        updateChecker: _FakeUpdateChecker(null),
+        installHealthChecker: _brokenInstallChecker(),
+        isBrewManaged: () => true,
+        brewUpdater: _FakeBrewUpdater(shouldFail: true),
+      ));
+      await settle(tester);
+
+      await tester.tap(find.text('Repair'));
+      await tester.pump();
+      await tester.tap(find.text('Yes'));
+      await settle(tester);
+
+      // 失敗するとエラーアイコン付きで「Repair」に戻る（再試行できる）
+      expect(find.text('Repair'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+      // エラーメッセージをコピーできる
+      await tester.tap(find.byTooltip('Copy error message'));
+      await settle(tester);
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(greenCheckIcon(), findsOneWidget);
+    });
+  });
+
+  testWidgets(
       'update notice: brew flow goes idle -> confirm -> running -> restart',
       (tester) async {
     final tempDir = createTempDir();
@@ -531,6 +621,7 @@ void main() {
           releaseUrl:
               Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
         )),
+        installHealthChecker: _healthyInstallChecker(),
         isBrewManaged: () => true,
         brewUpdater: _FakeBrewUpdater(),
         onRestart: () async => restarted = true,
@@ -581,6 +672,7 @@ void main() {
           releaseUrl:
               Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
         )),
+        installHealthChecker: _healthyInstallChecker(),
         isBrewManaged: () => true,
         brewUpdater: brewUpdater,
       ));
@@ -620,6 +712,7 @@ void main() {
           releaseUrl:
               Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
         )),
+        installHealthChecker: _healthyInstallChecker(),
         isBrewManaged: () => true,
         brewUpdater: brewUpdater,
       ));
@@ -664,6 +757,7 @@ void main() {
           releaseUrl:
               Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
         )),
+        installHealthChecker: _healthyInstallChecker(),
         isBrewManaged: () => true,
         brewUpdater: _FakeBrewUpdater(shouldFail: true),
       ));
@@ -677,6 +771,13 @@ void main() {
       // 失敗するとエラーアイコン付きで「Update」に戻る（再試行できる）
       expect(find.text('Update'), findsOneWidget);
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+      // エラーメッセージをコピーできる
+      await tester.tap(find.byTooltip('Copy error message'));
+      await settle(tester); // 非同期のコピー完了・スイープ開始
+      await tester.pump(const Duration(milliseconds: 600)); // スイープ完了
+      await tester.pump();
+      expect(greenCheckIcon(), findsOneWidget);
 
       // 再タップで確認画面に戻れる（再試行導線）
       await tester.tap(find.text('Update'));
@@ -702,6 +803,7 @@ void main() {
           releaseUrl:
               Uri.parse('https://github.com/rami2076/moost/releases/tag/v9.9.9'),
         )),
+        installHealthChecker: _healthyInstallChecker(),
         isBrewManaged: () => false,
         openUrl: (url) async => openedUrls.add(url),
       ));
@@ -1046,6 +1148,7 @@ class _FakeUpdateChecker extends UpdateChecker {
 class _FakeBrewUpdater extends BrewUpdater {
   final bool shouldFail;
   int runCalls = 0;
+  int repairCalls = 0;
 
   _FakeBrewUpdater({this.shouldFail = false});
 
@@ -1057,7 +1160,30 @@ class _FakeBrewUpdater extends BrewUpdater {
       throw const BrewUpdateException('boom');
     }
   }
+
+  @override
+  Future<void> repair() async {
+    repairCalls++;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    if (shouldFail) {
+      throw const BrewUpdateException('boom');
+    }
+  }
 }
+
+/// 常に「壊れていない」と判定する InstallHealthChecker
+/// （updateChecker を渡すテストは実機の /Applications/Moost.app や
+/// Caskroom を見に行かないよう、明示的にこれを注入する）。
+InstallHealthChecker _healthyInstallChecker() => InstallHealthChecker(
+      fileExists: (_) async => true,
+      listEntries: (_) async => const [],
+    );
+
+/// 常に「壊れている」と判定する InstallHealthChecker（修復フローのテスト用）。
+InstallHealthChecker _brokenInstallChecker() => InstallHealthChecker(
+      fileExists: (_) async => false,
+      listEntries: (_) async => const [],
+    );
 
 /// テスト用の AgentAdapter。要約はセッションID・範囲を埋め込んだ固定文字列を返す。
 class _FakeAdapter implements AgentAdapter {

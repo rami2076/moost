@@ -94,5 +94,13 @@
   "updateRunning": "更新中…",
   "updateRestart": "再起動",
   "updateFailed": "更新に失敗しました: {error}",
+  "copyErrorMessage": "エラーメッセージをコピー",
+  "repair": "修復",
+  "repairNeeded": "アプリの状態を修復できます",
+  "repairConfirmQuestion": "アプリの状態を修復しますか?",
+  "repairConfirmCopyQuestion": "修復コマンドをコピーしますか?",
+  "repairCommandCopied": "コマンドをコピーしました",
+  "repairRunning": "修復中…",
+  "repairFailed": "修復に失敗しました: {error}",
   "listUpdatedAt": "{month}月{day}日 {time}"
 }

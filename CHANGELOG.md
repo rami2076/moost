@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-08-15
+
 ### Fixed
 
 - Moost 自身のプロセスが Claude Code 由来の環境変数

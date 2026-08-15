@@ -135,10 +135,12 @@
   "settingMcpSectionTitle": "MCP integration",
   "settingMcpSectionDescription": "Let Claude Code, Codex CLI, or Claude Desktop read your recent sessions, memos, and registered projects directly.",
   "settingMcpBinaryMissing": "MCP server binary not found (only available in the distributed build).",
-  "settingMcpClaudeCodeButton": "Connect Claude Code",
-  "settingMcpCodexButton": "Connect Codex CLI",
-  "settingMcpClaudeDesktopButton": "Connect Claude Desktop",
-  "settingMcpTestConnectionButton": "Test connection",
+  "settingMcpTargetClaudeCode": "Claude Code",
+  "settingMcpTargetCodex": "Codex CLI",
+  "settingMcpTargetClaudeDesktop": "Claude Desktop",
+  "settingMcpConnectButton": "Connect",
+  "settingMcpConnectedLabel": "Connected",
+  "settingMcpDisconnectButton": "Disconnect",
   "settingMcpActionRunning": "Working…",
   "settingMcpActionSuccess": "Connected to {target}",
   "@settingMcpActionSuccess": {
@@ -161,8 +163,27 @@
       }
     }
   },
-  "settingMcpTestConnectionSuccess": "Connection test succeeded",
-  "settingMcpTestConnectionFailed": "Connection test failed (timed out or errored)",
+  "settingMcpDisconnectSuccess": "Disconnected from {target}",
+  "@settingMcpDisconnectSuccess": {
+    "description": "Shown after successfully removing an MCP host registration",
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "settingMcpDisconnectFailed": "Failed to disconnect from {target}: {error}",
+  "@settingMcpDisconnectFailed": {
+    "description": "Shown after failing to remove an MCP host registration",
+    "placeholders": {
+      "target": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "notesTitle": "Notes",
   "noteAutomationTitle": "Terminal automation permission",
   "noteAutomationBody": "The first time you resume a session, macOS asks for automation permission. Allow it once and it won't ask again.",

@@ -205,16 +205,22 @@ class AppLocalizationsJa extends AppLocalizations {
       'MCP サーバーのバイナリが見つかりません（配布ビルドでのみ利用できます）。';
 
   @override
-  String get settingMcpClaudeCodeButton => 'Claude Code と連携';
+  String get settingMcpTargetClaudeCode => 'Claude Code';
 
   @override
-  String get settingMcpCodexButton => 'Codex CLI と連携';
+  String get settingMcpTargetCodex => 'Codex CLI';
 
   @override
-  String get settingMcpClaudeDesktopButton => 'Claude Desktop と連携';
+  String get settingMcpTargetClaudeDesktop => 'Claude Desktop';
 
   @override
-  String get settingMcpTestConnectionButton => '接続テスト';
+  String get settingMcpConnectButton => '連携する';
+
+  @override
+  String get settingMcpConnectedLabel => '連携済み';
+
+  @override
+  String get settingMcpDisconnectButton => '解除';
 
   @override
   String get settingMcpActionRunning => '実行中…';
@@ -230,10 +236,14 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get settingMcpTestConnectionSuccess => '接続テストに成功しました';
+  String settingMcpDisconnectSuccess(String target) {
+    return '$target との連携を解除しました';
+  }
 
   @override
-  String get settingMcpTestConnectionFailed => '接続テストに失敗しました（タイムアウトまたはエラー）';
+  String settingMcpDisconnectFailed(String target, String error) {
+    return '$target との連携解除に失敗しました: $error';
+  }
 
   @override
   String get notesTitle => '注意';

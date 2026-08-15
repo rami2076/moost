@@ -446,29 +446,41 @@ abstract class AppLocalizations {
   /// **'MCP server binary not found (only available in the distributed build).'**
   String get settingMcpBinaryMissing;
 
-  /// No description provided for @settingMcpClaudeCodeButton.
+  /// No description provided for @settingMcpTargetClaudeCode.
   ///
   /// In en, this message translates to:
-  /// **'Connect Claude Code'**
-  String get settingMcpClaudeCodeButton;
+  /// **'Claude Code'**
+  String get settingMcpTargetClaudeCode;
 
-  /// No description provided for @settingMcpCodexButton.
+  /// No description provided for @settingMcpTargetCodex.
   ///
   /// In en, this message translates to:
-  /// **'Connect Codex CLI'**
-  String get settingMcpCodexButton;
+  /// **'Codex CLI'**
+  String get settingMcpTargetCodex;
 
-  /// No description provided for @settingMcpClaudeDesktopButton.
+  /// No description provided for @settingMcpTargetClaudeDesktop.
   ///
   /// In en, this message translates to:
-  /// **'Connect Claude Desktop'**
-  String get settingMcpClaudeDesktopButton;
+  /// **'Claude Desktop'**
+  String get settingMcpTargetClaudeDesktop;
 
-  /// No description provided for @settingMcpTestConnectionButton.
+  /// No description provided for @settingMcpConnectButton.
   ///
   /// In en, this message translates to:
-  /// **'Test connection'**
-  String get settingMcpTestConnectionButton;
+  /// **'Connect'**
+  String get settingMcpConnectButton;
+
+  /// No description provided for @settingMcpConnectedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get settingMcpConnectedLabel;
+
+  /// No description provided for @settingMcpDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get settingMcpDisconnectButton;
 
   /// No description provided for @settingMcpActionRunning.
   ///
@@ -488,17 +500,17 @@ abstract class AppLocalizations {
   /// **'Failed to connect to {target}: {error}'**
   String settingMcpActionFailed(String target, String error);
 
-  /// No description provided for @settingMcpTestConnectionSuccess.
+  /// Shown after successfully removing an MCP host registration
   ///
   /// In en, this message translates to:
-  /// **'Connection test succeeded'**
-  String get settingMcpTestConnectionSuccess;
+  /// **'Disconnected from {target}'**
+  String settingMcpDisconnectSuccess(String target);
 
-  /// No description provided for @settingMcpTestConnectionFailed.
+  /// Shown after failing to remove an MCP host registration
   ///
   /// In en, this message translates to:
-  /// **'Connection test failed (timed out or errored)'**
-  String get settingMcpTestConnectionFailed;
+  /// **'Failed to disconnect from {target}: {error}'**
+  String settingMcpDisconnectFailed(String target, String error);
 
   /// No description provided for @notesTitle.
   ///

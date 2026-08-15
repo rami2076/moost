@@ -50,6 +50,73 @@ class McpSetupService {
     await _run(codexPath, ['mcp', 'add', 'moost', '--', binaryPath]);
   }
 
+  Future<void> unregisterClaudeCode() async {
+    final claudePath = await _claudeResolver.resolve();
+    if (claudePath == null) {
+      throw const McpSetupException('claude command not found');
+    }
+    await _run(claudePath, ['mcp', 'remove', 'moost', '-s', 'user']);
+  }
+
+  Future<void> unregisterCodex() async {
+    final codexPath = await _codexResolver.resolve();
+    if (codexPath == null) {
+      throw const McpSetupException('codex command not found');
+    }
+    await _run(codexPath, ['mcp', 'remove', 'moost']);
+  }
+
+  /// `claude mcp get moost` の終了コードで登録済みかを判定する。
+  Future<bool> isClaudeCodeConnected() async {
+    final claudePath = await _claudeResolver.resolve();
+    if (claudePath == null) {
+      return false;
+    }
+    return _exitsZero(claudePath, ['mcp', 'get', 'moost']);
+  }
+
+  /// `codex mcp get moost` の終了コードで登録済みかを判定する。
+  Future<bool> isCodexConnected() async {
+    final codexPath = await _codexResolver.resolve();
+    if (codexPath == null) {
+      return false;
+    }
+    return _exitsZero(codexPath, ['mcp', 'get', 'moost']);
+  }
+
+  Future<bool> _exitsZero(String executable, List<String> arguments) async {
+    try {
+      final result = await Process.run(executable, arguments);
+      return result.exitCode == 0;
+    } on ProcessException {
+      return false;
+    }
+  }
+
+  /// `claude_desktop_config.json` の `mcpServers` に `moost` キーが
+  /// 既にあるかを見るだけ（実際に接続できるかまでは検証しない）。
+  Future<bool> isClaudeDesktopConnected() async {
+    final file = File(
+        '$_home/Library/Application Support/Claude/claude_desktop_config.json');
+    if (!await file.exists()) {
+      return false;
+    }
+    final content = await file.readAsString();
+    if (content.trim().isEmpty) {
+      return false;
+    }
+    try {
+      final decoded = jsonDecode(content);
+      if (decoded is! Map) {
+        return false;
+      }
+      final servers = decoded['mcpServers'];
+      return servers is Map && servers.containsKey('moost');
+    } on FormatException {
+      return false;
+    }
+  }
+
   Future<void> _run(String executable, List<String> arguments) async {
     final ProcessResult result;
     try {
@@ -101,6 +168,38 @@ class McpSetupService {
     await file.parent.create(recursive: true);
     await file.writeAsString(
         const JsonEncoder.withIndent('  ').convert(config));
+  }
+
+  /// `claude_desktop_config.json` の `mcpServers.moost` キーだけを取り除く。
+  /// 他社製 MCP サーバーを含む既存設定は壊さない。
+  Future<void> unregisterClaudeDesktop() async {
+    final file = File(
+        '$_home/Library/Application Support/Claude/claude_desktop_config.json');
+    if (!await file.exists()) {
+      return;
+    }
+    final content = await file.readAsString();
+    if (content.trim().isEmpty) {
+      return;
+    }
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(content);
+    } on FormatException {
+      throw McpSetupException(
+          '${file.path} is not valid JSON. Fix or remove it manually before retrying.');
+    }
+    if (decoded is! Map<String, Object?>) {
+      throw McpSetupException('${file.path} does not contain a JSON object');
+    }
+    final rawServers = decoded['mcpServers'];
+    if (rawServers is! Map) {
+      return;
+    }
+    final servers = Map<String, Object?>.from(rawServers)..remove('moost');
+    decoded['mcpServers'] = servers;
+    await file.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(decoded));
   }
 
   /// バイナリを実際に一度起動し、`initialize` ハンドシェイクが通るかを

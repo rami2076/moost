@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -49,6 +50,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _mcpBinaryExists = false;
   bool _mcpActionRunning = false;
   String? _mcpStatusMessage;
+  String? _mcpDebugTestResult;
+
+  /// 連携状態はプロセス起動を伴い遅いため、設定画面本体のロードとは
+  /// 切り離して非同期に取得する。null は「確認中」（各行は個別に
+  /// ローディング表示になり、画面全体のスピナーはブロックしない）。
+  bool? _claudeCodeConnected;
+  bool? _codexConnected;
+  bool? _claudeDesktopConnected;
 
   static const _terminals = ['Terminal.app', 'iTerm2'];
 
@@ -70,16 +79,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _claudePath.text = settings.claudePath;
       _detectedPath = detected;
       _mcpBinaryExists = mcpBinaryExists;
+      // 連携状態は下の _loadMcpConnectionStatus() が別途非同期で埋める。
+      // ここで null に戻すのは、_load() が再度呼ばれた場合
+      // （claudePath 変更時など）に古い状態を出し続けないため。
+      _claudeCodeConnected = null;
+      _codexConnected = null;
+      _claudeDesktopConnected = null;
+    });
+    if (mcpBinaryExists) {
+      unawaited(_loadMcpConnectionStatus());
+    }
+  }
+
+  /// 連携状態の確認（`claude mcp get` 等の外部プロセス起動を伴う）は、
+  /// 画面本体の表示より明らかに遅い。設定画面を開くたびに全体が
+  /// ローディングのまま止まって見えるという指摘（Issue #45 フィードバック4）
+  /// を受け、本体の setState とは切り離し、3件を並列に取得してから
+  /// 各行だけを個別に更新する。
+  Future<void> _loadMcpConnectionStatus() async {
+    final results = await Future.wait([
+      widget.mcpSetupService.isClaudeCodeConnected(),
+      widget.mcpSetupService.isCodexConnected(),
+      widget.mcpSetupService.isClaudeDesktopConnected(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _claudeCodeConnected = results[0];
+      _codexConnected = results[1];
+      _claudeDesktopConnected = results[2];
     });
   }
 
-  /// Claude Code / Codex CLI 連携ボタン共通の実行ラッパー。
-  /// バイナリ起動・外部プロセス実行を伴うため、二重押下を止め、
-  /// 成功/失敗を同じ場所にテキストで表示する。
+  /// Claude Code / Codex CLI / Claude Desktop の連携・解除ボタン共通の
+  /// 実行ラッパー。バイナリ起動・外部プロセス実行を伴うため、二重押下を
+  /// 止め、成功/失敗を同じ場所にテキストで表示する。成功後は登録状態を
+  /// 再読込し、ボタンの表示（連携する ⇔ 連携済み+解除）を切り替える。
   Future<void> _runMcpAction(
     String targetLabel,
-    Future<void> Function(String binaryPath) action,
-  ) async {
+    Future<void> Function(String binaryPath) action, {
+    required String Function(String target) successMessage,
+    required String Function(String target, String error) failureMessage,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     setState(() {
       _mcpActionRunning = true;
@@ -87,25 +127,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     try {
       await action(widget.mcpBinaryLocator.binaryPath);
+      // 設定本体の再読込は不要。連携状態だけを更新する
+      await _loadMcpConnectionStatus();
       if (!mounted) return;
       setState(() {
         _mcpActionRunning = false;
-        _mcpStatusMessage = l10n.settingMcpActionSuccess(targetLabel);
+        _mcpStatusMessage = successMessage(targetLabel);
       });
     } on McpSetupException catch (e) {
       if (!mounted) return;
       setState(() {
         _mcpActionRunning = false;
-        _mcpStatusMessage = l10n.settingMcpActionFailed(targetLabel, e.message);
+        _mcpStatusMessage = failureMessage(targetLabel, e.message);
       });
     }
   }
 
   Future<void> _testMcpConnection() async {
-    final l10n = AppLocalizations.of(context)!;
+    // 一般ユーザーには意味が伝わりにくいという指摘を受け、開発者向け
+    // デバッグ欄限定の機能にした（Issue #45 フィードバック3）。他の
+    // デバッグ項目と同じく l10n は通さない・結果も専用の表示欄に出す
     setState(() {
       _mcpActionRunning = true;
-      _mcpStatusMessage = l10n.settingMcpActionRunning;
+      _mcpDebugTestResult = 'running...';
     });
     bool success;
     try {
@@ -117,9 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _mcpActionRunning = false;
-      _mcpStatusMessage = success
-          ? l10n.settingMcpTestConnectionSuccess
-          : l10n.settingMcpTestConnectionFailed;
+      _mcpDebugTestResult = success ? 'succeeded' : 'failed';
     });
   }
 
@@ -279,48 +321,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (!_mcpBinaryExists)
                         Text(l10n.settingMcpBinaryMissing,
                             style: theme.textTheme.bodySmall)
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            OutlinedButton(
-                              onPressed: _mcpActionRunning
-                                  ? null
-                                  : () => _runMcpAction(
-                                        l10n.settingMcpClaudeCodeButton,
-                                        widget.mcpSetupService
-                                            .registerClaudeCode,
-                                      ),
-                              child: Text(l10n.settingMcpClaudeCodeButton),
-                            ),
-                            OutlinedButton(
-                              onPressed: _mcpActionRunning
-                                  ? null
-                                  : () => _runMcpAction(
-                                        l10n.settingMcpCodexButton,
-                                        widget.mcpSetupService.registerCodex,
-                                      ),
-                              child: Text(l10n.settingMcpCodexButton),
-                            ),
-                            OutlinedButton(
-                              onPressed: _mcpActionRunning
-                                  ? null
-                                  : () => _runMcpAction(
-                                        l10n.settingMcpClaudeDesktopButton,
-                                        widget.mcpSetupService
-                                            .registerClaudeDesktop,
-                                      ),
-                              child: Text(l10n.settingMcpClaudeDesktopButton),
-                            ),
-                            OutlinedButton(
-                              onPressed: _mcpActionRunning
-                                  ? null
-                                  : _testMcpConnection,
-                              child: Text(l10n.settingMcpTestConnectionButton),
-                            ),
-                          ],
+                      else ...[
+                        _McpTargetRow(
+                          label: l10n.settingMcpTargetClaudeCode,
+                          connected: _claudeCodeConnected,
+                          connectLabel: l10n.settingMcpConnectButton,
+                          connectedLabel: l10n.settingMcpConnectedLabel,
+                          disconnectLabel: l10n.settingMcpDisconnectButton,
+                          enabled: !_mcpActionRunning,
+                          onConnect: () => _runMcpAction(
+                            l10n.settingMcpTargetClaudeCode,
+                            widget.mcpSetupService.registerClaudeCode,
+                            successMessage: l10n.settingMcpActionSuccess,
+                            failureMessage: l10n.settingMcpActionFailed,
+                          ),
+                          onDisconnect: () => _runMcpAction(
+                            l10n.settingMcpTargetClaudeCode,
+                            (_) => widget.mcpSetupService.unregisterClaudeCode(),
+                            successMessage: l10n.settingMcpDisconnectSuccess,
+                            failureMessage: l10n.settingMcpDisconnectFailed,
+                          ),
                         ),
+                        _McpTargetRow(
+                          label: l10n.settingMcpTargetCodex,
+                          connected: _codexConnected,
+                          connectLabel: l10n.settingMcpConnectButton,
+                          connectedLabel: l10n.settingMcpConnectedLabel,
+                          disconnectLabel: l10n.settingMcpDisconnectButton,
+                          enabled: !_mcpActionRunning,
+                          onConnect: () => _runMcpAction(
+                            l10n.settingMcpTargetCodex,
+                            widget.mcpSetupService.registerCodex,
+                            successMessage: l10n.settingMcpActionSuccess,
+                            failureMessage: l10n.settingMcpActionFailed,
+                          ),
+                          onDisconnect: () => _runMcpAction(
+                            l10n.settingMcpTargetCodex,
+                            (_) => widget.mcpSetupService.unregisterCodex(),
+                            successMessage: l10n.settingMcpDisconnectSuccess,
+                            failureMessage: l10n.settingMcpDisconnectFailed,
+                          ),
+                        ),
+                        _McpTargetRow(
+                          label: l10n.settingMcpTargetClaudeDesktop,
+                          connected: _claudeDesktopConnected,
+                          connectLabel: l10n.settingMcpConnectButton,
+                          connectedLabel: l10n.settingMcpConnectedLabel,
+                          disconnectLabel: l10n.settingMcpDisconnectButton,
+                          enabled: !_mcpActionRunning,
+                          onConnect: () => _runMcpAction(
+                            l10n.settingMcpTargetClaudeDesktop,
+                            widget.mcpSetupService.registerClaudeDesktop,
+                            successMessage: l10n.settingMcpActionSuccess,
+                            failureMessage: l10n.settingMcpActionFailed,
+                          ),
+                          onDisconnect: () => _runMcpAction(
+                            l10n.settingMcpTargetClaudeDesktop,
+                            (_) =>
+                                widget.mcpSetupService.unregisterClaudeDesktop(),
+                            successMessage: l10n.settingMcpDisconnectSuccess,
+                            failureMessage: l10n.settingMcpDisconnectFailed,
+                          ),
+                        ),
+                      ],
                       if (_mcpStatusMessage != null) ...[
                         const SizedBox(height: 4),
                         Text(_mcpStatusMessage!,
@@ -364,6 +427,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _DebugMsField(
                           label: 'update copied',
                           notifier: CopyFeedbackTiming.updateCopiedHoldMs,
+                        ),
+                        const SizedBox(height: 16),
+                        // moost-mcp バイナリの自己診断（旧: 一般ユーザー向け
+                        // 「接続テスト」ボタン）。意味が伝わりにくいという
+                        // 指摘（Issue #45 フィードバック3）を受け、開発者向け
+                        // デバッグ欄限定にした
+                        Text('Debug: moost-mcp self-test',
+                            style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            OutlinedButton(
+                              onPressed: (_mcpActionRunning || !_mcpBinaryExists)
+                                  ? null
+                                  : _testMcpConnection,
+                              child: const Text('Run'),
+                            ),
+                            if (_mcpDebugTestResult != null) ...[
+                              const SizedBox(width: 8),
+                              Text(_mcpDebugTestResult!,
+                                  style: theme.textTheme.bodySmall),
+                            ],
+                          ],
                         ),
                       ],
                       const SizedBox(height: 24),
@@ -435,6 +521,86 @@ class _DebugMsFieldState extends State<_DebugMsField> {
           widget.notifier.value = ms.clamp(1, 60000);
         }
       },
+    );
+  }
+}
+
+/// MCP 連携先 1 件分の行（Issue #45 フィードバック1: ボタンを横並びの
+/// [Wrap] ではなく、縦に続くリストにしてほしいという指摘への対応）。
+///
+/// 未連携なら [connectLabel] のボタンだけ、連携済みなら [connectedLabel]
+/// のラベルと [disconnectLabel] の解除ボタンを出す（フィードバック2:
+/// 連携済みでも解除できるようにしてほしいという指摘への対応。連携する
+/// ボタン自体は連携済みの間は表示しないので、誤って再登録することもない）。
+///
+/// [connected] が null の間（連携状態を非同期に確認中）は、ボタンの
+/// 代わりに小さいスピナーを出す。設定画面本体はこの確認を待たずに
+/// 表示されるため、行ごとに個別のローディングになる（フィードバック4:
+/// 画面を開くたびに全体がローディングで止まって見える、への対応）。
+class _McpTargetRow extends StatelessWidget {
+  final String label;
+  final bool? connected;
+  final String connectLabel;
+  final String connectedLabel;
+  final String disconnectLabel;
+  final bool enabled;
+  final VoidCallback onConnect;
+  final VoidCallback onDisconnect;
+
+  const _McpTargetRow({
+    required this.label,
+    required this.connected,
+    required this.connectLabel,
+    required this.connectedLabel,
+    required this.disconnectLabel,
+    required this.enabled,
+    required this.onConnect,
+    required this.onDisconnect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final connected = this.connected;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: theme.textTheme.bodyMedium),
+          ),
+          if (connected == null)
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.outline,
+              ),
+            )
+          else if (connected) ...[
+            Text(
+              connectedLabel,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: enabled ? onDisconnect : null,
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+              ),
+              child: Text(disconnectLabel),
+            ),
+          ] else
+            OutlinedButton(
+              onPressed: enabled ? onConnect : null,
+              child: Text(connectLabel),
+            ),
+        ],
+      ),
     );
   }
 }

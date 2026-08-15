@@ -207,16 +207,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'MCP server binary not found (only available in the distributed build).';
 
   @override
-  String get settingMcpClaudeCodeButton => 'Connect Claude Code';
+  String get settingMcpTargetClaudeCode => 'Claude Code';
 
   @override
-  String get settingMcpCodexButton => 'Connect Codex CLI';
+  String get settingMcpTargetCodex => 'Codex CLI';
 
   @override
-  String get settingMcpClaudeDesktopButton => 'Connect Claude Desktop';
+  String get settingMcpTargetClaudeDesktop => 'Claude Desktop';
 
   @override
-  String get settingMcpTestConnectionButton => 'Test connection';
+  String get settingMcpConnectButton => 'Connect';
+
+  @override
+  String get settingMcpConnectedLabel => 'Connected';
+
+  @override
+  String get settingMcpDisconnectButton => 'Disconnect';
 
   @override
   String get settingMcpActionRunning => 'Working…';
@@ -232,11 +238,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingMcpTestConnectionSuccess => 'Connection test succeeded';
+  String settingMcpDisconnectSuccess(String target) {
+    return 'Disconnected from $target';
+  }
 
   @override
-  String get settingMcpTestConnectionFailed =>
-      'Connection test failed (timed out or errored)';
+  String settingMcpDisconnectFailed(String target, String error) {
+    return 'Failed to disconnect from $target: $error';
+  }
 
   @override
   String get notesTitle => 'Notes';

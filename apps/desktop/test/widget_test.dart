@@ -98,6 +98,22 @@ Finder greenCheckIcon() => find.byWidgetPredicate(
         widget.icon == Icons.check &&
         widget.color == Colors.green);
 
+/// MCP 連携セクションの、[targetLabel]（"Claude Code" 等）の行にある
+/// 「Connect」ボタンだけを絞り込む。3 行とも同じラベル文言のボタンを
+/// 使っているため、行の Row を祖先として辿って一意にする。
+Finder mcpConnectButtonFor(String targetLabel) => find.descendant(
+      of: find.ancestor(
+          of: find.text(targetLabel), matching: find.byType(Row)),
+      matching: find.widgetWithText(OutlinedButton, 'Connect'),
+    );
+
+/// [mcpConnectButtonFor] の解除ボタン版。
+Finder mcpDisconnectButtonFor(String targetLabel) => find.descendant(
+      of: find.ancestor(
+          of: find.text(targetLabel), matching: find.byType(Row)),
+      matching: find.widgetWithText(TextButton, 'Disconnect'),
+    );
+
 /// テスト用の一時ディレクトリを作り、競合に耐える teardown を登録する。
 ///
 /// ストアの保存は「.tmp 書き込み → rename」のアトミック方式のため、
@@ -855,8 +871,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
       await waitFor(tester, find.textContaining('MCP server binary'));
       expect(find.textContaining('MCP server binary'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, 'Connect Claude Code'),
-          findsNothing);
+      // バイナリがない場合は連携先の行自体を出さない
+      expect(find.text('Claude Code'), findsNothing);
     });
   });
 
@@ -882,8 +898,7 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
       await waitFor(tester, find.text('MCP integration'));
 
-      final connectButton =
-          find.widgetWithText(OutlinedButton, 'Connect Claude Code');
+      final connectButton = mcpConnectButtonFor('Claude Code');
       await tester.dragUntilVisible(
         connectButton,
         find.byType(ListView),
@@ -893,8 +908,10 @@ void main() {
       await waitFor(tester, find.textContaining('Connected to'));
 
       expect(fakeMcpSetup.calls, ['claude-code']);
-      expect(find.textContaining('Connected to Connect Claude Code'),
-          findsOneWidget);
+      expect(find.textContaining('Connected to Claude Code'), findsOneWidget);
+      // 連携済みになったので、行のボタンは「Connected」表示に切り替わる
+      expect(mcpConnectButtonFor('Claude Code'), findsNothing);
+      expect(find.text('Connected'), findsOneWidget);
     });
   });
 
@@ -921,8 +938,7 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
       await waitFor(tester, find.text('MCP integration'));
 
-      final connectButton =
-          find.widgetWithText(OutlinedButton, 'Connect Claude Code');
+      final connectButton = mcpConnectButtonFor('Claude Code');
       await tester.dragUntilVisible(
         connectButton,
         find.byType(ListView),
@@ -932,6 +948,52 @@ void main() {
       await waitFor(tester, find.textContaining('claude command not found'));
 
       expect(find.textContaining('Failed to connect'), findsOneWidget);
+      // 失敗時はボタンのまま（Connected には切り替わらない）
+      expect(mcpConnectButtonFor('Claude Code'), findsOneWidget);
+    });
+  });
+
+  testWidgets(
+      'settings screen: MCP disconnect button unregisters and reverts to Connect',
+      (tester) async {
+    final tempDir = createTempDir();
+    final claudeHome = Directory('${tempDir.path}/claude')..createSync();
+    final fakeMcpSetup = FakeMcpSetupService(claudeCodeConnected: true);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MoostApp(
+        registry:
+            AdapterRegistry([ClaudeCodeAdapter(claudeHome: claudeHome.path)]),
+        memoStore: FakeMemoStore(),
+        settingsStore: FakeSettingsStore(),
+        projectStore: FakeProjectStore(),
+        mcpBinaryLocator: FakeMcpBinaryLocator(),
+        mcpSetupService: fakeMcpSetup,
+      ));
+      await settle(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      await waitFor(tester, find.text('MCP integration'));
+
+      // 最初から連携済みなので Connected 表示 + Disconnect ボタンが出る
+      final disconnectButton = mcpDisconnectButtonFor('Claude Code');
+      await tester.dragUntilVisible(
+        disconnectButton,
+        find.byType(ListView),
+        const Offset(0, -50),
+      );
+      expect(find.text('Connected'), findsOneWidget);
+      expect(mcpConnectButtonFor('Claude Code'), findsNothing);
+
+      await tester.tap(disconnectButton);
+      await waitFor(tester, find.textContaining('Disconnected from'));
+
+      expect(fakeMcpSetup.calls, ['claude-code']);
+      expect(find.textContaining('Disconnected from Claude Code'),
+          findsOneWidget);
+      // 解除後は Connect ボタンに戻る
+      expect(mcpConnectButtonFor('Claude Code'), findsOneWidget);
+      expect(mcpDisconnectButtonFor('Claude Code'), findsNothing);
     });
   });
 

@@ -89,6 +89,141 @@ void main() {
     });
   });
 
+  group('unregisterClaudeCode', () {
+    test('runs claude mcp remove for user scope', () async {
+      final logFile = File('${tempDir.path}/calls.log');
+      final claudePath = await writeFakeScript(
+          'claude', 'echo "\$@" >> "${logFile.path}"');
+      final service = McpSetupService(
+        claudeResolver: _FixedClaudeResolver(claudePath),
+      );
+
+      await service.unregisterClaudeCode();
+
+      final calls = await logFile.readAsLines();
+      expect(calls, ['mcp remove moost -s user']);
+    });
+
+    test('throws when claude command is not found', () async {
+      final service =
+          McpSetupService(claudeResolver: _FixedClaudeResolver(null));
+
+      await expectLater(
+        service.unregisterClaudeCode(),
+        throwsA(isA<McpSetupException>()),
+      );
+    });
+  });
+
+  group('unregisterCodex', () {
+    test('runs codex mcp remove', () async {
+      final logFile = File('${tempDir.path}/calls.log');
+      final codexPath = await writeFakeScript(
+          'codex', 'echo "\$@" >> "${logFile.path}"');
+      final service = McpSetupService(
+        codexResolver: _FixedCodexResolver(codexPath),
+      );
+
+      await service.unregisterCodex();
+
+      final calls = await logFile.readAsLines();
+      expect(calls, ['mcp remove moost']);
+    });
+  });
+
+  group('isClaudeCodeConnected', () {
+    test('true when claude mcp get exits successfully', () async {
+      final claudePath = await writeFakeScript('claude', 'exit 0');
+      final service = McpSetupService(
+        claudeResolver: _FixedClaudeResolver(claudePath),
+      );
+
+      expect(await service.isClaudeCodeConnected(), isTrue);
+    });
+
+    test('false when claude mcp get exits with an error', () async {
+      final claudePath = await writeFakeScript('claude', 'exit 1');
+      final service = McpSetupService(
+        claudeResolver: _FixedClaudeResolver(claudePath),
+      );
+
+      expect(await service.isClaudeCodeConnected(), isFalse);
+    });
+
+    test('false when claude command is not found', () async {
+      final service =
+          McpSetupService(claudeResolver: _FixedClaudeResolver(null));
+
+      expect(await service.isClaudeCodeConnected(), isFalse);
+    });
+  });
+
+  group('isCodexConnected', () {
+    test('true when codex mcp get exits successfully', () async {
+      final codexPath = await writeFakeScript('codex', 'exit 0');
+      final service = McpSetupService(
+        codexResolver: _FixedCodexResolver(codexPath),
+      );
+
+      expect(await service.isCodexConnected(), isTrue);
+    });
+
+    test('false when codex mcp get exits with an error', () async {
+      final codexPath = await writeFakeScript('codex', 'exit 1');
+      final service = McpSetupService(
+        codexResolver: _FixedCodexResolver(codexPath),
+      );
+
+      expect(await service.isCodexConnected(), isFalse);
+    });
+  });
+
+  group('isClaudeDesktopConnected', () {
+    File configFile(String home) => File(
+        '$home/Library/Application Support/Claude/claude_desktop_config.json');
+
+    test('false when the config file does not exist', () async {
+      final service = McpSetupService(home: tempDir.path);
+
+      expect(await service.isClaudeDesktopConnected(), isFalse);
+    });
+
+    test('false when moost is not registered', () async {
+      final file = configFile(tempDir.path);
+      await file.parent.create(recursive: true);
+      await file.writeAsString(jsonEncode({
+        'mcpServers': {
+          'other-tool': {'command': '/usr/bin/other-tool'},
+        },
+      }));
+      final service = McpSetupService(home: tempDir.path);
+
+      expect(await service.isClaudeDesktopConnected(), isFalse);
+    });
+
+    test('true when moost is already registered', () async {
+      final file = configFile(tempDir.path);
+      await file.parent.create(recursive: true);
+      await file.writeAsString(jsonEncode({
+        'mcpServers': {
+          'moost': {'command': '/path/to/moost-mcp'},
+        },
+      }));
+      final service = McpSetupService(home: tempDir.path);
+
+      expect(await service.isClaudeDesktopConnected(), isTrue);
+    });
+
+    test('false on invalid JSON instead of throwing', () async {
+      final file = configFile(tempDir.path);
+      await file.parent.create(recursive: true);
+      await file.writeAsString('{not valid json');
+      final service = McpSetupService(home: tempDir.path);
+
+      expect(await service.isClaudeDesktopConnected(), isFalse);
+    });
+  });
+
   group('registerClaudeDesktop', () {
     File configFile(String home) =>
         File('$home/Library/Application Support/Claude/claude_desktop_config.json');
@@ -135,6 +270,50 @@ void main() {
       );
       // ファイルは書き換えられていないこと
       expect(await file.readAsString(), '{not valid json');
+    });
+  });
+
+  group('unregisterClaudeDesktop', () {
+    File configFile(String home) =>
+        File('$home/Library/Application Support/Claude/claude_desktop_config.json');
+
+    test('no-op when the config file does not exist', () async {
+      final service = McpSetupService(home: tempDir.path);
+
+      await service.unregisterClaudeDesktop();
+
+      expect(await configFile(tempDir.path).exists(), isFalse);
+    });
+
+    test('removes only the moost key, preserving other servers', () async {
+      final file = configFile(tempDir.path);
+      await file.parent.create(recursive: true);
+      await file.writeAsString(jsonEncode({
+        'mcpServers': {
+          'other-tool': {'command': '/usr/bin/other-tool'},
+          'moost': {'command': '/path/to/moost-mcp'},
+        },
+      }));
+      final service = McpSetupService(home: tempDir.path);
+
+      await service.unregisterClaudeDesktop();
+
+      final content = jsonDecode(await file.readAsString()) as Map<String, Object?>;
+      final servers = content['mcpServers'] as Map<String, Object?>;
+      expect(servers.containsKey('moost'), isFalse);
+      expect(servers['other-tool'], {'command': '/usr/bin/other-tool'});
+    });
+
+    test('throws instead of overwriting invalid JSON', () async {
+      final file = configFile(tempDir.path);
+      await file.parent.create(recursive: true);
+      await file.writeAsString('{not valid json');
+      final service = McpSetupService(home: tempDir.path);
+
+      await expectLater(
+        service.unregisterClaudeDesktop(),
+        throwsA(isA<McpSetupException>()),
+      );
     });
   });
 

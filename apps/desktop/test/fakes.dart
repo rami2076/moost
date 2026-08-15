@@ -108,28 +108,69 @@ class FakeMcpSetupService implements McpSetupService {
   final Map<String, String> failWith;
   final bool testConnectionResult;
 
+  /// 実サービスと同様、register* が成功すると対応する is*Connected が
+  /// true を返すようになる（設定画面が「連携済み」表示へ切り替わる
+  /// 挙動をテストで再現するため）。
+  bool claudeCodeConnected;
+  bool codexConnected;
+  bool claudeDesktopConnected;
+
   FakeMcpSetupService({
     this.failWith = const {},
     this.testConnectionResult = true,
+    this.claudeCodeConnected = false,
+    this.codexConnected = false,
+    this.claudeDesktopConnected = false,
   });
 
-  Future<void> _record(String target) async {
+  Future<void> _record(String target, {required bool connectedAfter}) async {
     calls.add(target);
     final message = failWith[target];
     if (message != null) {
       throw McpSetupException(message);
     }
+    switch (target) {
+      case 'claude-code':
+        claudeCodeConnected = connectedAfter;
+      case 'codex':
+        codexConnected = connectedAfter;
+      case 'claude-desktop':
+        claudeDesktopConnected = connectedAfter;
+    }
   }
 
   @override
-  Future<void> registerClaudeCode(String binaryPath) => _record('claude-code');
+  Future<void> registerClaudeCode(String binaryPath) =>
+      _record('claude-code', connectedAfter: true);
 
   @override
-  Future<void> registerCodex(String binaryPath) => _record('codex');
+  Future<void> registerCodex(String binaryPath) =>
+      _record('codex', connectedAfter: true);
 
   @override
   Future<void> registerClaudeDesktop(String binaryPath) =>
-      _record('claude-desktop');
+      _record('claude-desktop', connectedAfter: true);
+
+  @override
+  Future<void> unregisterClaudeCode() =>
+      _record('claude-code', connectedAfter: false);
+
+  @override
+  Future<void> unregisterCodex() =>
+      _record('codex', connectedAfter: false);
+
+  @override
+  Future<void> unregisterClaudeDesktop() =>
+      _record('claude-desktop', connectedAfter: false);
+
+  @override
+  Future<bool> isClaudeCodeConnected() async => claudeCodeConnected;
+
+  @override
+  Future<bool> isCodexConnected() async => codexConnected;
+
+  @override
+  Future<bool> isClaudeDesktopConnected() async => claudeDesktopConnected;
 
   @override
   Future<bool> testConnection(String binaryPath,

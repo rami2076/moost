@@ -24,14 +24,15 @@ void main() {
   group('buildResumeCommand (via ClaudeCodeAdapter)', () {
     final adapter = ClaudeCodeAdapter(claudeHome: '/nonexistent');
 
-    test('builds cd && claude --resume', () {
+    test('builds cd && claude --resume with the env -u prefix', () {
       final command = adapter.buildResumeCommand(
         projectPath: '/Users/foo/project',
         sessionId: 'abc-123',
       );
       expect(
         command,
-        "cd '/Users/foo/project' && claude --resume 'abc-123'",
+        "cd '/Users/foo/project' && "
+        "${claudeCodeEnvUnsetPrefix()}claude --resume 'abc-123'",
       );
     });
 
@@ -47,10 +48,13 @@ void main() {
   group('buildNewSessionCommand (via ClaudeCodeAdapter)', () {
     final adapter = ClaudeCodeAdapter(claudeHome: '/nonexistent');
 
-    test('builds cd && claude without --resume', () {
+    test('builds cd && claude without --resume, with the env -u prefix', () {
       final command =
           adapter.buildNewSessionCommand(projectPath: '/Users/foo/project');
-      expect(command, "cd '/Users/foo/project' && claude");
+      expect(
+        command,
+        "cd '/Users/foo/project' && ${claudeCodeEnvUnsetPrefix()}claude",
+      );
     });
 
     test('keeps backquoted path intact inside quotes', () {

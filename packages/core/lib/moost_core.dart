@@ -16,6 +16,7 @@ export 'src/agent/codex/codex_rollout_reader.dart';
 export 'src/agent/codex/codex_summarizer.dart';
 export 'src/agent/codex/codex_transcript_extractor.dart';
 export 'src/agent/summarize_exception.dart';
+export 'src/claude_code_environment.dart';
 export 'src/model/memo.dart';
 export 'src/model/project.dart';
 export 'src/model/recent_session.dart';

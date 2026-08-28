@@ -5,6 +5,7 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'linux_tray.dart';
 import 'popover_position.dart';
 
 /// システムトレイ常駐の面倒を見る（design.md 6 章）。
@@ -29,23 +30,33 @@ class TrayService with TrayListener, WindowListener {
 
   /// トレイを初期化する。成功したら true。
   ///
-  /// Linux（GNOME）は AppIndicator 拡張がないとトレイへの登録に失敗する
-  /// ため、ここで失敗を検出してフォールバック（通常ウィンドウ）に回す。
+  /// Linux は runner 側の自前 StatusNotifierItem で起動する。AppIndicator
+  /// のホスト（GNOME の拡張等）がいないと登録に失敗するため、失敗時は
+  /// 通常ウィンドウへのフォールバックを呼び出し側（main.dart）で行う。
   Future<bool> init() async {
-    trayManager.addListener(this);
     windowManager.addListener(this);
     // 閉じる操作で終了させず onWindowClose に回す
     await windowManager.setPreventClose(true);
+
+    if (Platform.isLinux) {
+      // コールバックには this をクロージャで保持するため、LinuxTray は
+      // メソッドチャネルのハンドラが持つ参照で生存する（保持用フィールドは不要）
+      final linuxTray = LinuxTray(
+        onActivate: _toggleWindow,
+        onMenuOpen: showWindow,
+        onMenuQuit: () => exit(0),
+      );
+      _available = await linuxTray.init(
+        openLabel: openLabel,
+        quitLabel: quitLabel,
+      );
+      return _available;
+    }
+
+    trayManager.addListener(this);
     try {
-      // macOS は isTemplate で自動配色（黒テンプレートで良い）。Linux の
-      // AppIndicator は isTemplate を無視して画像をそのまま表示するため、
-      // 黒いテンプレートを出すとダークパネルで見えにくい。白版を出す
-      // （asset: tray_icon_white.png。白 + 透明度のみ）
-      if (Platform.isLinux) {
-        await trayManager.setIcon('assets/tray_icon_white.png');
-      } else {
-        await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
-      }
+      // macOS は isTemplate で自動配色（黒テンプレートで良い）
+      await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
       await trayManager.setContextMenu(Menu(items: [
         MenuItem(key: _keyOpen, label: openLabel),
         MenuItem.separator(),

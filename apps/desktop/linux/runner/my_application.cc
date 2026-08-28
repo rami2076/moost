@@ -6,6 +6,7 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
+#include "status_notifier_item.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -74,6 +75,28 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  // Linux トレイ（自前 StatusNotifierItem）の初期化。Dart 側から
+  // MethodChannel 'moost/linux_tray' 経由で init が呼ばれる（TrayService）。
+  // ここではチャネルだけ用意しておき、Dart の init ハンドシェイクで
+  // labels を受け取る。セッションバスで StatusNotifierItem を確立し、
+  // クリックは MethodChannel 経由で Dart へ通知する
+  g_autoptr(FlBinaryMessenger) messenger =
+      fl_engine_get_binary_messenger(fl_view_get_engine(view));
+  FlMethodChannel* tray_channel = fl_method_channel_new(
+      messenger, "moost/linux_tray",
+      FL_METHOD_CODEC(fl_standard_method_codec_new()));
+  // 以降の所有権は status_notifier_item が持つ（stc_set_channel が ref する）
+  stc_set_channel(tray_channel);
+
+  // セッションバスからトレイアイコンを登録する
+  g_autoptr(GError) error = nullptr;
+  GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+  if (connection != nullptr) {
+    if (!stc_init(connection)) {
+      g_warning("moost: linux tray unavailable; falling back to a normal window");
+    }
+  }
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

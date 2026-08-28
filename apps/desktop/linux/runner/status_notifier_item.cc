@@ -31,6 +31,10 @@ char* g_quit_label = nullptr;
 gboolean g_available = false;
 guint g_item_registration_id = 0;
 guint g_menu_registration_id = 0;
+// 登録直後にホストが AboutToShow を一度呼ぶ（単なる初期化）ため、その間は
+// クリックとみなさない。登録からこの時間だけ無視する
+constexpr gint64 kIgnoreAboutToShowMs = 3000;
+gint64 g_registered_at_ms = 0;
 
 const char* g_item_path = "/org/ayatana/NotificationItem/moost";
 const char* g_menu_path = "/org/ayatana/NotificationItem/moost/Menu";
@@ -220,8 +224,26 @@ void HandleMenuMethodCall(GDBusConnection* connection, const char* sender,
                           const char* method_name, GVariant* parameters,
                           GDBusMethodInvocation* invocation, gpointer data) {
   if (g_strcmp0(method_name, "AboutToShow") == 0) {
+    // 表示直前に呼ばれる（＝トレイアイコンがクリックされた）。GNOME の
+    // ubuntu-appindicators 拡張は左クリックでも Activate を送らず必ず
+    // メニューを開く。そこで「メニューを開く」をクリックの合図とみなし、
+    // ウィンドウも同時に表示して「トレイクリック → Moost を開く」を成立させる。
+    // 登録直後の初期化による呼び出しは無視する
+    if (g_get_monotonic_time() / 1000 - g_registered_at_ms <
+        kIgnoreAboutToShowMs) {
+      g_dbus_method_invocation_return_value(invocation,
+                                            g_variant_new("(b)", TRUE));
+      return;
+    }
+    if (g_channel != nullptr) {
+      g_autoptr(FlValue) args = fl_value_new_map();
+      fl_value_set_string_take(args, "kind",
+                               fl_value_new_string("activate"));
+      fl_method_channel_invoke_method(g_channel, "onTrayIconClicked", args,
+                                      nullptr, nullptr, nullptr);
+    }
     g_dbus_method_invocation_return_value(invocation,
-                                          g_variant_new_boolean(TRUE));
+                                          g_variant_new("(b)", TRUE));
   } else if (g_strcmp0(method_name, "Event") == 0) {
     gint32 id;
     const char* event_id;
@@ -250,29 +272,32 @@ void HandleMenuMethodCall(GDBusConnection* connection, const char* sender,
     gint32 id;
     const char* name;
     g_variant_get(parameters, "(is)", &id, &name);
+    // 返り値は out 型 v ＝「variant で包んだ値」をタプルで返す
+    GVariant* value;
     if (g_strcmp0(name, "label") == 0) {
       const char* label =
           id == kMenuOpen
               ? (g_open_label != nullptr ? g_open_label : "Open Moost")
               : (g_quit_label != nullptr ? g_quit_label : "Quit Moost");
-      g_dbus_method_invocation_return_value(invocation,
-                                            g_variant_new_string(label));
+      value = g_variant_new_variant(g_variant_new_string(label));
     } else if (g_strcmp0(name, "type") == 0) {
-      g_dbus_method_invocation_return_value(
-          invocation,
+      value = g_variant_new_variant(
           g_variant_new_string(id == 2 ? "separator" : "normal"));
     } else if (g_strcmp0(name, "enabled") == 0 ||
                g_strcmp0(name, "visible") == 0) {
-      g_dbus_method_invocation_return_value(invocation,
-                                            g_variant_new_boolean(id != 2));
+      value = g_variant_new_variant(g_variant_new_boolean(id != 2));
     } else {
-      g_dbus_method_invocation_return_value(
-          invocation, g_variant_new_variant(g_variant_new_string("")));
+      value = g_variant_new_variant(g_variant_new_string(""));
     }
+    g_dbus_method_invocation_return_value(invocation,
+                                          g_variant_new("(v)", value));
   } else if (g_strcmp0(method_name, "GetGroupProperties") == 0) {
+    // この GLib は配列型には値を渡せず builder を要求する。空配列なら
+    // 空 builder を渡せば良い
+    GVariantBuilder arr;
+    g_variant_builder_init(&arr, G_VARIANT_TYPE("a(ia{sv})"));
     g_dbus_method_invocation_return_value(
-        invocation, g_variant_new_array(G_VARIANT_TYPE("(ia{sv})"), nullptr,
-                                        0));
+        invocation, g_variant_new("(a(ia{sv}))", &arr));
   } else {
     g_dbus_method_invocation_return_value(invocation, nullptr);
   }
@@ -381,6 +406,9 @@ void stc_set_channel(FlMethodChannel* channel) {
 
 gboolean stc_init(GDBusConnection* connection) {
   g_connection = connection;
+  // ガード開始時刻は登録呼び出しより先に設定する（登録処理中にホストが
+  // AboutToShow を呼び得るため、それをクリックと誤認しない）
+  g_registered_at_ms = g_get_monotonic_time() / 1000;
 
   g_autoptr(GDBusNodeInfo) item_info = g_dbus_node_info_new_for_xml(
       kItemXml, nullptr);

@@ -41,8 +41,12 @@ class TrayService with TrayListener, WindowListener {
     if (Platform.isLinux) {
       // コールバックには this をクロージャで保持するため、LinuxTray は
       // メソッドチャネルのハンドラが持つ参照で生存する（保持用フィールドは不要）
+      // GNOME の ubuntu-appindicators は左クリックでも Activate を送らず
+      // 常に「メニューを開く」(AboutToShow) を呼ぶ。この呼び出しは実際の
+      // クリックでのみ飛ぶ（起動時の自動表示は runner の first_frame が
+      // 原因で、そちらは別途 no-op 化済み）。よって「クリック = 直接開く」
       final linuxTray = LinuxTray(
-        onActivate: _toggleWindow,
+        onActivate: showWindow,
         onMenuOpen: showWindow,
         onMenuQuit: () => exit(0),
       );

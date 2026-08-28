@@ -31,6 +31,10 @@ char* g_quit_label = nullptr;
 gboolean g_available = false;
 guint g_item_registration_id = 0;
 guint g_menu_registration_id = 0;
+// 登録直後にホストが AboutToShow を一度呼ぶことがある（初期化）。その間は
+// クリックとみなさない（起動時にウィンドウを出さないため）
+constexpr gint64 kIgnoreAboutToShowMs = 3000;
+gint64 g_registered_at_ms = 0;
 
 const char* g_item_path = "/org/ayatana/NotificationItem/moost";
 const char* g_menu_path = "/org/ayatana/NotificationItem/moost/Menu";
@@ -223,10 +227,23 @@ void HandleMenuMethodCall(GDBusConnection* connection, const char* sender,
                           const char* method_name, GVariant* parameters,
                           GDBusMethodInvocation* invocation, gpointer data) {
   if (g_strcmp0(method_name, "AboutToShow") == 0) {
-    // シングルクリック時にホストが開くメニューに先立って呼ばれる。
-    // ここでウィンドウを出すと「メニューと同時にウインドウが開く」になって
-    // しまうため何もしない（メニューは DE の仕様上必ず開く）。
-    // メニューなしで開くのはダブルクリック（ホストが Activate を呼ぶ）
+    // シングルクリックでホストがメニューを開く際に呼ばれる。メニュー自体は
+    // GNOME の仕様上消せないが、シングルクリックを「開く」として同時に
+    // ウィンドウも表示する（＝トレイクリックで開く、を成立させる）。
+    // 登録直後に来る初期化呼び出しでは開かない（起動時はトレイのみ）。
+    if (g_get_monotonic_time() / 1000 - g_registered_at_ms <
+        kIgnoreAboutToShowMs) {
+      g_dbus_method_invocation_return_value(invocation,
+                                            g_variant_new("(b)", TRUE));
+      return;
+    }
+    if (g_channel != nullptr) {
+      g_autoptr(FlValue) args = fl_value_new_map();
+      fl_value_set_string_take(args, "kind",
+                               fl_value_new_string("activate"));
+      fl_method_channel_invoke_method(g_channel, "onTrayIconClicked", args,
+                                      nullptr, nullptr, nullptr);
+    }
     g_dbus_method_invocation_return_value(invocation,
                                           g_variant_new("(b)", TRUE));
   } else if (g_strcmp0(method_name, "Event") == 0) {
@@ -391,6 +408,9 @@ void stc_set_channel(FlMethodChannel* channel) {
 
 gboolean stc_init(GDBusConnection* connection) {
   g_connection = connection;
+  // ガード開始時刻は登録より先に設定する（登録処理中の AboutToShow を
+  // クリックと誤認しないため）
+  g_registered_at_ms = g_get_monotonic_time() / 1000;
 
   g_autoptr(GDBusNodeInfo) item_info = g_dbus_node_info_new_for_xml(
       kItemXml, nullptr);

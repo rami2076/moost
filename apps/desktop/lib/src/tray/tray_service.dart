@@ -20,19 +20,34 @@ class TrayService with TrayListener, WindowListener {
   final String openLabel;
   final String quitLabel;
 
+  /// トレイアイコンが実際に動作しているか。false のときは通常ウィンドウ
+  /// として振る舞う（GNOME 等の Linux フォールバック、Q4）。
+  bool _available = false;
+  bool get available => _available;
+
   TrayService({required this.openLabel, required this.quitLabel});
 
-  Future<void> init() async {
+  /// トレイを初期化する。成功したら true。
+  ///
+  /// Linux（GNOME）は AppIndicator 拡張がないとトレイへの登録に失敗する
+  /// ため、ここで失敗を検出してフォールバック（通常ウィンドウ）に回す。
+  Future<bool> init() async {
     trayManager.addListener(this);
     windowManager.addListener(this);
     // 閉じる操作で終了させず onWindowClose に回す
     await windowManager.setPreventClose(true);
-    await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
-    await trayManager.setContextMenu(Menu(items: [
-      MenuItem(key: _keyOpen, label: openLabel),
-      MenuItem.separator(),
-      MenuItem(key: _keyQuit, label: quitLabel),
-    ]));
+    try {
+      await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+      await trayManager.setContextMenu(Menu(items: [
+        MenuItem(key: _keyOpen, label: openLabel),
+        MenuItem.separator(),
+        MenuItem(key: _keyQuit, label: quitLabel),
+      ]));
+      _available = true;
+    } on Object {
+      _available = false;
+    }
+    return _available;
   }
 
   static const _keyOpen = 'open';
@@ -59,7 +74,11 @@ class TrayService with TrayListener, WindowListener {
     if (_suppressHideCount > 0) {
       return;
     }
-    // 常駐アプリなので閉じる = 隠す
+    // トレイなし（Linux フォールバック）では閉じる = 終了。
+    // 常駐アプリの場合は閉じる = 隠す
+    if (!_available) {
+      exit(0);
+    }
     await windowManager.hide();
   }
 
@@ -87,6 +106,11 @@ class TrayService with TrayListener, WindowListener {
 
   @override
   void onWindowBlur() async {
+    // トレイなし（Linux フォールバック）では通常ウィンドウなので blur で
+    // 隠さない
+    if (!_available) {
+      return;
+    }
     // アプリ外を触ったら隠れる（ポップオーバー挙動。design.md 6 章）。
     // ただし withoutBlurHide 実行中（フォルダ選択ダイアログ表示中等）は
     // 隠さない
@@ -121,7 +145,11 @@ class TrayService with TrayListener, WindowListener {
   }
 
   Future<void> showWindow() async {
-    await _positionUnderTrayIcon();
+    if (Platform.isMacOS) {
+      await _positionUnderTrayIcon();
+    }
+    // Linux では setPosition/setAlignment が window_manager に実装されて
+    // いないため、トレイ直下への配置は行わず OS 既定の位置で表示する
     await windowManager.show();
     await windowManager.focus();
     shownCount.value++;
@@ -131,6 +159,7 @@ class TrayService with TrayListener, WindowListener {
   ///
   /// マルチディスプレイではクリック位置（カーソル）のあるディスプレイを
   /// 基準にする（Issue #16。計算本体は popover_position.dart）。
+  /// macOS 専用: 呼び出し側（showWindow）で Platform.isMacOS を確認済み。
   Future<void> _positionUnderTrayIcon() async {
     final size = await windowManager.getSize();
 

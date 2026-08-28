@@ -255,7 +255,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteAutomationBody =>
-      'The first time you resume a session, macOS asks for automation permission. Allow it once and it won\'t ask again.';
+      'The first time you resume a session, macOS asks for automation permission; allow it once and it won\'t ask again. TIP: a terminal opens in a new window (macOS: Terminal.app / iTerm2, Linux: gnome-terminal).';
 
   @override
   String get noteRetentionTitle => 'Session retention';

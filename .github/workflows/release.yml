@@ -1,6 +1,6 @@
 # タグ push で起動するリリース自動化（RELEASE.md 3.2）。
-# analyze / test を再実行してから release ビルド → ad-hoc 署名 → dmg 化 →
-# GitHub Release 作成（dmg + CHANGELOG 該当節を添付）。
+# analyze / test を再実行してから macOS の dmg と Linux (Ubuntu) の .deb を
+# ビルドし、両方を GitHub Release へ添付する。
 #
 # 使い方:
 #   1. CHANGELOG の [Unreleased] を [x.y.z] - YYYY-MM-DD に確定
@@ -18,7 +18,9 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # === macOS: dmg ビルド（既存フロー） ===
+  build-macos:
+    name: Build macOS (dmg)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -45,11 +47,7 @@ jobs:
         run: flutter build macos --release
         working-directory: apps/desktop
 
-      # MCP サーバー（apps/mcp_server）を単体バイナリにビルドし、.app に
-      # 同梱する（Issue #45）。設定画面から Claude Code / Codex CLI /
-      # Claude Desktop へ連携登録する際、このバイナリの実パスを指定する。
-      # --deep 署名でこのバイナリも一緒に署名されるよう、署名ステップより
-      # 前に .app の中へ配置する
+      # MCP サーバーを単体バイナリにし、.app へ同梱する（Issue #45）
       - name: Build and embed moost-mcp binary
         run: |
           dart compile exe bin/moost_mcp.dart -o moost-mcp
@@ -58,8 +56,6 @@ jobs:
             "../desktop/build/macos/Build/Products/Release/moost_desktop.app/Contents/Resources/moost-mcp"
         working-directory: apps/mcp_server
 
-      # 当面は ad-hoc 署名（RELEASE.md 4 章。Swift 版と同じ）。
-      # 初回起動時の Gatekeeper 警告は README の回避手順で対応する
       - name: Ad-hoc sign
         run: >
           codesign --force --deep --sign -
@@ -75,42 +71,141 @@ jobs:
           hdiutil create -volname "Moost $VERSION" -srcfolder dist/dmg \
             -ov -format UDZO "dist/Moost-$VERSION.dmg"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "artifact dir already populated"
 
-      # CHANGELOG から「## [x.y.z]」〜次の「## [」直前までを抜き出す。
-      # 該当節がないタグ（テストタグ等）は定型文にフォールバックする
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moost-macos
+          path: dist/Moost-*.dmg
+          if-no-files-found: error
+
+  # === Linux (Ubuntu): .deb ビルド ===
+  build-linux:
+    name: Build Linux (.deb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+
+      - name: Enforce lockfiles
+        run: |
+          (cd packages/core && dart pub get --enforce-lockfile)
+          (cd apps/desktop && flutter pub get --enforce-lockfile)
+          (cd apps/mcp_server && dart pub get --enforce-lockfile)
+
+      - name: Analyze and test
+        run: |
+          (cd packages/core && dart analyze && dart test)
+          (cd apps/desktop && flutter analyze && flutter test)
+          (cd apps/mcp_server && dart analyze && dart test)
+
+      # Linux ビルドに必要なシステムライブラリ（本番 .deb の Depends と一致）
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libayatana-appindicator3-dev dpkg-dev
+
+      - name: Build Linux app (release)
+        run: flutter build linux --release
+        working-directory: apps/desktop
+
+      # MCP サーバーを単体バイナリにし、Linux バンドルの実行ファイル直下へ
+      # 同梱する（McpBinaryLocator の Linux 分岐に対応）
+      - name: Build and embed moost-mcp binary into the Linux bundle
+        run: |
+          dart compile exe bin/moost_mcp.dart -o moost-mcp
+          cp moost-mcp ../desktop/build/linux/x64/release/bundle/moost-mcp
+          chmod +x ../desktop/build/linux/x64/release/bundle/moost-mcp
+        working-directory: apps/mcp_server
+
+      - name: Package .deb
+        run: ./scripts/linux/package_deb.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moost-linux
+          path: dist/moost_*.deb
+          if-no-files-found: error
+
+  # === リリース作成（両成果物を添付） ===
+  release:
+    name: Create GitHub Release
+    needs: [build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: moost-macos
+          path: dist/macos
+      - uses: actions/download-artifact@v4
+        with:
+          name: moost-linux
+          path: dist/linux
+
+      - name: Collect artifacts and compute hashes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          ls -l dist/macos dist/linux
+          DMG=$(ls dist/macos/Moost-*.dmg)
+          DEB=$(ls dist/linux/moost_*.deb)
+          echo "DMG_PATH=$DMG" >> "$GITHUB_ENV"
+          echo "DEB_PATH=$DEB" >> "$GITHUB_ENV"
+          DMG_SHA=$(sha256sum "$DMG" | awk '{print $1}')
+          echo "DMG_SHA=$DMG_SHA" >> "$GITHUB_ENV"
+
+      # CHANGELOG から該当節を抜き出す（既存フローと同じ）
       - name: Extract changelog section
         run: |
           awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" {flag=1; next}
-            /^## \[/ {flag=0}
+            /^## \\[/ {flag=0}
             flag' CHANGELOG.md > RELEASE_NOTES.md
           if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
             echo "(CHANGELOG に $VERSION の節がありません)" > RELEASE_NOTES.md
           fi
 
-      # インストールコマンドをノート末尾に付ける（gh CLI 経由の DL は
-      # quarantine が付かず Gatekeeper 警告なしで起動できる）
-      - name: Append install command
+      # プラットフォーム別のインストールコマンドをノート末尾に付ける
+      - name: Append install commands
         run: |
           cat >> RELEASE_NOTES.md << EOF
 
           ## インストール
 
-          ### Homebrew を使っている場合
+          ### macOS
+
+          Homebrew を使っている場合:
 
           \`\`\`bash
           brew upgrade --cask moost
           \`\`\`
 
-          ### 使っていない場合
+          使っていない場合:
 
           \`\`\`bash
           gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.dmg' -O ~/Downloads/Moost.dmg
           open ~/Downloads/Moost.dmg
           \`\`\`
 
-          開いたウィンドウの Moost.app を Applications へドラッグしてください
-          （完了後、マウントされたディスクイメージは取り出して構いません）。
+          ### Linux (Ubuntu / Debian)
+
+          \`\`\`bash
+          gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.deb' -O ~/Downloads/Moost.deb
+          sudo apt install ~/Downloads/Moost.deb
+          \`\`\`
+
+          GNOME でトレイアイコンが出ない場合は、拡張機能「AppIndicator and
+          KStatusNotifierItem Support」を有効にしてください（Ubuntu は既定で有効）。
+          \`gnome-extensions enable ubuntu-appindicators@ubuntu.com\` で確認できます。
           EOF
 
       - name: Create GitHub Release
@@ -121,7 +216,8 @@ jobs:
           case "$GITHUB_REF_NAME" in
             *-*) PRERELEASE_FLAG="--prerelease" ;;
           esac
-          gh release create "$GITHUB_REF_NAME" "dist/Moost-$VERSION.dmg" \
+          gh release create "$GITHUB_REF_NAME" \
+            "$DMG_PATH" "$DEB_PATH" \
             --title "$GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \
             $PRERELEASE_FLAG
@@ -135,8 +231,6 @@ jobs:
         env:
           TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
         run: |
-          SHA256=$(shasum -a 256 "dist/Moost-$VERSION.dmg" | awk '{print $1}')
-
           mkdir -p ~/.ssh
           printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_deploy_key
           chmod 600 ~/.ssh/tap_deploy_key
@@ -149,7 +243,7 @@ jobs:
           cat > Casks/moost.rb << EOF
           cask "moost" do
             version "$VERSION"
-            sha256 "$SHA256"
+            sha256 "$DMG_SHA"
 
             url "https://github.com/${{ github.repository }}/releases/download/v#{version}/Moost-#{version}.dmg"
             name "Moost"

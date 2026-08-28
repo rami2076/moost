@@ -5,6 +5,27 @@
 
 ## [Unreleased]
 
+### Added (Linux / Ubuntu)
+
+- **Linux (Ubuntu 24.04) 対応**: Flutter Linux デスクトップビルドを追加し、
+  `.deb` パッケージ（`scripts/linux/package_deb.sh`）をリリースに自動添付するように
+  （Q1）。`.deb` は `/opt/moost/` に展開し、ランチャーのデスクトップエントリと
+  `moost` コマンドのシンボリックリンクを用意
+- **トレイ常駐**: AppIndicator 経由。Ubuntu 標準の GNOME では既定で有効。
+  拡張がない環境では通常ウィンドウとして動作するフォールバックを実装（Q4）
+- **復帰先ターミナル**: 設定に `gnome-terminal` を追加。Linux では
+  gnome-terminal（無ければ `x-terminal-emulator`）を bash ログインシェルで起動し
+  復帰コマンドを実行（Q3）。macOS 専用ターミナル値（Terminal.app / iTerm2）が
+  設定に残っていても gnome-terminal へ正規化
+- **PATH 自動検出の Linux 対応**: `claude`/`codex` のパス解決を macOS の
+  zsh に加えて Linux では bash（`-ic`）で行うように
+- **更新通知の Linux 対応**: brew のない環境ではリリースページを開く手動導線に。
+  `xdg-open` を利用。InstallHealthChecker（macOS cask 固有）は Linux では
+  無効
+- **MCP 連携の Linux 対応**: Claude Desktop 設定パスを Linux では
+  `~/.config/Claude/claude_desktop_config.json` に。同梱 moost-mcp バイナリの
+  配置先も Linux バンドルに合わせて解決
+
 ## [1.10.0] - 2026-08-15
 
 ### Added

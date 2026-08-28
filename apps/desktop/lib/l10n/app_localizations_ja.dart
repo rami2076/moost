@@ -253,7 +253,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get noteAutomationBody =>
-      'セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます。一度「許可」を選べば以後は表示されません。';
+      'セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます（一度「許可」を選べば以後は出ません）。ターミナルは別ウィンドウで開きます（macOS: Terminal.app / iTerm2、Linux: gnome-terminal）。Linux ではこの権限ダイアログは出ません。';
 
   @override
   String get noteRetentionTitle => 'セッションの保持期間';

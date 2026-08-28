@@ -527,7 +527,7 @@ abstract class AppLocalizations {
   /// No description provided for @noteAutomationBody.
   ///
   /// In en, this message translates to:
-  /// **'The first time you resume a session, macOS asks for automation permission. Allow it once and it won\'t ask again.'**
+  /// **'The first time you resume a session, macOS asks for automation permission; allow it once and it won\'t ask again. TIP: a terminal opens in a new window (macOS: Terminal.app / iTerm2, Linux: gnome-terminal).'**
   String get noteAutomationBody;
 
   /// No description provided for @noteRetentionTitle.

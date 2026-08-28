@@ -59,7 +59,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool? _codexConnected;
   bool? _claudeDesktopConnected;
 
-  static const _terminals = ['Terminal.app', 'iTerm2'];
+  /// 選択可能なターミナル。Linux は gnome-terminal のみ（Q3。設定値として
+  /// 保存しつつ macOS⇔Linux の差異は TerminalLauncher 側で正規化する）。
+  static List<String> get _terminals =>
+      Platform.isLinux ? const ['gnome-terminal'] : const ['Terminal.app', 'iTerm2'];
 
   @override
   void initState() {

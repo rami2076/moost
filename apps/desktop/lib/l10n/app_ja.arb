@@ -71,7 +71,7 @@
   "settingMcpDisconnectFailed": "{target} との連携解除に失敗しました: {error}",
   "notesTitle": "注意",
   "noteAutomationTitle": "ターミナル操作の権限",
-  "noteAutomationBody": "セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます。一度「許可」を選べば以後は表示されません。",
+  "noteAutomationBody": "セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます（一度「許可」を選べば以後は出ません）。ターミナルは別ウィンドウで開きます（macOS: Terminal.app / iTerm2、Linux: gnome-terminal）。Linux ではこの権限ダイアログは出ません。",
   "noteRetentionTitle": "セッションの保持期間",
   "noteRetentionBody": "セッションは Claude Code が cleanupPeriodDays（デフォルト 30 日）に基づいて保持します。メモを登録していても、期限切れのセッションには復帰できない場合があります。",
   "noteSummaryTitle": "Claude 要約について",

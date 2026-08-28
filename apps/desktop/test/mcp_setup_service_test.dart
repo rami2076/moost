@@ -23,6 +23,16 @@ void main() {
     return file.path;
   }
 
+  // Claude Desktop の設定パスはプラットフォームに依らず macOS 配下の
+  // 形でテストする（クロスプラットフォームのテスト安定化のため）
+  String macConfigPath(String home) =>
+      '$home/Library/Application Support/Claude/claude_desktop_config.json';
+
+  McpSetupService serviceWith(String home) => McpSetupService(
+        home: home,
+        claudeDesktopConfigPath: macConfigPath(home),
+      );
+
   group('registerClaudeCode', () {
     test('runs claude mcp add with the binary path', () async {
       final logFile = File('${tempDir.path}/calls.log');
@@ -179,11 +189,29 @@ void main() {
   });
 
   group('isClaudeDesktopConnected', () {
-    File configFile(String home) => File(
-        '$home/Library/Application Support/Claude/claude_desktop_config.json');
+    File configFile(String home) => File(macConfigPath(home));
+
+    test('Linux: uses ~/.config/Claude/claude_desktop_config.json', () async {
+      // 既定（claudeDesktopConfigPath 未指定）は Linux でのみ .config 配下を
+      // 使う。このテストは実環境が Linux のときだけ意味を持つ
+      if (!Platform.isLinux) {
+        return;
+      }
+      final file = File(
+          '${tempDir.path}/.config/Claude/claude_desktop_config.json');
+      await file.parent.create(recursive: true);
+      await file.writeAsString(jsonEncode({
+        'mcpServers': {
+          'moost': {'command': '/path/to/moost-mcp'},
+        },
+      }));
+      final service = McpSetupService(home: tempDir.path);
+
+      expect(await service.isClaudeDesktopConnected(), isTrue);
+    });
 
     test('false when the config file does not exist', () async {
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       expect(await service.isClaudeDesktopConnected(), isFalse);
     });
@@ -196,7 +224,7 @@ void main() {
           'other-tool': {'command': '/usr/bin/other-tool'},
         },
       }));
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       expect(await service.isClaudeDesktopConnected(), isFalse);
     });
@@ -209,7 +237,7 @@ void main() {
           'moost': {'command': '/path/to/moost-mcp'},
         },
       }));
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       expect(await service.isClaudeDesktopConnected(), isTrue);
     });
@@ -218,7 +246,7 @@ void main() {
       final file = configFile(tempDir.path);
       await file.parent.create(recursive: true);
       await file.writeAsString('{not valid json');
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       expect(await service.isClaudeDesktopConnected(), isFalse);
     });
@@ -229,7 +257,7 @@ void main() {
         File('$home/Library/Application Support/Claude/claude_desktop_config.json');
 
     test('creates a new config file when none exists', () async {
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       await service.registerClaudeDesktop('/path/to/moost-mcp');
 
@@ -248,7 +276,7 @@ void main() {
           'other-tool': {'command': '/usr/bin/other-tool'},
         },
       }));
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       await service.registerClaudeDesktop('/path/to/moost-mcp');
 
@@ -262,7 +290,7 @@ void main() {
       final file = configFile(tempDir.path);
       await file.parent.create(recursive: true);
       await file.writeAsString('{not valid json');
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       await expectLater(
         service.registerClaudeDesktop('/path/to/moost-mcp'),
@@ -278,7 +306,7 @@ void main() {
         File('$home/Library/Application Support/Claude/claude_desktop_config.json');
 
     test('no-op when the config file does not exist', () async {
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       await service.unregisterClaudeDesktop();
 
@@ -294,7 +322,7 @@ void main() {
           'moost': {'command': '/path/to/moost-mcp'},
         },
       }));
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       await service.unregisterClaudeDesktop();
 
@@ -308,7 +336,7 @@ void main() {
       final file = configFile(tempDir.path);
       await file.parent.create(recursive: true);
       await file.writeAsString('{not valid json');
-      final service = McpSetupService(home: tempDir.path);
+      final service = serviceWith(tempDir.path);
 
       await expectLater(
         service.unregisterClaudeDesktop(),

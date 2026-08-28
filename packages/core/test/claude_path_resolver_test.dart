@@ -3,6 +3,13 @@ import 'dart:io';
 import 'package:moost_core/moost_core.dart';
 import 'package:test/test.dart';
 
+/// テスト実行環境（＝ resolver の実環境）で使われるであろうシェル引数を返す。
+/// CI は Linux ランナーで動くため、ここがプラットフォーム依存なのは
+/// テストの実行環境と同一判定になることの裏返し。
+List<String> shellProbeArgs(String binary) => Platform.isLinux
+    ? ['-ic', 'command -v $binary']
+    : ['-lic', 'command -v $binary'];
+
 void main() {
   group('ClaudePathResolver.resolve', () {
     test('returns the manual override, expanding a leading ~', () async {
@@ -26,8 +33,7 @@ void main() {
           fileExists: (path) async => false,
         );
 
-    test('uses -lic (not -lc) so nvm/pyenv/asdf-style PATH via .zshrc is '
-        'resolvable', () async {
+    test('uses an interactive login shell (-lic / -ic) so nvm/pyenv/asdf-' 'style PATH via rc file is resolvable', () async {
       List<String>? capturedArgs;
       final resolver = resolverWith((args) async {
         capturedArgs = args;
@@ -36,7 +42,7 @@ void main() {
 
       await resolver.resolve();
 
-      expect(capturedArgs, ['-lic', 'command -v claude']);
+      expect(capturedArgs, shellProbeArgs('claude'));
     });
 
     test('takes only the last line when .zshrc pollutes stdout', () async {

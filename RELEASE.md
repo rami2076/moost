@@ -65,9 +65,11 @@ git タグを打つだけの軽量リリースとする。
 3. `dart analyze && dart test` が通ることを確認してコミット
 4. `git tag v<x.y.z>` → push
 
-### 3.2 フェーズ 2 以降（macOS アプリ配布）
+### 3.2 フェーズ 2 以降（macOS アプリ配布 + Linux .deb）
 
 リリースは GitHub Actions のタグ起動ワークフローに集約する（Swift 版 `build-dmg.sh` の置き換え）。
+macOS の dmg に加えて、Linux (Ubuntu) 向けの `.deb` も同じ Release に添付される
+（build-linux ジョブが `flutter build linux` → `scripts/linux/package_deb.sh` で生成）。
 
 **手元でやること:**
 
@@ -80,9 +82,9 @@ git タグを打つだけの軽量リリースとする。
 
 1. `dart analyze` / `dart test` / osv-scanner
 2. `dart pub get --enforce-lockfile` で依存を固定取得
-3. `flutter build macos --release`
-4. .app の署名（当面は ad-hoc 署名。Swift 版と同じ）→ dmg 化
-5. GitHub Release を作成し、dmg と CHANGELOG 該当節を添付
+3. macOS: `flutter build macos --release` → .app 署名（当面は ad-hoc 署名）→ dmg 化
+4. Linux: `flutter build linux --release` → moost-mcp をバンドルへ同梱 → `scripts/linux/package_deb.sh` で .deb 化
+5. GitHub Release を作成し、dmg + deb と CHANGELOG 該当節を添付
 
 **リリース後の確認:**
 

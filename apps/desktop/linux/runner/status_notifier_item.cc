@@ -31,10 +31,6 @@ char* g_quit_label = nullptr;
 gboolean g_available = false;
 guint g_item_registration_id = 0;
 guint g_menu_registration_id = 0;
-// 登録直後にホストが AboutToShow を一度呼ぶ（単なる初期化）ため、その間は
-// クリックとみなさない。登録からこの時間だけ無視する
-constexpr gint64 kIgnoreAboutToShowMs = 3000;
-gint64 g_registered_at_ms = 0;
 
 const char* g_item_path = "/org/ayatana/NotificationItem/moost";
 const char* g_menu_path = "/org/ayatana/NotificationItem/moost/Menu";
@@ -155,6 +151,9 @@ GVariant* LoadItemProperty(GDBusConnection* connection, const char* sender,
     return g_variant_new_string("");
   }
   if (g_strcmp0(property_name, "Menu") == 0) {
+    // Menu を "/"（無し）にすると ubuntu-appindicators はアイコン自体を
+    // レンダリングしなくなる（実測）。Menu は有効なパスを返し、メニュー
+    // 本体（dbusmenu）を 0 項目にして実質「メニューなし」にする
     return g_variant_new_object_path(g_menu_path);
   }
   if (g_strcmp0(property_name, "ItemIsMenu") == 0) {
@@ -184,8 +183,7 @@ GVariant* MenuItemStruct(int id, const char* label, const char* type) {
                         g_variant_new_boolean(true));
   g_variant_builder_add(&props, "{sv}", "visible",
                         g_variant_new_boolean(true));
-  // コンテナ位置には builder のポインタを渡す（GLib 2.80 以降の正書法）。
-  // g_variant_builder_end をインラインで渡すと assert で落ちる
+  // コンテナ位置には builder のポインタを渡す（GLib 2.80 以降の正書法）
   GVariantBuilder children;
   g_variant_builder_init(&children, G_VARIANT_TYPE("av"));
   return g_variant_new("(ia{sv}av)", id, &props, &children);
@@ -196,7 +194,8 @@ GVariant* MenuItemStruct(int id, const char* label, const char* type) {
 static void AddMenuItem(GVariantBuilder* children, int id, const char* label,
                         const char* type) {
   g_variant_builder_add_value(
-      children, g_variant_new_variant(MenuItemStruct(id, label, type)));
+      children,
+      g_variant_new_variant(MenuItemStruct(id, label, type)));
 }
 
 GVariant* RootItem() {
@@ -224,24 +223,10 @@ void HandleMenuMethodCall(GDBusConnection* connection, const char* sender,
                           const char* method_name, GVariant* parameters,
                           GDBusMethodInvocation* invocation, gpointer data) {
   if (g_strcmp0(method_name, "AboutToShow") == 0) {
-    // 表示直前に呼ばれる（＝トレイアイコンがクリックされた）。GNOME の
-    // ubuntu-appindicators 拡張は左クリックでも Activate を送らず必ず
-    // メニューを開く。そこで「メニューを開く」をクリックの合図とみなし、
-    // ウィンドウも同時に表示して「トレイクリック → Moost を開く」を成立させる。
-    // 登録直後の初期化による呼び出しは無視する
-    if (g_get_monotonic_time() / 1000 - g_registered_at_ms <
-        kIgnoreAboutToShowMs) {
-      g_dbus_method_invocation_return_value(invocation,
-                                            g_variant_new("(b)", TRUE));
-      return;
-    }
-    if (g_channel != nullptr) {
-      g_autoptr(FlValue) args = fl_value_new_map();
-      fl_value_set_string_take(args, "kind",
-                               fl_value_new_string("activate"));
-      fl_method_channel_invoke_method(g_channel, "onTrayIconClicked", args,
-                                      nullptr, nullptr, nullptr);
-    }
+    // シングルクリック時にホストが開くメニューに先立って呼ばれる。
+    // ここでウィンドウを出すと「メニューと同時にウインドウが開く」になって
+    // しまうため何もしない（メニューは DE の仕様上必ず開く）。
+    // メニューなしで開くのはダブルクリック（ホストが Activate を呼ぶ）
     g_dbus_method_invocation_return_value(invocation,
                                           g_variant_new("(b)", TRUE));
   } else if (g_strcmp0(method_name, "Event") == 0) {
@@ -406,9 +391,6 @@ void stc_set_channel(FlMethodChannel* channel) {
 
 gboolean stc_init(GDBusConnection* connection) {
   g_connection = connection;
-  // ガード開始時刻は登録呼び出しより先に設定する（登録処理中にホストが
-  // AboutToShow を呼び得るため、それをクリックと誤認しない）
-  g_registered_at_ms = g_get_monotonic_time() / 1000;
 
   g_autoptr(GDBusNodeInfo) item_info = g_dbus_node_info_new_for_xml(
       kItemXml, nullptr);

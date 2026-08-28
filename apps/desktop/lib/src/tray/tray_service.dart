@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:screen_retriever/screen_retriever.dart';
@@ -177,12 +178,67 @@ class TrayService with TrayListener, WindowListener {
   Future<void> showWindow() async {
     if (Platform.isMacOS) {
       await _positionUnderTrayIcon();
+    } else if (Platform.isLinux) {
+      // トレイアイコン（＝クリック時のカーソル位置）の直下に配置する
+      await _positionBelowCursor();
     }
-    // Linux では setPosition/setAlignment が window_manager に実装されて
-    // いないため、トレイ直下への配置は行わず OS 既定の位置で表示する
     await windowManager.show();
     await windowManager.focus();
     shownCount.value++;
+  }
+
+  /// クリック時のカーソル（＝トレイアイコン）の直下にウィンドウを配置する。
+  ///
+  /// window_manager の Linux 実装には setPosition/setAlignment が無いため、
+  /// 位置込みで動かせる setBounds を使う。
+  Future<void> _positionBelowCursor() async {
+    Size size = const Size(570, 660);
+    try {
+      final bounds = await windowManager.getBounds();
+      if (bounds.size.width > 0) {
+        size = bounds.size;
+      }
+    } on Object {
+      // 取得できなくても既定サイズで続行
+    }
+
+    Offset? cursor;
+    var workAreas = const <Rect>[];
+    try {
+      cursor = await screenRetriever.getCursorScreenPoint();
+      final displays = await screenRetriever.getAllDisplays();
+      workAreas = [
+        for (final display in displays)
+          if (display.visiblePosition != null && display.visibleSize != null)
+            display.visiblePosition! & display.visibleSize!,
+      ];
+    } on Object {
+      // カーソル・ディスプレイ情報が取れなければ既定位置のまま表示
+      return;
+    }
+
+    // アイコン直下・中央揃え（上部パネルのすぐ下から、と考えた 14px 下）
+    var x = cursor.dx - size.width / 2;
+    var y = cursor.dy + 14;
+    if (workAreas.isNotEmpty) {
+      // - ディスプレイの作業領域内に収める
+      // - 上端だとパネルに隠れるため、収まらなければ下寄せする
+      Rect? chosen;
+      for (final wa in workAreas) {
+        if (cursor.dx >= wa.left && cursor.dx <= wa.right) {
+          chosen = wa;
+          break;
+        }
+      }
+      final wa = chosen ?? workAreas.first;
+      x = x.clamp(wa.left, math.max(wa.left, wa.right - size.width));
+      y = y.clamp(wa.top, math.max(wa.top, wa.bottom - size.height));
+    }
+    try {
+      await windowManager.setBounds(Rect.fromLTWH(x, y, size.width, size.height));
+    } on Object {
+      // 配置失敗でも表示は続行（既定位置で open）
+    }
   }
 
   /// トレイアイコンの直下・中央揃えに配置する（NSPopover の見た目に寄せる）。

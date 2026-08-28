@@ -33,11 +33,16 @@
   やめ、メニュー経由の「開く」でウィンドウが一瞬で隠れる問題を解消
 - **Linux のトレイ左クリック対応**: 既存プラグイン（tray_manager)は Linux で
   クリック（Activate）を取得できなかったため、runner（C++ / GDBus）に
-  自前の StatusNotifierItem を実装。GNOME の ubuntu-appindicators は左クリック
-  でも Activate を送らずメニューを開く（AboutToShow）ため、これをクリックの
-  合図として**トレイアイコン左クリックでウィンドウを直接表示**する。
-  あわせて runner の初回フレーム自動表示を no-op 化し、「起動時はトレイだけ・
-  クリックで開く」を実現（起動時の自動表示はこれが原因だった）
+  自前の StatusNotifierItem を実装。
+  - 起動時はトレイだけ・ウィンドウ非表示（runner の first_frame 自動表示を
+    no-op 化。自動表示が起動時に出る真因だった）
+  - **ダブルクリックでメニューなしの直接オープン**（GNOME 拡張が
+    Activate を呼ぶ。実機で確認）。表示位置は**トレイアイコンの直下**
+    （Linux は setPosition 非対応のため setBounds でカーソル直下に配置）
+  - シングルクリックのメニュー表示は GNOME(ubuntu-appindicators) の
+    仕様でアプリから制御できない（削ろうとするとアイコンごと消えるため）。
+    AboutToShow で勝手にウィンドウを開く件は撤去し、
+    シングル=メニュー/ダブル=直接開く に整理
 - **pi エージェント対応**: pi（この coding agent）のセッション
   （`~/.pi/agent/sessions/**/*.jsonl`）を直近一覧・メモ・復帰の対象に追加。
   復帰は `pi --session <id>`、要約はローカル抽出（API 消費なし）。

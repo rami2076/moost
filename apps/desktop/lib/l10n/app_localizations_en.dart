@@ -196,6 +196,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingCopyAnimation => 'Copy success animation';
 
   @override
+  String get settingTrayClickMode => 'Tray click behavior (Linux)';
+
+  @override
+  String get settingTrayClickModeNone => 'Normal (single click shows the menu)';
+
+  @override
+  String get settingTrayClickModeFakeDouble =>
+      'Treat a single click as a double click (opens without the menu)';
+
+  @override
+  String get settingTrayClickModeCloseMenu =>
+      'Auto-close the menu after opening';
+
+  @override
   String get settingMcpSectionTitle => 'MCP integration';
 
   @override

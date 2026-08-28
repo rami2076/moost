@@ -23,9 +23,13 @@ Future<void> main() async {
 
   // トレイメニューはウィジェットツリー外なので、OS ロケールから文言を引く
   final l10n = lookupAppLocalizations(PlatformDispatcher.instance.locale);
+  final settingsStore = SettingsStore.defaultLocation();
+  final settings = await settingsStore.load();
   final tray = TrayService(
     openLabel: l10n.trayOpen,
     quitLabel: l10n.trayQuit,
+    // トレイのクリック補正モード（Linux のみ有効）
+    trayClickMode: settings.trayClickMode,
   );
 
   // トレイ登録の可否を先に判定する（Linux/GNOME は AppIndicator 拡張が
@@ -73,7 +77,7 @@ Future<void> main() async {
     ]),
     memoStore: MemoStore.defaultLocation(),
     projectStore: ProjectStore.defaultLocation(),
-    settingsStore: SettingsStore.defaultLocation(),
+    settingsStore: settingsStore,
     windowShown: tray.shownCount,
     updateChecker: UpdateChecker(currentVersion: packageInfo.version),
     appVersion: packageInfo.version,

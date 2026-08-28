@@ -22,12 +22,24 @@ class LinuxTray {
 
   /// run アプリが起動しトレイアイコンを出せたかを返す（false なら
   /// 呼び出し側は通常ウィンドウへフォールバックする）。
-  Future<bool> init({required String openLabel, required String quitLabel}) {
+  ///
+  /// [mode] は Settings.trayClickMode の値（0: なし / 1: フェイクダブル /
+  /// 2: メニュー自動クローズ）。
+  Future<bool> init({
+    required String openLabel,
+    required String quitLabel,
+    int mode = 0,
+  }) {
     _channel.setMethodCallHandler(_handle);
     return _channel
         .invokeMethod<bool>('init', {
           'openLabel': openLabel,
           'quitLabel': quitLabel,
+          'mode': switch (mode) {
+            1 => 'fakeDouble',
+            2 => 'closeMenu',
+            _ => 'none',
+          },
         })
         .then((available) => available ?? false);
   }

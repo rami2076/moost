@@ -31,18 +31,21 @@
 - **Linux のトレイ体験改善**: (1) ダークパネルで見えるよう白版アイコン
   （tray_icon_white.png）を Linux で使用、(2) blur での自動非表示を Linux では
   やめ、メニュー経由の「開く」でウィンドウが一瞬で隠れる問題を解消
-- **Linux のトレイ左クリック対応**: 既存プラグイン（tray_manager)は Linux で
-  クリック（Activate）を取得できなかったため、runner（C++ / GDBus）に
-  自前の StatusNotifierItem を実装。
   - 起動時はトレイだけ・ウィンドウ非表示（runner の first_frame 自動表示を
     no-op 化。自動表示が起動時に出る真因だった）
-  - **ダブルクリックでメニューなしの直接オープン**（GNOME 拡張が
-    Activate を呼ぶ。実機で確認）。表示位置は**トレイアイコンの直下**
-    （Linux は setPosition 非対応のため setBounds でカーソル直下に配置）
-  - シングルクリックのメニュー表示は GNOME(ubuntu-appindicators) の
-    仕様でアプリから制御できない（削ろうとするとアイコンごと消えるため）。
-    AboutToShow で勝手にウィンドウを開く件は撤去し、
-    シングル=メニュー/ダブル=直接開く に整理
+  - 表示位置は**トレイアイコンの直下**（Linux は setPosition 非対応のため
+    setBounds でカーソル直下に配置）
+- **Linux のトレイクリック補正（モード切替）**: 「1クリックでダブル扱い
+  (A)」「メニューを自動クローズ (B)」「なし」を設定画面から変更可能
+  （`trayClickMode` 設定、Linux のみ表示）。
+  - A: runner で X11 の XRecord によりトレイ領域のクリックを監視し、
+    XTest で 2 発目のクリックを合成して GNOME をダブル扱いにさせる
+    → **シングルクリックでメニューなしに開く**（実機で Activate 受信を確認）
+  - B: AboutToShow の直後に XTest で ESC を送り、開いたメニューを自動で閉じる
+  - X11 専用（Wayland では自動で補正なし）。シングルクリック時のメニュー
+    表示は GNOME(ubuntu-appindicators) の仕様上完全には消せない。
+    重ねて、ユーザー本人のダブルクリックには干渉しない（合成しない）
+  - ビルド依存に libxtst-dev を追加（release.yml も追記）
 - **pi エージェント対応**: pi（この coding agent）のセッション
   （`~/.pi/agent/sessions/**/*.jsonl`）を直近一覧・メモ・復帰の対象に追加。
   復帰は `pi --session <id>`、要約はローカル抽出（API 消費なし）。

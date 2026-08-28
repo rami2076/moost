@@ -971,6 +971,14 @@ void main() {
       await settle(tester);
 
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      // Linux テストでは「トレイ動作」設定が入り MCP 欄が下に押されるため
+      // スクロールして見つける（画面遷移が終わってから）
+      await settle(tester);
+      await tester.dragUntilVisible(
+        find.textContaining('MCP server binary'),
+        find.byType(ListView),
+        const Offset(0, -200),
+      );
       await waitFor(tester, find.textContaining('MCP server binary'));
       expect(find.textContaining('MCP server binary'), findsOneWidget);
       // バイナリがない場合は連携先の行自体を出さない

@@ -17,12 +17,27 @@ class Settings {
   /// コピー成功時のフィードバックアニメーション（円周スイープ）の有無。
   final bool copyAnimation;
 
+  /// Linux のトレイクリック補正モード（macOS では使われない）。
+  /// 0: なし / 1: ダブルクリック扱い（1クリックで開く・メニューなし）/
+  /// 2: メニュー自動クローズ。
+  final int trayClickMode;
+
+  /// 既定値は「ダブルクリック扱い（A）」。macOS では使われないため
+  /// この既定値が macOS に悪影響はない。
+  static const int trayClickModeDefault = 1;
+
+  /// Linux のトレイクリック補正モードの意味づけ。
+  static const trayClickModeNone = 0; // 補正なし（シングル=メニュー）
+  static const trayClickModeFakeDouble = 1; // 1 クリックをダブル扱い（メニューなし）
+  static const trayClickModeCloseMenu = 2; // メニューを自動クローズ（B）
+
   const Settings({
     this.terminalApp = 'Terminal.app',
     this.recentSessionLimit = 20,
     this.claudePath = '',
     this.summaryRallyCount = 1,
     this.copyAnimation = true,
+    this.trayClickMode = trayClickModeDefault,
   });
 
   Settings copyWith({
@@ -31,6 +46,7 @@ class Settings {
     String? claudePath,
     int? summaryRallyCount,
     bool? copyAnimation,
+    int? trayClickMode,
   }) {
     return Settings(
       terminalApp: terminalApp ?? this.terminalApp,
@@ -38,6 +54,7 @@ class Settings {
       claudePath: claudePath ?? this.claudePath,
       summaryRallyCount: summaryRallyCount ?? this.summaryRallyCount,
       copyAnimation: copyAnimation ?? this.copyAnimation,
+      trayClickMode: trayClickMode ?? this.trayClickMode,
     );
   }
 
@@ -47,6 +64,7 @@ class Settings {
         'claudePath': claudePath,
         'summaryRallyCount': summaryRallyCount,
         'copyAnimation': copyAnimation,
+        'trayClickMode': trayClickMode,
       };
 
   factory Settings.fromJson(Map<String, Object?> json) {
@@ -75,6 +93,7 @@ class Settings {
       summaryRallyCount:
           integer('summaryRallyCount', defaults.summaryRallyCount),
       copyAnimation: boolean('copyAnimation', defaults.copyAnimation),
+      trayClickMode: integer('trayClickMode', defaults.trayClickMode),
     );
   }
 }

@@ -27,7 +27,14 @@ class TrayService with TrayListener, WindowListener {
   bool _available = false;
   bool get available => _available;
 
-  TrayService({required this.openLabel, required this.quitLabel});
+  /// トレイのクリック補正モード（Settings.trayClickMode）。Linux のみ意味を持つ。
+  final int trayClickMode;
+
+  TrayService({
+    required this.openLabel,
+    required this.quitLabel,
+    this.trayClickMode = 0,
+  });
 
   /// トレイを初期化する。成功したら true。
   ///
@@ -54,6 +61,7 @@ class TrayService with TrayListener, WindowListener {
       _available = await linuxTray.init(
         openLabel: openLabel,
         quitLabel: quitLabel,
+        mode: trayClickMode,
       );
       return _available;
     }

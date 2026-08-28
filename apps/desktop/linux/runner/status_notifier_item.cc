@@ -12,6 +12,8 @@
 //  - アイコン画像は実行ファイル直下の data/flutter_assets/assets/ から解決
 #include "status_notifier_item.h"
 
+#include "x11_click_combo.h"
+
 #include <glib.h>
 #include <gio/gio.h>
 #include <gtk/gtk.h>
@@ -237,6 +239,8 @@ void HandleMenuMethodCall(GDBusConnection* connection, const char* sender,
                                             g_variant_new("(b)", TRUE));
       return;
     }
+    // closeMenu 補正: 開こうとしているメニューを ESC で自動クローズ
+    x11_click_combo_on_menu_open();
     if (g_channel != nullptr) {
       g_autoptr(FlValue) args = fl_value_new_map();
       fl_value_set_string_take(args, "kind",
@@ -361,17 +365,24 @@ static void HandleChannelCall(FlMethodChannel* channel, FlMethodCall* call,
     FlValue* args = fl_method_call_get_args(call);
     const char* open_label = nullptr;
     const char* quit_label = nullptr;
+    const char* mode = nullptr;
     if (fl_value_get_type(args) == FL_VALUE_TYPE_MAP) {
       FlValue* o = fl_value_lookup_string(args, "openLabel");
       FlValue* q = fl_value_lookup_string(args, "quitLabel");
+      FlValue* m = fl_value_lookup_string(args, "mode");
       if (o != nullptr && fl_value_get_type(o) == FL_VALUE_TYPE_STRING) {
         open_label = fl_value_get_string(o);
       }
       if (q != nullptr && fl_value_get_type(q) == FL_VALUE_TYPE_STRING) {
         quit_label = fl_value_get_string(q);
       }
+      if (m != nullptr && fl_value_get_type(m) == FL_VALUE_TYPE_STRING) {
+        mode = fl_value_get_string(m);
+      }
     }
     stc_set_labels(open_label, quit_label);
+    // トレイクリック補正（fakeDouble / closeMenu / none）
+    x11_click_combo_set_mode(mode != nullptr ? mode : "none");
     g_autoptr(GError) error = nullptr;
     fl_method_call_respond_success(
         call, fl_value_new_bool(stc_is_available()), &error);

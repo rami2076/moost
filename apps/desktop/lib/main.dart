@@ -189,6 +189,18 @@ class MoostApp extends StatelessWidget {
       colorSchemeSeed: Colors.teal,
       textTheme: textTheme,
       useMaterial3: true,
+      // Linux(Flutter エンジン)は既定フォント族から CJK へ fallback せず
+      // 豆腐になる問題があるため、OS ごとの日本語フォントを明示的に
+      // フォールバックに並べる。macOS: Hiragino/Yu Gothic、
+      // Linux: Noto Sans CJK JP（Ubuntu は fonts-noto-cjk で導入）
+      fontFamilyFallback: const [
+        'Noto Sans CJK JP',
+        'Yu Gothic',
+        'Hiragino Kaku Gothic ProN',
+        'Hiragino Sans',
+        'PingFang SC',
+        'Microsoft YaHei',
+      ],
     );
   }
 }

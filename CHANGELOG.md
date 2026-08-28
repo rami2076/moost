@@ -25,6 +25,9 @@
 - **MCP 連携の Linux 対応**: Claude Desktop 設定パスを Linux では
   `~/.config/Claude/claude_desktop_config.json` に。同梱 moost-mcp バイナリの
   配置先も Linux バンドルに合わせて解決
+- **Linux の日本語表示修正**: Flutter Linux エンジンは既定フォント族から CJK へ
+  fallback せず豆腐（□）化するため、ThemeData の fontFamilyFallback に
+  Noto Sans CJK JP / Yu Gothic / Hiragino 等を明示指定（macOS は上書きなし）
 
 ## [1.10.0] - 2026-08-15
 

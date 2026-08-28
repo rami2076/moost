@@ -37,7 +37,15 @@ class TrayService with TrayListener, WindowListener {
     // 閉じる操作で終了させず onWindowClose に回す
     await windowManager.setPreventClose(true);
     try {
-      await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+      // macOS は isTemplate で自動配色（黒テンプレートで良い）。Linux の
+      // AppIndicator は isTemplate を無視して画像をそのまま表示するため、
+      // 黒いテンプレートを出すとダークパネルで見えにくい。白版を出す
+      // （asset: tray_icon_white.png。白 + 透明度のみ）
+      if (Platform.isLinux) {
+        await trayManager.setIcon('assets/tray_icon_white.png');
+      } else {
+        await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+      }
       await trayManager.setContextMenu(Menu(items: [
         MenuItem(key: _keyOpen, label: openLabel),
         MenuItem.separator(),
@@ -106,8 +114,15 @@ class TrayService with TrayListener, WindowListener {
 
   @override
   void onWindowBlur() async {
-    // トレイなし（Linux フォールバック）では通常ウィンドウなので blur で
-    // 隠さない
+    // Linux は blur での自動非表示をしない。macOS の NSPopover 風挙動
+    // （外側クリックで閉じる）は単左クリックトグルが効く前提だが、Linux の
+    // AppIndicator はクリックイベントを渡さず「開く」は常にメニュー経由に
+    // なるため、自動非表示は開いた瞬間に隠れる事故のもとになる（目撃例）。
+    // 閉じる操作（タイトルバー X 等）でトレイへ戻る形に統一する
+    if (Platform.isLinux) {
+      return;
+    }
+    // トレイなしフォールバックでは通常ウィンドウなので blur で隠さない
     if (!_available) {
       return;
     }

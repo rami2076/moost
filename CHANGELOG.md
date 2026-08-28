@@ -28,6 +28,9 @@
 - **Linux の日本語表示修正**: Flutter Linux エンジンは既定フォント族から CJK へ
   fallback せず豆腐（□）化するため、ThemeData の fontFamilyFallback に
   Noto Sans CJK JP / Yu Gothic / Hiragino 等を明示指定（macOS は上書きなし）
+- **Linux のトレイ体験改善**: (1) ダークパネルで見えるよう白版アイコン
+  （tray_icon_white.png）を Linux で使用、(2) blur での自動非表示を Linux では
+  やめ、メニュー経由の「開く」でウィンドウが一瞬で隠れる問題を解消
 
 ## [1.10.0] - 2026-08-15
 

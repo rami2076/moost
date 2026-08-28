@@ -69,6 +69,7 @@ Future<void> main() async {
     registry: AdapterRegistry([
       ClaudeCodeAdapter(),
       CodexAdapter(),
+      PiAdapter(),
     ]),
     memoStore: MemoStore.defaultLocation(),
     projectStore: ProjectStore.defaultLocation(),

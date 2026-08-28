@@ -12,6 +12,7 @@ void main() {
     registry: AdapterRegistry([
       ClaudeCodeAdapter(),
       CodexAdapter(),
+      PiAdapter(),
     ]),
     memoStore: MemoStore.defaultLocation(),
     projectStore: ProjectStore.defaultLocation(),

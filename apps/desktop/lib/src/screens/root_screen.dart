@@ -81,6 +81,7 @@ String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
 Color _agentColor(String agentId) => switch (agentId) {
   ClaudeCodeAdapter.id => const Color(0xFFD97757),
   CodexAdapter.id => const Color(0xFF6867AA),
+  PiAdapter.id => const Color(0xFF2E7D9E),
   _ => Colors.grey,
 };
 

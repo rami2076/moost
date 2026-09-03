@@ -229,24 +229,23 @@ void HandleMenuMethodCall(GDBusConnection* connection, const char* sender,
                           const char* method_name, GVariant* parameters,
                           GDBusMethodInvocation* invocation, gpointer data) {
   if (g_strcmp0(method_name, "AboutToShow") == 0) {
-    // シングルクリックでホストがメニューを開く際に呼ばれる。メニュー自体は
-    // GNOME の仕様上消せないが、シングルクリックを「開く」として同時に
-    // ウィンドウも表示する（＝トレイクリックで開く、を成立させる）。
-    // 登録直後に来る初期化呼び出しでは開かない（起動時はトレイのみ）。
-    if (g_get_monotonic_time() / 1000 - g_registered_at_ms <
-        kIgnoreAboutToShowMs) {
-      g_dbus_method_invocation_return_value(invocation,
-                                            g_variant_new("(b)", TRUE));
-      return;
-    }
-    // closeMenu 補正: 開こうとしているメニューを ESC で自動クローズ
-    x11_click_combo_on_menu_open();
-    if (g_channel != nullptr) {
-      g_autoptr(FlValue) args = fl_value_new_map();
-      fl_value_set_string_take(args, "kind",
-                               fl_value_new_string("activate"));
-      fl_method_channel_invoke_method(g_channel, "onTrayIconClicked", args,
-                                      nullptr, nullptr, nullptr);
+    // シングルクリックでホストがメニューを開く際に呼ばれる。
+    // 既定（mode none）ではここで何もしない＝通常の「メニューのみ」動作。
+    // 補正モード（fakeDouble/closeMenu）のときだけ、シングルクリックを
+    // 「開く」とみなしてウィンドウを表示する（これ自体が小細工のため
+    // none では行わない）。登録直後に来る初期化呼び出しも無視する。
+    if (x11_click_combo_current_mode() != 0 &&
+        g_get_monotonic_time() / 1000 - g_registered_at_ms >=
+            kIgnoreAboutToShowMs) {
+      // closeMenu 補正: 開こうとしているメニューを ESC で自動クローズ
+      x11_click_combo_on_menu_open();
+      if (g_channel != nullptr) {
+        g_autoptr(FlValue) args = fl_value_new_map();
+        fl_value_set_string_take(args, "kind",
+                                 fl_value_new_string("activate"));
+        fl_method_channel_invoke_method(g_channel, "onTrayIconClicked", args,
+                                        nullptr, nullptr, nullptr);
+      }
     }
     g_dbus_method_invocation_return_value(invocation,
                                           g_variant_new("(b)", TRUE));

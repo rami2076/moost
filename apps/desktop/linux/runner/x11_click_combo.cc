@@ -250,6 +250,14 @@ void x11_click_combo_set_mode(const char* mode) {
 #endif
 }
 
+int x11_click_combo_current_mode() {
+#ifdef GDK_WINDOWING_X11
+  return s_mode.load();
+#else
+  return 0;
+#endif
+}
+
 void x11_click_combo_on_menu_open() {
 #ifdef GDK_WINDOWING_X11
   if (s_mode.load() == 2) {

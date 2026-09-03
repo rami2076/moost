@@ -54,6 +54,10 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_default_size(window, 1280, 720);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
+  // この環境（NVIDIA EGL)では Impeller(OpenGLES) の raster スレッドが
+  // libnvidia-eglcore.so 内で SIGSEGV して描画のたびに落ちる。
+  // Impeller を無効化して Skia にフォールバックさせる（クラッシュ回避）。
+  fl_dart_project_set_enable_impeller(project, FALSE);
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
 

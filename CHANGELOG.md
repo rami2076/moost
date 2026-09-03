@@ -35,17 +35,21 @@
     no-op 化。自動表示が起動時に出る真因だった）
   - 表示位置は**トレイアイコンの直下**（Linux は setPosition 非対応のため
     setBounds でカーソル直下に配置）
-- **Linux のトレイクリック補正（モード切替）**: 「1クリックでダブル扱い
-  (A)」「メニューを自動クローズ (B)」「なし」を設定画面から変更可能
-  （`trayClickMode` 設定、Linux のみ表示）。
-  - A: runner で X11 の XRecord によりトレイ領域のクリックを監視し、
-    XTest で 2 発目のクリックを合成して GNOME をダブル扱いにさせる
-    → **シングルクリックでメニューなしに開く**（実機で Activate 受信を確認）
-  - B: AboutToShow の直後に XTest で ESC を送り、開いたメニューを自動で閉じる
-  - X11 専用（Wayland では自動で補正なし）。シングルクリック時のメニュー
-    表示は GNOME(ubuntu-appindicators) の仕様上完全には消せない。
-    重ねて、ユーザー本人のダブルクリックには干渉しない（合成しない）
+- **Linux のトレイクリック動作を「標準の 2 アクション起動」に整理**: 
+  シングルクリック=メニュー表示、メニューの「Open Moost」で開く（既定）。
+  小細工（XRecord/XTest 合成・ESC 自動クローズ）は設定
+  `trayClickMode`（Linux のみ設定画面で選択）で有効化できる選択肢に:
+  - なし（既定）: シングルクリックはメニューのみ（AboutToShow で
+    ウィンドウを勝手に開かない）。メニューの「Open Moost」で開く
+  - A(fakeDouble): XRecord でトレイ領域の 1 クリックを検知し XTest で
+    2 発目を合成して「ダブル扱い」に → メニューなしで直接開く
+  - B(closeMenu): 開いた直後にメニューへ ESC を送って自動クローズ
   - ビルド依存に libxtst-dev を追加（release.yml も追記）
+- **NVIDIA EGL/GLX 環境での Flutter 描画クラッシュ対策**: ランナー
+  （main.cc）で Flutter engine をソフトウェアレンダリング
+  （`FLUTTER_ENGINE_SWITCHES=--enable-software-rendering`）に設定。
+  一部の NVIDIA ドライバでウィンドウ表示時の描画スレッドが
+  libnvidia-*core.so 内で SIGSEGV する問題を回避（環境変数があれば尊重）
 - **pi エージェント対応**: pi（この coding agent）のセッション
   （`~/.pi/agent/sessions/**/*.jsonl`）を直近一覧・メモ・復帰の対象に追加。
   復帰は `pi --session <id>`、要約はローカル抽出（API 消費なし）。

@@ -172,9 +172,11 @@ jobs:
         run: |
           V="$(echo "$VERSION" | cut -d- -f1)"
           echo "VERSION=$VERSION (changelog 検索用: $V)"
+          # バックスラッシュに依存せず mawk/gawk 両方で確実な index() 方式
+          # （文字列の先頭が "## [<ver>]" であるかを判定。正規表現は使わない）
           awk -v ver="$V" '
-            $0 ~ "^##\\[" ver "\\]" {flag=1; next}
-            $0 ~ "^##\\[" {flag=0}
+            index($0, "## [" ver "]") == 1 {flag=1; next}
+            index($0, "## [") == 1 {flag=0}
             flag' CHANGELOG.md > RELEASE_NOTES.md
           if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
             echo "(CHANGELOG に $V の節がありません)" > RELEASE_NOTES.md

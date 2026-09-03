@@ -163,15 +163,21 @@ jobs:
           DMG_SHA=$(sha256sum "$DMG" | awk '{print $1}')
           echo "DMG_SHA=$DMG_SHA" >> "$GITHUB_ENV"
 
-      # CHANGELOG から該当節を抜き出す（既存フローと同じ）
+      # CHANGELOG から該当節を抜き出す。
+      # タグ名が v1.2.3-rc1 のような prerelease の場合も、CHANGELOG の見出し
+      # （## [1.2.3]）と一致するよう、タグから「-以降」を取り除いて検索する。
+      # 正規表現はシェルクォートを挟むと バックスラッシュが暴れるため、
+      # 文字列正規表現（$0 ~ "..."）形式で書く。
       - name: Extract changelog section
         run: |
-          awk -v ver="$VERSION" '
-            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
-            /^## \\[/ {flag=0}
+          V="$(echo "$VERSION" | cut -d- -f1)"
+          echo "VERSION=$VERSION (changelog 検索用: $V)"
+          awk -v ver="$V" '
+            $0 ~ "^##\\[" ver "\\]" {flag=1; next}
+            $0 ~ "^##\\[" {flag=0}
             flag' CHANGELOG.md > RELEASE_NOTES.md
           if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
-            echo "(CHANGELOG に $VERSION の節がありません)" > RELEASE_NOTES.md
+            echo "(CHANGELOG に $V の節がありません)" > RELEASE_NOTES.md
           fi
 
       # プラットフォーム別のインストールコマンドをノート末尾に付ける

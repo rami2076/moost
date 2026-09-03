@@ -149,3 +149,40 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
 - [ ] schemaVersion を変えた場合: マイグレーション実装 + テストがあり、MAJOR を上げている
 - [ ] クリーン環境で最小動線（一覧 → メモ登録 → 復帰）を確認した
 - [ ] 設定画面のバージョン表示が新しい版になっている
+
+## 6. リリースフローのトラブルシューティング（練習リリースで発見）
+
+2026-09-03 の練習リリース（v1.11.0-rc1 / rc2）で発生した失敗と対処を記録する。
+同様の問題は RELEASE_NOTES の生成・CI で再発し得るため、手順を変更する際は
+この節も更新すること。
+
+### 失敗 1: CI の `flutter pub get --enforce-lockfile` が失敗（exit 65）
+
+- 症状: desktop（analyze + widget test）が "Failed to update packages" で失敗
+- 原因: ローカルの Flutter 3.47.2 で `flutter pub get` を実行し、`apps/desktop/pubspec.lock`
+  の transitive 依存（intl / matcher / meta など約 26 箇所）が更新されたままコミットされた。
+  CI は Flutter 3.44.5 固定のため、SDK が要求する版（より古い）と lockfile が一致しなかった
+- 対処: `git checkout main -- apps/desktop/pubspec.lock` で main の lockfile へ戻して再 push
+- 教訓: 依存の追加・削除以外で lockfile が変わるのはローカル pub get のせい。
+  **CI の Flutter バージョン（3.44.5）を基準に lockfile を固定**し、無関係な差分はコミットしない
+
+### 失敗 2: rc1 の build-linux が `fl_dart_project_set_enable_impeller` で失敗
+
+- 症状: `error: use of undeclared identifier 'fl_dart_project_set_enable_impeller'` → Build process failed
+- 原因: ローカル（Flutter 3.47.2）の `flutter_linux.h` には存在するが、
+  **CI の Flutter 3.44.5 には無い API** を呼んでいた（ローカルビルドは通る）
+- 対処: この API 呼び出しを削除し、ソフトウェアレンダリングは
+  `FLUTTER_ENGINE_SWITCHES=--enable-software-rendering`（環境変数・両バージョンで有効）に一本化
+- 教訓: **CI で固定している Flutter バージョンでビルドを通す**こと。新 API を使う際は
+  CI のヘッダ（bin/cache/artifacts/engine/linux-*/flutter_linux/）で存在確認する
+
+### 失敗 3: rc2 の「Extract changelog section」が失敗（awk: unterminated regexp）
+
+- 原因 A: スラッシュ形式の正規表現リテラル `/^## \\[/` が、シェルクォートを経由した
+  `\\` により `\\[` と解釈され「文字クラスが閉じていない」エラーになった
+- 原因 B: `VERSION=1.11.0-rc2` のまま `## [1.11.0-rc2]` を検索しており、CHANGELOG の
+  見出し `## [1.11.0]` に一致しなかった（論理バグ）
+- 対処: タグから `-` 以降を除いた `V` で検索し、awk の比較は `$0 ~ "...\\[...]"` の
+  **文字列正規表現形式**に変更
+- 教訓: **prerelease タグを打つ際は CHANGELOG 節の検索から `-` 以降を除く**。
+  awk の正規表現は `$0 ~ ".."` 文字列形式で書くとクォートの罠を避けられる

@@ -428,6 +428,30 @@ abstract class AppLocalizations {
   /// **'Copy success animation'**
   String get settingCopyAnimation;
 
+  /// No description provided for @settingTrayClickMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Tray click behavior (Linux)'**
+  String get settingTrayClickMode;
+
+  /// No description provided for @settingTrayClickModeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal (single click shows the menu)'**
+  String get settingTrayClickModeNone;
+
+  /// No description provided for @settingTrayClickModeFakeDouble.
+  ///
+  /// In en, this message translates to:
+  /// **'Treat a single click as a double click (opens without the menu)'**
+  String get settingTrayClickModeFakeDouble;
+
+  /// No description provided for @settingTrayClickModeCloseMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-close the menu after opening'**
+  String get settingTrayClickModeCloseMenu;
+
   /// No description provided for @settingMcpSectionTitle.
   ///
   /// In en, this message translates to:
@@ -527,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @noteAutomationBody.
   ///
   /// In en, this message translates to:
-  /// **'The first time you resume a session, macOS asks for automation permission. Allow it once and it won\'t ask again.'**
+  /// **'The first time you resume a session, macOS asks for automation permission; allow it once and it won\'t ask again. TIP: a terminal opens in a new window (macOS: Terminal.app / iTerm2, Linux: gnome-terminal).'**
   String get noteAutomationBody;
 
   /// No description provided for @noteRetentionTitle.

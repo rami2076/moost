@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'linux_tray.dart';
 import 'popover_position.dart';
 
 /// システムトレイ常駐の面倒を見る（design.md 6 章）。
@@ -20,19 +22,64 @@ class TrayService with TrayListener, WindowListener {
   final String openLabel;
   final String quitLabel;
 
-  TrayService({required this.openLabel, required this.quitLabel});
+  /// トレイアイコンが実際に動作しているか。false のときは通常ウィンドウ
+  /// として振る舞う（GNOME 等の Linux フォールバック、Q4）。
+  bool _available = false;
+  bool get available => _available;
 
-  Future<void> init() async {
-    trayManager.addListener(this);
+  /// トレイのクリック補正モード（Settings.trayClickMode）。Linux のみ意味を持つ。
+  final int trayClickMode;
+
+  TrayService({
+    required this.openLabel,
+    required this.quitLabel,
+    this.trayClickMode = 0,
+  });
+
+  /// トレイを初期化する。成功したら true。
+  ///
+  /// Linux は runner 側の自前 StatusNotifierItem で起動する。AppIndicator
+  /// のホスト（GNOME の拡張等）がいないと登録に失敗するため、失敗時は
+  /// 通常ウィンドウへのフォールバックを呼び出し側（main.dart）で行う。
+  Future<bool> init() async {
     windowManager.addListener(this);
     // 閉じる操作で終了させず onWindowClose に回す
     await windowManager.setPreventClose(true);
-    await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
-    await trayManager.setContextMenu(Menu(items: [
-      MenuItem(key: _keyOpen, label: openLabel),
-      MenuItem.separator(),
-      MenuItem(key: _keyQuit, label: quitLabel),
-    ]));
+
+    if (Platform.isLinux) {
+      // コールバックには this をクロージャで保持するため、LinuxTray は
+      // メソッドチャネルのハンドラが持つ参照で生存する（保持用フィールドは不要）
+      // GNOME の ubuntu-appindicators は左クリックでも Activate を送らず
+      // 常に「メニューを開く」(AboutToShow) を呼ぶ。この呼び出しは実際の
+      // クリックでのみ飛ぶ（起動時の自動表示は runner の first_frame が
+      // 原因で、そちらは別途 no-op 化済み）。よって「クリック = 直接開く」
+      final linuxTray = LinuxTray(
+        onActivate: showWindow,
+        onMenuOpen: showWindow,
+        onMenuQuit: () => exit(0),
+      );
+      _available = await linuxTray.init(
+        openLabel: openLabel,
+        quitLabel: quitLabel,
+        mode: trayClickMode,
+      );
+      return _available;
+    }
+
+    trayManager.addListener(this);
+    try {
+      // macOS は isTemplate で自動配色（黒テンプレートで良い）
+      await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+      await trayManager.setContextMenu(Menu(items: [
+        MenuItem(key: _keyOpen, label: openLabel),
+        MenuItem.separator(),
+        MenuItem(key: _keyQuit, label: quitLabel),
+      ]));
+      _available = true;
+    } on Object {
+      _available = false;
+    }
+    return _available;
   }
 
   static const _keyOpen = 'open';
@@ -59,7 +106,11 @@ class TrayService with TrayListener, WindowListener {
     if (_suppressHideCount > 0) {
       return;
     }
-    // 常駐アプリなので閉じる = 隠す
+    // トレイなし（Linux フォールバック）では閉じる = 終了。
+    // 常駐アプリの場合は閉じる = 隠す
+    if (!_available) {
+      exit(0);
+    }
     await windowManager.hide();
   }
 
@@ -87,6 +138,18 @@ class TrayService with TrayListener, WindowListener {
 
   @override
   void onWindowBlur() async {
+    // Linux は blur での自動非表示をしない。macOS の NSPopover 風挙動
+    // （外側クリックで閉じる）は単左クリックトグルが効く前提だが、Linux の
+    // AppIndicator はクリックイベントを渡さず「開く」は常にメニュー経由に
+    // なるため、自動非表示は開いた瞬間に隠れる事故のもとになる（目撃例）。
+    // 閉じる操作（タイトルバー X 等）でトレイへ戻る形に統一する
+    if (Platform.isLinux) {
+      return;
+    }
+    // トレイなしフォールバックでは通常ウィンドウなので blur で隠さない
+    if (!_available) {
+      return;
+    }
     // アプリ外を触ったら隠れる（ポップオーバー挙動。design.md 6 章）。
     // ただし withoutBlurHide 実行中（フォルダ選択ダイアログ表示中等）は
     // 隠さない
@@ -121,16 +184,76 @@ class TrayService with TrayListener, WindowListener {
   }
 
   Future<void> showWindow() async {
-    await _positionUnderTrayIcon();
+    if (Platform.isMacOS) {
+      await _positionUnderTrayIcon();
+    } else if (Platform.isLinux) {
+      // トレイアイコン（＝クリック時のカーソル位置）の直下に配置する
+      await _positionBelowCursor();
+    }
     await windowManager.show();
     await windowManager.focus();
     shownCount.value++;
+  }
+
+  /// クリック時のカーソル（＝トレイアイコン）の直下にウィンドウを配置する。
+  ///
+  /// window_manager の Linux 実装には setPosition/setAlignment が無いため、
+  /// 位置込みで動かせる setBounds を使う。
+  Future<void> _positionBelowCursor() async {
+    Size size = const Size(570, 660);
+    try {
+      final bounds = await windowManager.getBounds();
+      if (bounds.size.width > 0) {
+        size = bounds.size;
+      }
+    } on Object {
+      // 取得できなくても既定サイズで続行
+    }
+
+    Offset? cursor;
+    var workAreas = const <Rect>[];
+    try {
+      cursor = await screenRetriever.getCursorScreenPoint();
+      final displays = await screenRetriever.getAllDisplays();
+      workAreas = [
+        for (final display in displays)
+          if (display.visiblePosition != null && display.visibleSize != null)
+            display.visiblePosition! & display.visibleSize!,
+      ];
+    } on Object {
+      // カーソル・ディスプレイ情報が取れなければ既定位置のまま表示
+      return;
+    }
+
+    // アイコン直下・中央揃え（上部パネルのすぐ下から、と考えた 14px 下）
+    var x = cursor.dx - size.width / 2;
+    var y = cursor.dy + 14;
+    if (workAreas.isNotEmpty) {
+      // - ディスプレイの作業領域内に収める
+      // - 上端だとパネルに隠れるため、収まらなければ下寄せする
+      Rect? chosen;
+      for (final wa in workAreas) {
+        if (cursor.dx >= wa.left && cursor.dx <= wa.right) {
+          chosen = wa;
+          break;
+        }
+      }
+      final wa = chosen ?? workAreas.first;
+      x = x.clamp(wa.left, math.max(wa.left, wa.right - size.width));
+      y = y.clamp(wa.top, math.max(wa.top, wa.bottom - size.height));
+    }
+    try {
+      await windowManager.setBounds(Rect.fromLTWH(x, y, size.width, size.height));
+    } on Object {
+      // 配置失敗でも表示は続行（既定位置で open）
+    }
   }
 
   /// トレイアイコンの直下・中央揃えに配置する（NSPopover の見た目に寄せる）。
   ///
   /// マルチディスプレイではクリック位置（カーソル）のあるディスプレイを
   /// 基準にする（Issue #16。計算本体は popover_position.dart）。
+  /// macOS 専用: 呼び出し側（showWindow）で Platform.isMacOS を確認済み。
   Future<void> _positionUnderTrayIcon() async {
     final size = await windowManager.getSize();
 

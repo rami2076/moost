@@ -81,6 +81,7 @@ String _formatListUpdatedAt(AppLocalizations l10n, DateTime updatedAt) {
 Color _agentColor(String agentId) => switch (agentId) {
   ClaudeCodeAdapter.id => const Color(0xFFD97757),
   CodexAdapter.id => const Color(0xFF6867AA),
+  PiAdapter.id => const Color(0xFF2E7D9E),
   _ => Colors.grey,
 };
 
@@ -165,18 +166,34 @@ class RootScreen extends StatefulWidget {
     this.installHealthChecker,
   });
 
-  static bool defaultIsBrewManaged() =>
-      Directory('/opt/homebrew/Caskroom/moost').existsSync() ||
-      Directory('/usr/local/Caskroom/moost').existsSync();
+  /// brew (Cask) 管理下か。Linux には brew cask の概念がないため
+  /// 常に false（＝更新はリリースページを開くだけの手動導線になる）。
+  static bool defaultIsBrewManaged() {
+    if (Platform.isLinux) {
+      return false;
+    }
+    return Directory('/opt/homebrew/Caskroom/moost').existsSync() ||
+        Directory('/usr/local/Caskroom/moost').existsSync();
+  }
 
   static Future<void> defaultOpenUrl(Uri url) async {
-    await Process.run('open', [url.toString()]);
+    // macOS: open / Linux: xdg-open（GUI アプリの PATH は最小限だが
+    // いずれも /usr/bin に存在する標準コマンド）
+    final command = Platform.isLinux ? 'xdg-open' : 'open';
+    await Process.run(command, [url.toString()]);
   }
 
   /// cask の install 先は固定パス（Casks/moost.rb の `app "Moost.app"`）。
   /// この関数は isBrewManaged が true のときだけ呼ばれるので、
   /// 通常インストールならこのパスに実体がある前提で問題ない。
+  /// Linux では brew 自己更新自体が無いため呼ばれない（保険として
+  /// `/opt/moost` を開く分岐を入れておく）。
   static Future<void> defaultRestart() async {
+    if (Platform.isLinux) {
+      await Process.start('/opt/moost/moost_desktop', const [],
+          mode: ProcessStartMode.detached);
+      exit(0);
+    }
     await Process.start('open', [
       '/Applications/Moost.app',
     ], mode: ProcessStartMode.detached);

@@ -25,11 +25,16 @@ class InstallHealthChecker {
   /// Caskroom ディレクトリ一覧の取得を差し替え可能にする（テスト用）。
   final Future<List<String>> Function(String dirPath) listEntries;
 
+  /// テスト用にプラットフォーム分岐を固定できる。null なら実環境の判定を使う。
+  final bool _isLinux;
+
   InstallHealthChecker({
     Future<bool> Function(String path)? fileExists,
     Future<List<String>> Function(String dirPath)? listEntries,
+    bool? isLinux,
   })  : fileExists = fileExists ?? ((path) => File(path).exists()),
-        listEntries = listEntries ?? _defaultListEntries;
+        listEntries = listEntries ?? _defaultListEntries,
+        _isLinux = isLinux ?? Platform.isLinux;
 
   static Future<List<String>> _defaultListEntries(String dirPath) async {
     final dir = Directory(dirPath);
@@ -44,6 +49,11 @@ class InstallHealthChecker {
 
   /// 壊れていれば true。
   Future<bool> isBroken() async {
+    // この検査は macOS の Homebrew Cask 固有。Linux では適用しない
+    // （macOS 専用パスを調べると常に「壊れている」と誤判定するため）。
+    if (_isLinux) {
+      return false;
+    }
     if (!await fileExists(_executablePath)) {
       return true;
     }

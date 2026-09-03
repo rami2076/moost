@@ -23,7 +23,11 @@ class ClaudePathResolver {
     Future<ProcessResult> Function(List<String> args)? runZsh,
     Future<bool> Function(String path)? fileExists,
   })  : home = home ?? Platform.environment['HOME'] ?? '',
-        runZsh = runZsh ?? ((args) => Process.run('zsh', args)),
+        // Linux では zsh が無いことが多いため bash を使う（GUI から起動
+        // するため PATH が最小限になる問題はどちらの OS でも同じ）。
+        // テストでは注入された関数を使うので、この選択は実環境にだけ効く
+        runZsh = runZsh ??
+            ((args) => Process.run(Platform.isLinux ? 'bash' : 'zsh', args)),
         fileExists = fileExists ?? ((path) => File(path).exists());
 
   static const _knownRelativePaths = [
@@ -59,10 +63,15 @@ class ClaudePathResolver {
 
   Future<String?> _resolveViaLoginShell() async {
     try {
-      // -i（対話シェル）を付けないと .zshrc を読まないため、nvm/pyenv/asdf
-      // 等が PATH を .zshrc 側で追加している環境では claude を見つけられ
-      // なかった（Issue #53）。-lc では原理的に解決できない
-      final result = await runZsh(['-lic', 'command -v claude']);
+      // -i（対話シェル）を付けないと .zshrc/.bashrc を読まないため、
+      // nvm/pyenv/asdf 等が PATH を rc 側で追加している環境では claude を
+      // 見つけられなかった（Issue #53）。-lc では原理的に解決できない。
+      // シェルは OS に応じて選ぶ（Linux: bash -ic で .bashrc を読む）
+      final shellArgs = Platform.isLinux
+          ? ['-ic', 'command -v claude']
+          : ['-lic', 'command -v claude'];
+      final result =
+          await runZsh(shellArgs).timeout(const Duration(seconds: 10));
       if (result.exitCode != 0) {
         return null;
       }

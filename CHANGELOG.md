@@ -5,6 +5,56 @@
 
 ## [Unreleased]
 
+### Added (Linux / Ubuntu)
+
+- **Linux (Ubuntu 24.04) 対応**: Flutter Linux デスクトップビルドを追加し、
+  `.deb` パッケージ（`scripts/linux/package_deb.sh`）をリリースに自動添付するように
+  （Q1）。`.deb` は `/opt/moost/` に展開し、ランチャーのデスクトップエントリと
+  `moost` コマンドのシンボリックリンクを用意
+- **トレイ常駐**: AppIndicator 経由。Ubuntu 標準の GNOME では既定で有効。
+  拡張がない環境では通常ウィンドウとして動作するフォールバックを実装（Q4）
+- **復帰先ターミナル**: 設定に `gnome-terminal` を追加。Linux では
+  gnome-terminal（無ければ `x-terminal-emulator`）を bash ログインシェルで起動し
+  復帰コマンドを実行（Q3）。macOS 専用ターミナル値（Terminal.app / iTerm2）が
+  設定に残っていても gnome-terminal へ正規化
+- **PATH 自動検出の Linux 対応**: `claude`/`codex` のパス解決を macOS の
+  zsh に加えて Linux では bash（`-ic`）で行うように
+- **更新通知の Linux 対応**: brew のない環境ではリリースページを開く手動導線に。
+  `xdg-open` を利用。InstallHealthChecker（macOS cask 固有）は Linux では
+  無効
+- **MCP 連携の Linux 対応**: Claude Desktop 設定パスを Linux では
+  `~/.config/Claude/claude_desktop_config.json` に。同梱 moost-mcp バイナリの
+  配置先も Linux バンドルに合わせて解決
+- **Linux の日本語表示修正**: Flutter Linux エンジンは既定フォント族から CJK へ
+  fallback せず豆腐（□）化するため、ThemeData の fontFamilyFallback に
+  Noto Sans CJK JP / Yu Gothic / Hiragino 等を明示指定（macOS は上書きなし）
+- **Linux のトレイ体験改善**: (1) ダークパネルで見えるよう白版アイコン
+  （tray_icon_white.png）を Linux で使用、(2) blur での自動非表示を Linux では
+  やめ、メニュー経由の「開く」でウィンドウが一瞬で隠れる問題を解消
+  - 起動時はトレイだけ・ウィンドウ非表示（runner の first_frame 自動表示を
+    no-op 化。自動表示が起動時に出る真因だった）
+  - 表示位置は**トレイアイコンの直下**（Linux は setPosition 非対応のため
+    setBounds でカーソル直下に配置）
+- **Linux のトレイクリック動作を「標準の 2 アクション起動」に整理**: 
+  シングルクリック=メニュー表示、メニューの「Open Moost」で開く（既定）。
+  小細工（XRecord/XTest 合成・ESC 自動クローズ）は設定
+  `trayClickMode`（Linux のみ設定画面で選択）で有効化できる選択肢に:
+  - なし（既定）: シングルクリックはメニューのみ（AboutToShow で
+    ウィンドウを勝手に開かない）。メニューの「Open Moost」で開く
+  - A(fakeDouble): XRecord でトレイ領域の 1 クリックを検知し XTest で
+    2 発目を合成して「ダブル扱い」に → メニューなしで直接開く
+  - B(closeMenu): 開いた直後にメニューへ ESC を送って自動クローズ
+  - ビルド依存に libxtst-dev を追加（release.yml も追記）
+- **NVIDIA EGL/GLX 環境での Flutter 描画クラッシュ対策**: ランナー
+  （main.cc）で Flutter engine をソフトウェアレンダリング
+  （`FLUTTER_ENGINE_SWITCHES=--enable-software-rendering`）に設定。
+  一部の NVIDIA ドライバでウィンドウ表示時の描画スレッドが
+  libnvidia-*core.so 内で SIGSEGV する問題を回避（環境変数があれば尊重）
+- **pi エージェント対応**: pi（この coding agent）のセッション
+  （`~/.pi/agent/sessions/**/*.jsonl`）を直近一覧・メモ・復帰の対象に追加。
+  復帰は `pi --session <id>`、要約はローカル抽出（API 消費なし）。
+  MCP サーバー側も pi を追加
+
 ## [1.10.0] - 2026-08-15
 
 ### Added

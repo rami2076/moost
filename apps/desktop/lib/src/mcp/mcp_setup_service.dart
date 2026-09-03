@@ -24,15 +24,24 @@ class McpSetupException implements Exception {
 class McpSetupService {
   final ClaudePathResolver _claudeResolver;
   final CodexPathResolver _codexResolver;
-  final String _home;
+  final String _claudeDesktopConfigPath;
 
   McpSetupService({
     ClaudePathResolver? claudeResolver,
     CodexPathResolver? codexResolver,
     String? home,
+    String? claudeDesktopConfigPath,
   })  : _claudeResolver = claudeResolver ?? ClaudePathResolver(),
         _codexResolver = codexResolver ?? CodexPathResolver(),
-        _home = home ?? Platform.environment['HOME'] ?? '';
+        // macOS: ~/Library/Application Support/Claude/...
+        // Linux: ~/.config/Claude/...（XDG_CONFIG_HOME 準拠）
+        _claudeDesktopConfigPath = claudeDesktopConfigPath ??
+            (Platform.isLinux
+                ? '${home ?? Platform.environment['HOME'] ?? ''}/'
+                    '.config/Claude/claude_desktop_config.json'
+                : '${home ?? Platform.environment['HOME'] ?? ''}/'
+                    'Library/Application Support/Claude/'
+                    'claude_desktop_config.json');
 
   Future<void> registerClaudeCode(String binaryPath) async {
     final claudePath = await _claudeResolver.resolve();
@@ -96,8 +105,7 @@ class McpSetupService {
   /// `claude_desktop_config.json` の `mcpServers` に `moost` キーが
   /// 既にあるかを見るだけ（実際に接続できるかまでは検証しない）。
   Future<bool> isClaudeDesktopConnected() async {
-    final file = File(
-        '$_home/Library/Application Support/Claude/claude_desktop_config.json');
+    final file = File(_claudeDesktopConfigPath);
     if (!await file.exists()) {
       return false;
     }
@@ -133,12 +141,10 @@ class McpSetupService {
     }
   }
 
-  /// `~/Library/Application Support/Claude/claude_desktop_config.json` の
-  /// `mcpServers.moost` だけを追記/更新する。他社製 MCP サーバーを含む
-  /// 既存設定は壊さない（ファイル全体の上書きはしない）。
+  /// `claude_desktop_config.json` の `mcpServers.moost` だけを追記/更新する。
+  /// 他社製 MCP サーバーを含む既存設定は壊さない（ファイル全体の上書きはしない）。
   Future<void> registerClaudeDesktop(String binaryPath) async {
-    final file = File(
-        '$_home/Library/Application Support/Claude/claude_desktop_config.json');
+    final file = File(_claudeDesktopConfigPath);
 
     Map<String, Object?> config = {};
     if (await file.exists()) {
@@ -173,8 +179,7 @@ class McpSetupService {
   /// `claude_desktop_config.json` の `mcpServers.moost` キーだけを取り除く。
   /// 他社製 MCP サーバーを含む既存設定は壊さない。
   Future<void> unregisterClaudeDesktop() async {
-    final file = File(
-        '$_home/Library/Application Support/Claude/claude_desktop_config.json');
+    final file = File(_claudeDesktopConfigPath);
     if (!await file.exists()) {
       return;
     }

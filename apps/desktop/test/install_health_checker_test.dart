@@ -6,6 +6,7 @@ void main() {
     test('reports healthy when the executable exists and Caskroom is clean',
         () async {
       final checker = InstallHealthChecker(
+        isLinux: false,
         fileExists: (_) async => true,
         listEntries: (_) async => const ['1.9.1'],
       );
@@ -15,6 +16,7 @@ void main() {
 
     test('reports broken when the executable is missing', () async {
       final checker = InstallHealthChecker(
+        isLinux: false,
         fileExists: (_) async => false,
         listEntries: (_) async => const ['1.9.1'],
       );
@@ -25,6 +27,7 @@ void main() {
     test('reports broken when a leftover .upgrading directory remains',
         () async {
       final checker = InstallHealthChecker(
+        isLinux: false,
         fileExists: (_) async => true,
         listEntries: (dirPath) async =>
             dirPath.endsWith('/Caskroom/moost') ? ['1.9.0.upgrading'] : [],
@@ -36,8 +39,20 @@ void main() {
     test('reports healthy when Caskroom directories do not exist (non-brew '
         'install)', () async {
       final checker = InstallHealthChecker(
+        isLinux: false,
         fileExists: (_) async => true,
         listEntries: (_) async => const [],
+      );
+
+      expect(await checker.isBroken(), isFalse);
+    });
+
+    test('Linux: always reports healthy (no Homebrew Cask concept)',
+        () async {
+      final checker = InstallHealthChecker(
+        isLinux: true,
+        fileExists: (_) async => false,
+        listEntries: (_) async => const ['broken.upgrading'],
       );
 
       expect(await checker.isBroken(), isFalse);

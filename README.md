@@ -15,9 +15,35 @@ Memo + Roost — AI コーディングエージェント CLI のセッション�
   あらかじめ登録しておけば新規セッションをワンクリックで開始できる
 - **マルチエージェント対応**: Claude Code / Codex CLI の両方に対応
 - **アプリ内更新通知**: 新しいバージョンが出ると通知し、Homebrew 導入なら
-  ワンクリックで更新できる
+  ワンクリックで更新できる（Linux はリリースページへの案内のみ）
 
-## インストール（macOS）
+## インストール（macOS / Linux）
+
+### Linux (Ubuntu / Debian)
+
+[Releases](https://github.com/rami2076/moost/releases) から `.deb` をダウンロードし、
+以下のどちらかで導入する（Ubuntu 24.04 で検証済み）。
+
+```bash
+# gh CLI なら
+gh release download -R rami2076/moost -p '*.deb' -D ~/Downloads
+sudo apt install ~/Downloads/moost_*.deb
+```
+
+- ランチャーから「Moost」で起動できるほか、`moost` コマンドでも起動できる
+  （シンボリックリンク経由）。
+- トレイアイコンは AppIndicator 経由。Ubuntu 標準の GNOME では既定で有効。
+  出ない場合は拡張機能「AppIndicator and KStatusNotifierItem Support」を
+  有効にする:
+
+  ```bash
+  gnome-extensions enable ubuntu-appindicators@ubuntu.com
+  ```
+
+  拡張を入れられない環境では、通常ウィンドウとして動作する（フォールバック）。
+- 更新通知が来たらボタンでリリースページが開く。`.deb` を入れ替えて更新する。
+
+### macOS
 
 ### Homebrew（推奨）
 

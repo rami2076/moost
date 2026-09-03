@@ -194,6 +194,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingCopyAnimation => 'コピー成功アニメーション';
 
   @override
+  String get settingTrayClickMode => 'トレイのクリック動作（Linux）';
+
+  @override
+  String get settingTrayClickModeNone => '通常（シングルクリックはメニュー）';
+
+  @override
+  String get settingTrayClickModeFakeDouble => '1クリックをダブル扱い（メニューなしで開く）';
+
+  @override
+  String get settingTrayClickModeCloseMenu => '開いた直後にメニューを自動クローズ';
+
+  @override
   String get settingMcpSectionTitle => 'MCP 連携';
 
   @override
@@ -253,7 +265,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get noteAutomationBody =>
-      'セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます。一度「許可」を選べば以後は表示されません。';
+      'セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます（一度「許可」を選べば以後は出ません）。ターミナルは別ウィンドウで開きます（macOS: Terminal.app / iTerm2、Linux: gnome-terminal）。Linux ではこの権限ダイアログは出ません。';
 
   @override
   String get noteRetentionTitle => 'セッションの保持期間';

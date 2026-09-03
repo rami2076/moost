@@ -59,8 +59,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool? _codexConnected;
   bool? _claudeDesktopConnected;
 
-  static const _terminals = ['Terminal.app', 'iTerm2'];
+  /// 選択可能なターミナル。Linux は gnome-terminal のみ（Q3。設定値として
+  /// 保存しつつ macOS⇔Linux の差異は TerminalLauncher 側で正規化する）。
+  static List<String> get _terminals =>
+      Platform.isLinux ? const ['gnome-terminal'] : const ['Terminal.app', 'iTerm2'];
 
+  /// トレイのクリック補正モード（設定画面の表示順）。
+  static const _trayClickModes = [
+    Settings.trayClickModeNone,
+    Settings.trayClickModeFakeDouble,
+    Settings.trayClickModeCloseMenu,
+  ];
   @override
   void initState() {
     super.initState();
@@ -301,6 +310,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               settings.copyWith(copyAnimation: value));
                         },
                       ),
+
+                      // トレイのクリック動作（Linux のみ。macOS では無意味なので非表示）
+                      if (Platform.isLinux) ...[
+                        const SizedBox(height: 16),
+                        Text(l10n.settingTrayClickMode,
+                            style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 4),
+                        DropdownMenu<int>(
+                          initialSelection: settings.trayClickMode,
+                          requestFocusOnTap: false,
+                          expandedInsets: EdgeInsets.zero,
+                          dropdownMenuEntries: [
+                            for (final mode in _trayClickModes)
+                              DropdownMenuEntry(
+                                value: mode,
+                                label: switch (mode) {
+                                  0 => l10n.settingTrayClickModeNone,
+                                  1 => l10n.settingTrayClickModeFakeDouble,
+                                  _ => l10n.settingTrayClickModeCloseMenu,
+                                },
+                              ),
+                          ],
+                          onSelected: (value) {
+                            if (value != null) {
+                              _update(settings.copyWith(trayClickMode: value));
+                            }
+                          },
+                        ),
+                      ],
 
                       // MCP 連携（Issue #45）: Claude Code / Codex CLI /
                       // Claude Desktop へワンクリックで登録する。バイナリは

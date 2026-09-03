@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -22,23 +23,48 @@ Future<void> main() async {
 
   // トレイメニューはウィジェットツリー外なので、OS ロケールから文言を引く
   final l10n = lookupAppLocalizations(PlatformDispatcher.instance.locale);
+  final settingsStore = SettingsStore.defaultLocation();
+  final settings = await settingsStore.load();
   final tray = TrayService(
     openLabel: l10n.trayOpen,
     quitLabel: l10n.trayQuit,
+    // トレイのクリック補正モード（Linux のみ有効）
+    trayClickMode: settings.trayClickMode,
   );
 
-  // ポップオーバー風の固定ウィンドウ: タイトルバーなし・移動/リサイズ不可
-  const windowOptions = WindowOptions(
-    size: Size(570, 660),
-    skipTaskbar: true,
-    titleBarStyle: TitleBarStyle.hidden,
-    windowButtonVisibility: false,
-  );
-  await tray.init();
+  // トレイ登録の可否を先に判定する（Linux/GNOME は AppIndicator 拡張が
+  // ないと失敗する）。成功 = ポップオーバー風の固定ウィンドウ、
+  // 失敗 = 通常ウィンドウとして起動時に表示（Q4 のフォールバック）。
+  final trayAvailable = await tray.init();
+
+  final windowOptions = trayAvailable
+      // ポップオーバー風の固定ウィンドウ: タイトルバーなし・タスクバー非表示
+      ? const WindowOptions(
+          size: Size(570, 660),
+          skipTaskbar: true,
+          titleBarStyle: TitleBarStyle.hidden,
+          windowButtonVisibility: false,
+        )
+      // トレイなしフォールバック: 通常ウィンドウ（タイトルバーあり・中央）
+      : const WindowOptions(
+          size: Size(570, 660),
+          center: true,
+          title: 'Moost',
+        );
+
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.setMovable(false);
-    await windowManager.setResizable(false);
-    // 起動時はトレイアイコンだけ。ウィンドウはトレイクリックで初めて表示する
+    // window_manager は Linux で setMovable/setResizable を実装していない。
+    // macOS のみ移動/リサイズ不可にする（Linux では何もしない）
+    if (!Platform.isLinux) {
+      await windowManager.setMovable(false);
+      await windowManager.setResizable(false);
+    }
+    if (trayAvailable) {
+      // 起動時はトレイアイコンだけ。ウィンドウはトレイクリックで初めて表示する
+    } else {
+      // フォールバック: 通常ウィンドウとして最初から表示する
+      await windowManager.show();
+    }
   });
 
   final packageInfo = await PackageInfo.fromPlatform();
@@ -47,10 +73,11 @@ Future<void> main() async {
     registry: AdapterRegistry([
       ClaudeCodeAdapter(),
       CodexAdapter(),
+      PiAdapter(),
     ]),
     memoStore: MemoStore.defaultLocation(),
     projectStore: ProjectStore.defaultLocation(),
-    settingsStore: SettingsStore.defaultLocation(),
+    settingsStore: settingsStore,
     windowShown: tray.shownCount,
     updateChecker: UpdateChecker(currentVersion: packageInfo.version),
     appVersion: packageInfo.version,
@@ -58,7 +85,8 @@ Future<void> main() async {
     // 経由の一覧再読込を伴い、フォルダ選択ダイアログを閉じた直後に呼ぶと
     // 「配置し直し」と「再読込」が二重に走ってちらつく。ここでは今の位置の
     // まま show/focus するだけでよい（RootScreen.defaultShowWindow）
-    withoutWindowHide: tray.withoutBlurHide,
+    // トレイなしフォールバックでは blur で隠れる挙動自体が無いので null。
+    withoutWindowHide: trayAvailable ? tray.withoutBlurHide : null,
   ));
 }
 
@@ -166,6 +194,18 @@ class MoostApp extends StatelessWidget {
       colorSchemeSeed: Colors.teal,
       textTheme: textTheme,
       useMaterial3: true,
+      // Linux(Flutter エンジン)は既定フォント族から CJK へ fallback せず
+      // 豆腐になる問題があるため、OS ごとの日本語フォントを明示的に
+      // フォールバックに並べる。macOS: Hiragino/Yu Gothic、
+      // Linux: Noto Sans CJK JP（Ubuntu は fonts-noto-cjk で導入）
+      fontFamilyFallback: const [
+        'Noto Sans CJK JP',
+        'Yu Gothic',
+        'Hiragino Kaku Gothic ProN',
+        'Hiragino Sans',
+        'PingFang SC',
+        'Microsoft YaHei',
+      ],
     );
   }
 }

@@ -196,6 +196,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingCopyAnimation => 'Copy success animation';
 
   @override
+  String get settingTrayClickMode => 'Tray click behavior (Linux)';
+
+  @override
+  String get settingTrayClickModeNone => 'Normal (single click shows the menu)';
+
+  @override
+  String get settingTrayClickModeFakeDouble =>
+      'Treat a single click as a double click (opens without the menu)';
+
+  @override
+  String get settingTrayClickModeCloseMenu =>
+      'Auto-close the menu after opening';
+
+  @override
   String get settingMcpSectionTitle => 'MCP integration';
 
   @override
@@ -255,7 +269,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteAutomationBody =>
-      'The first time you resume a session, macOS asks for automation permission. Allow it once and it won\'t ask again.';
+      'The first time you resume a session, macOS asks for automation permission; allow it once and it won\'t ask again. TIP: a terminal opens in a new window (macOS: Terminal.app / iTerm2, Linux: gnome-terminal).';
 
   @override
   String get noteRetentionTitle => 'Session retention';

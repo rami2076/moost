@@ -971,6 +971,14 @@ void main() {
       await settle(tester);
 
       await tester.tap(find.widgetWithText(TextButton, 'Settings'));
+      // Linux テストでは「トレイ動作」設定が入り MCP 欄が下に押されるため
+      // スクロールして見つける（画面遷移が終わってから）
+      await settle(tester);
+      await tester.dragUntilVisible(
+        find.textContaining('MCP server binary'),
+        find.byType(ListView),
+        const Offset(0, -200),
+      );
       await waitFor(tester, find.textContaining('MCP server binary'));
       expect(find.textContaining('MCP server binary'), findsOneWidget);
       // バイナリがない場合は連携先の行自体を出さない
@@ -1175,12 +1183,14 @@ class _FakeBrewUpdater extends BrewUpdater {
 /// （updateChecker を渡すテストは実機の /Applications/Moost.app や
 /// Caskroom を見に行かないよう、明示的にこれを注入する）。
 InstallHealthChecker _healthyInstallChecker() => InstallHealthChecker(
+      isLinux: false,
       fileExists: (_) async => true,
       listEntries: (_) async => const [],
     );
 
 /// 常に「壊れている」と判定する InstallHealthChecker（修復フローのテスト用）。
 InstallHealthChecker _brokenInstallChecker() => InstallHealthChecker(
+      isLinux: false,
       fileExists: (_) async => false,
       listEntries: (_) async => const [],
     );

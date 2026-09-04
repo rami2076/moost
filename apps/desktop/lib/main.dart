@@ -73,7 +73,13 @@ Future<void> main() async {
     registry: AdapterRegistry([
       ClaudeCodeAdapter(),
       CodexAdapter(),
-      PiAdapter(),
+      PiAdapter(
+        // pi は起動時にヘッドレスでなく資格されたモデルを要求するため、
+        // デフォルトだとサーバー非配信のモデルになり 404 で固まる
+        // （Issue #68）。設定で明示できるようにする。
+        provider: settings.piProvider,
+        model: settings.piModel,
+      ),
     ]),
     memoStore: MemoStore.defaultLocation(),
     projectStore: ProjectStore.defaultLocation(),

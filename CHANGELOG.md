@@ -3,6 +3,17 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [Unreleased]
+
+### Fixed
+
+- **Issue #68: pi セッションの再開・新規作成でモデル 404 になる問題**:
+  pi は起動時に現在の既定 model/provider を使うため、セッションが使っていた
+  ローカルモデルがサーバーで配信されていないと再開・新規作成とも最初の
+  やり取りで 404 になるのを、設定画面から pi の provider / model を指定して
+  `pi --provider <p> --model <m>` で起動できるようにして回避。
+  設定はアプリ再起動後に反映（PiAdapter は起動時に構築されるため）。
+
 ## [1.11.0] - 2026-09-03
 
 ### Added (Linux / Ubuntu)

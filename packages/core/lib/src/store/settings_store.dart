@@ -22,6 +22,14 @@ class Settings {
   /// 2: メニュー自動クローズ。
   final int trayClickMode;
 
+  /// pi 起動時に指定する provider 名（空なら付けない）。
+  /// ローカル LLM を複数切り替える環境だと pi 側の既定モデルが
+  /// 配信されず 404 になることがあるため、明示できるようにする（Issue #68）。
+  final String piProvider;
+
+  /// pi 起動時に指定する model 名（空なら付けない）。
+  final String piModel;
+
   /// 既定値は「ダブルクリック扱い（A）」。macOS では使われないため
   /// この既定値が macOS に悪影響はない。
   static const int trayClickModeDefault = 1;
@@ -38,6 +46,8 @@ class Settings {
     this.summaryRallyCount = 1,
     this.copyAnimation = true,
     this.trayClickMode = trayClickModeDefault,
+    this.piProvider = '',
+    this.piModel = '',
   });
 
   Settings copyWith({
@@ -47,6 +57,8 @@ class Settings {
     int? summaryRallyCount,
     bool? copyAnimation,
     int? trayClickMode,
+    String? piProvider,
+    String? piModel,
   }) {
     return Settings(
       terminalApp: terminalApp ?? this.terminalApp,
@@ -55,6 +67,8 @@ class Settings {
       summaryRallyCount: summaryRallyCount ?? this.summaryRallyCount,
       copyAnimation: copyAnimation ?? this.copyAnimation,
       trayClickMode: trayClickMode ?? this.trayClickMode,
+      piProvider: piProvider ?? this.piProvider,
+      piModel: piModel ?? this.piModel,
     );
   }
 
@@ -65,6 +79,8 @@ class Settings {
         'summaryRallyCount': summaryRallyCount,
         'copyAnimation': copyAnimation,
         'trayClickMode': trayClickMode,
+        'piProvider': piProvider,
+        'piModel': piModel,
       };
 
   factory Settings.fromJson(Map<String, Object?> json) {
@@ -94,6 +110,8 @@ class Settings {
           integer('summaryRallyCount', defaults.summaryRallyCount),
       copyAnimation: boolean('copyAnimation', defaults.copyAnimation),
       trayClickMode: integer('trayClickMode', defaults.trayClickMode),
+      piProvider: str('piProvider', defaults.piProvider),
+      piModel: str('piModel', defaults.piModel),
     );
   }
 }

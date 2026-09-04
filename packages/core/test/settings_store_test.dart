@@ -23,6 +23,9 @@ void main() {
     expect(settings.claudePath, '');
     expect(settings.summaryRallyCount, 1);
     expect(settings.copyAnimation, isTrue);
+    // Issue #68: pi の provider/model は既定では空（フラグを付けない）
+    expect(settings.piProvider, '');
+    expect(settings.piModel, '');
   });
 
   test('save and load roundtrip', () async {
@@ -32,6 +35,8 @@ void main() {
       claudePath: '~/.local/bin/claude',
       summaryRallyCount: 5,
       copyAnimation: false,
+      piProvider: 'dspark',
+      piModel: 'deepseek-v4-flash-0731',
     ));
 
     final settings = await store.load();
@@ -40,6 +45,8 @@ void main() {
     expect(settings.claudePath, '~/.local/bin/claude');
     expect(settings.summaryRallyCount, 5);
     expect(settings.copyAnimation, isFalse);
+    expect(settings.piProvider, 'dspark');
+    expect(settings.piModel, 'deepseek-v4-flash-0731');
   });
 
   test('unknown or missing keys fall back to defaults', () async {
@@ -52,6 +59,16 @@ void main() {
     expect(settings.recentSessionLimit, 20);
     // 旧バージョンの settings.json に copyAnimation はない → デフォルト true
     expect(settings.copyAnimation, isTrue);
+  });
+
+  test('piProvider only; missing piModel falls back to default', () async {
+    final file = File('${tempDir.path}/v1/settings.json');
+    await file.parent.create(recursive: true);
+    await file.writeAsString('{"schemaVersion":1,"piProvider":"glm"}');
+
+    final settings = await store.load();
+    expect(settings.piProvider, 'glm');
+    expect(settings.piModel, '');
   });
 
   test('wrong value types fall back to defaults without crashing', () async {

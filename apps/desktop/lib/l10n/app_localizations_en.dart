@@ -193,6 +193,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingClaudePathNotFound => 'Auto-detect: not found';
 
   @override
+  String get settingPiProvider =>
+      'pi provider (passed as --provider at launch)';
+
+  @override
+  String get settingPiModel => 'pi model (passed as --model at launch)';
+
+  @override
+  String get settingPiHint => 'Leave empty to use pi\'s default';
+
+  @override
+  String get settingPiRestartNote => '* Requires app restart to take effect';
+
+  @override
   String get settingCopyAnimation => 'Copy success animation';
 
   @override

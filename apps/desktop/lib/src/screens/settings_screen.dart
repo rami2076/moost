@@ -45,6 +45,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   Settings? _settings;
   late final TextEditingController _claudePath;
+  late final TextEditingController _piProvider;
+  late final TextEditingController _piModel;
   String? _detectedPath;
 
   bool _mcpBinaryExists = false;
@@ -74,6 +76,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _claudePath = TextEditingController();
+    _piProvider = TextEditingController();
+    _piModel = TextEditingController();
     _load();
   }
 
@@ -86,6 +90,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _settings = settings;
       _claudePath.text = settings.claudePath;
+      _piProvider.text = settings.piProvider;
+      _piModel.text = settings.piModel;
       _detectedPath = detected;
       _mcpBinaryExists = mcpBinaryExists;
       // 連携状態は下の _loadMcpConnectionStatus() が別途非同期で埋める。
@@ -177,6 +183,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _claudePath.dispose();
+    _piProvider.dispose();
+    _piModel.dispose();
     super.dispose();
   }
 
@@ -292,6 +300,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _detectedPath == null
                             ? l10n.settingClaudePathNotFound
                             : l10n.settingClaudePathDetected(_detectedPath!),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // pi の provider / model（空欄なら pi の既定に従う）
+                      Text(l10n.settingPiProvider,
+                          style: theme.textTheme.bodySmall),
+                      TextField(
+                        controller: _piProvider,
+                        decoration: InputDecoration(
+                          hintText: l10n.settingPiHint,
+                          isDense: true,
+                        ),
+                        onSubmitted: (value) async {
+                          await _update(settings.copyWith(piProvider: value));
+                          await _load();
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(l10n.settingPiModel,
+                          style: theme.textTheme.bodySmall),
+                      TextField(
+                        controller: _piModel,
+                        decoration: InputDecoration(
+                          hintText: l10n.settingPiHint,
+                          isDense: true,
+                        ),
+                        onSubmitted: (value) async {
+                          await _update(settings.copyWith(piModel: value));
+                          await _load();
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.settingPiRestartNote,
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 16),

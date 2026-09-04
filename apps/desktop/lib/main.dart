@@ -25,6 +25,17 @@ Future<void> main() async {
   final l10n = lookupAppLocalizations(PlatformDispatcher.instance.locale);
   final settingsStore = SettingsStore.defaultLocation();
   final settings = await settingsStore.load();
+
+  // Issue #68: 未設定の場合は pi が実際に使えるモデル（サーバー配信中）を
+  // 自動検出する。設定があればそれが優先。失敗しても既定（フラグなし）に
+  // 戻るだけで害はない。
+  final detected = await PiModelProbe().detectServedModel();
+  final piProvider = settings.piProvider.isNotEmpty
+      ? settings.piProvider
+      : (detected?.$1 ?? '');
+  final piModel = settings.piModel.isNotEmpty
+      ? settings.piModel
+      : (detected?.$2 ?? '');
   final tray = TrayService(
     openLabel: l10n.trayOpen,
     quitLabel: l10n.trayQuit,
@@ -74,11 +85,10 @@ Future<void> main() async {
       ClaudeCodeAdapter(),
       CodexAdapter(),
       PiAdapter(
-        // pi は起動時にヘッドレスでなく資格されたモデルを要求するため、
-        // デフォルトだとサーバー非配信のモデルになり 404 で固まる
-        // （Issue #68）。設定で明示できるようにする。
-        provider: settings.piProvider,
-        model: settings.piModel,
+        // pi は起動時に既定モデルを使うためサーバー非配信だと 404 になる
+        // （Issue #68）。設定 or 自動検出のモデルを明示する。
+        provider: piProvider,
+        model: piModel,
       ),
     ]),
     memoStore: MemoStore.defaultLocation(),

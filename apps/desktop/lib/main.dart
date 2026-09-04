@@ -26,16 +26,14 @@ Future<void> main() async {
   final settingsStore = SettingsStore.defaultLocation();
   final settings = await settingsStore.load();
 
-  // Issue #68: 未設定の場合は pi が実際に使えるモデル（サーバー配信中）を
-  // 自動検出する。設定があればそれが優先。失敗しても既定（フラグなし）に
-  // 戻るだけで害はない。
-  final detected = await PiModelProbe().detectServedModel();
-  final piProvider = settings.piProvider.isNotEmpty
-      ? settings.piProvider
-      : (detected?.$1 ?? '');
-  final piModel = settings.piModel.isNotEmpty
-      ? settings.piModel
-      : (detected?.$2 ?? '');
+  // Issue #68: 設定が両方ある場合はそれをそのまま使う（起動遅延を避ける）。
+  // 未設定なら pi が実際に使えるモデル（サーバー配信中）を自動検出する。
+  // 検出失敗時は既定（フラグなし）に戻るだけで害はない。
+  final (piProvider, piModel) =
+      settings.piProvider.isNotEmpty && settings.piModel.isNotEmpty
+          ? (settings.piProvider, settings.piModel)
+          : await _resolvePiLaunch(settings);
+
   final tray = TrayService(
     openLabel: l10n.trayOpen,
     quitLabel: l10n.trayQuit,
@@ -104,6 +102,21 @@ Future<void> main() async {
     // トレイなしフォールバックでは blur で隠れる挙動自体が無いので null。
     withoutWindowHide: trayAvailable ? tray.withoutBlurHide : null,
   ));
+}
+
+/// Issue #68: moost からの pi 起動に使用する provider/model を決める。
+/// 設定は両方埋まっている時に限りそのまま使う（片方だけだと不一致に
+/// なり得るため検出結果で補完）。どちらも無ければサーバー配信を探る。
+Future<(String, String)> _resolvePiLaunch(Settings settings) async {
+  try {
+    final detected = await PiModelProbe().detectServedModel();
+    return (
+      settings.piProvider.isNotEmpty ? settings.piProvider : (detected?.$1 ?? ''),
+      settings.piModel.isNotEmpty ? settings.piModel : (detected?.$2 ?? ''),
+    );
+  } on Object {
+    return (settings.piProvider, settings.piModel);
+  }
 }
 
 class MoostApp extends StatelessWidget {

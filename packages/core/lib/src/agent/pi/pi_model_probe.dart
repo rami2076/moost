@@ -1,26 +1,37 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// pi の設定（`~/.pi/agent/models.json`）に載っている provider/model のうち、
-/// 実際にサーバーが配信している 1 組を返す。
+/// pi の設定（`~/.pi/agent/models.json` と `settings.json`）から、
+/// 実際にサーバーが配信している provider/model を 1 組返す。
 ///
 /// pi は起動時に既定 provider/model を使うため、複数のローカル LLM を
 /// 切り替える環境では既定モデルが配信されておらず 404 になる（Issue #68）。
 /// moost から復帰・新規作成するコマンドに配信中のモデルを渡せば、
 /// 設定なしでも動くようになる。検出できない場合は null（pi 既定に従う）。
+///
+/// 対応していない環境（OpenAI 互換 /models を持たないプロバイダのみ、
+/// サーバーが停止中、settings.json の既定モデルが不在など）では null を
+/// 返すだけで壊れない。仕組み上「最善努力」であり、固定指定が確実。
 class PiModelProbe {
   /// pi の models.json。テストで差し替えられるようにする。
   final File modelsFile;
+
+  /// pi の settings.json（defaultProvider / defaultModel の参照用）。
+  final File settingsFile;
 
   /// HTTP クライアント生成（テストで置き換え可能）。
   final HttpClient Function() httpClientFactory;
 
   PiModelProbe({
     File? modelsFile,
+    File? settingsFile,
     HttpClient Function()? httpClientFactory,
   })  : modelsFile =
             modelsFile ??
                 File('${Platform.environment['HOME'] ?? ''}/.pi/agent/models.json'),
+        settingsFile =
+            settingsFile ??
+                File('${Platform.environment['HOME'] ?? ''}/.pi/agent/settings.json'),
         httpClientFactory =
             httpClientFactory ?? (() => HttpClient());
 
@@ -38,6 +49,19 @@ class PiModelProbe {
 
     final client = httpClientFactory();
     try {
+      // pi の既定 (provider, model) が配信されていればそれを最優先で使う。
+      // これが本来 pi が使う想定のものなので、挙動を変えずに確実化できる。
+      final (defaultProvider, defaultModel) = _readDefaultOr(('', ''));
+      if (defaultProvider.isNotEmpty && defaultModel.isNotEmpty) {
+        final baseUrl = _baseUrlOf(providers, defaultProvider);
+        if (baseUrl != null) {
+          final served = await _fetchServedModelIds(client, baseUrl);
+          if (served?.contains(defaultModel) ?? false) {
+            return (defaultProvider, defaultModel);
+          }
+        }
+      }
+
       for (final entry in providers.entries) {
         final providerName = entry.key;
         final provider = entry.value;
@@ -64,10 +88,7 @@ class PiModelProbe {
           continue; // 接続できない provider は飛ばす
         }
         // 設定に載っている ID の中で「サーバーが実際に配信している」ものを優先
-        final matched = served
-            .where(ids.contains)
-            .toList()
-          ..sort();
+        final matched = served.where(ids.contains).toList()..sort();
         if (matched.isNotEmpty) {
           return (providerName, matched.first);
         }
@@ -78,6 +99,38 @@ class PiModelProbe {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// settings.json の defaultProvider / defaultModel（無ければ空）。
+  (String, String) _readDefaultOr((String, String) fallback) {
+    try {
+      if (!settingsFile.existsSync()) {
+        return fallback;
+      }
+      final decoded = jsonDecode(settingsFile.readAsStringSync());
+      if (decoded is! Map<String, Object?>) {
+        return fallback;
+      }
+      final p = decoded['defaultProvider'];
+      final m = decoded['defaultModel'];
+      return (
+        p is String ? p : fallback.$1,
+        m is String ? m : fallback.$2,
+      );
+    } on Object {
+      return fallback;
+    }
+  }
+
+  /// provider 名から baseUrl を引く。なければ null。
+  String? _baseUrlOf(
+      Map<String, Object?> providers, String providerName) {
+    final provider = providers[providerName];
+    if (provider is! Map<String, Object?>) {
+      return null;
+    }
+    final baseUrl = provider['baseUrl'];
+    return baseUrl is String && baseUrl.isNotEmpty ? baseUrl : null;
   }
 
   Map<String, Object?>? _readProviders(File file) {

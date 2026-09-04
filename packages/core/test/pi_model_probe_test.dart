@@ -38,6 +38,16 @@ void main() {
     return file;
   }
 
+  /// 既定 provider/model を持つ settings.json を書く（無ければ ''.''）
+  File writeSettings({String provider = '', String model = ''}) {
+    final file = File('${tempDir.path}/settings.json');
+    file.writeAsStringSync(jsonEncode({
+      if (provider.isNotEmpty) 'defaultProvider': provider,
+      if (model.isNotEmpty) 'defaultModel': model,
+    }));
+    return file;
+  }
+
   test('detects the first provider/model that the server serves', () async {
     final server = await startServing(['deepseek-v4-flash-0731']);
     addTearDown(() => server.close(force: true));
@@ -58,11 +68,43 @@ void main() {
       },
     });
 
-    final probe = PiModelProbe(modelsFile: file);
+    final probe = PiModelProbe(
+      modelsFile: file,
+      settingsFile: writeSettings(),
+    );
     final result = await probe.detectServedModel();
     expect(result, isNotNull);
     expect(result!.$1, 'dspark');
     expect(result.$2, 'deepseek-v4-flash-0731');
+  });
+
+  test('served default model is preferred even when later providers match',
+      () async {
+    final server = await startServing(
+        ['deepseek-v4-flash-0731', 'gemma-4-26B-A4B']);
+    addTearDown(() => server.close(force: true));
+    final file = writeModels({
+      'gemma4': {
+        'baseUrl': 'http://127.0.0.1:${server.port}/v1',
+        'models': [
+          {'id': 'gemma-4-26B-A4B'},
+        ],
+      },
+      'dspark': {
+        'baseUrl': 'http://127.0.0.1:${server.port}/v1',
+        'models': [
+          {'id': 'deepseek-v4-flash-0731'},
+        ],
+      },
+    });
+    final probe = PiModelProbe(
+      modelsFile: file,
+      settingsFile: writeSettings(provider: 'gemma4', model: 'gemma-4-26B-A4B'),
+    );
+    final result = await probe.detectServedModel();
+    expect(result, isNotNull);
+    expect(result!.$1, 'gemma4');
+    expect(result.$2, 'gemma-4-26B-A4B');
   });
 
   test('returns null when no configured model is served', () async {
@@ -76,13 +118,45 @@ void main() {
         ],
       },
     });
-    final probe = PiModelProbe(modelsFile: file);
+    final probe = PiModelProbe(
+      modelsFile: file,
+      settingsFile: writeSettings(),
+    );
     expect(await probe.detectServedModel(), isNull);
+  });
+
+  test('non-served default falls back to scanning other providers', () async {
+    // settings.json で既定は gemma4 だが配信は dspark のみ → 走査で dspark を選ぶ
+    final server = await startServing(['deepseek-v4-flash-0731']);
+    addTearDown(() => server.close(force: true));
+    final file = writeModels({
+      'gemma4': {
+        'baseUrl': 'http://127.0.0.1:${server.port}/v1',
+        'models': [
+          {'id': 'gemma-4-26B-A4B'},
+        ],
+      },
+      'dspark': {
+        'baseUrl': 'http://127.0.0.1:${server.port}/v1',
+        'models': [
+          {'id': 'deepseek-v4-flash-0731'},
+        ],
+      },
+    });
+    final probe = PiModelProbe(
+      modelsFile: file,
+      settingsFile: writeSettings(provider: 'gemma4', model: 'gemma-4-26B-A4B'),
+    );
+    final result = await probe.detectServedModel();
+    expect(result, isNotNull);
+    expect(result!.$1, 'dspark');
+    expect(result.$2, 'deepseek-v4-flash-0731');
   });
 
   test('returns null when models.json is missing or malformed', () async {
     final missing = PiModelProbe(
       modelsFile: File('${tempDir.path}/nope.json'),
+      settingsFile: writeSettings(),
     );
     expect(await missing.detectServedModel(), isNull);
 
@@ -92,6 +166,7 @@ void main() {
         f.writeAsStringSync('not json');
         return f;
       })(),
+      settingsFile: writeSettings(),
     );
     expect(await malformed.detectServedModel(), isNull);
   });
@@ -111,7 +186,10 @@ void main() {
         ],
       },
     });
-    final probe = PiModelProbe(modelsFile: file);
+    final probe = PiModelProbe(
+      modelsFile: file,
+      settingsFile: writeSettings(),
+    );
     expect(await probe.detectServedModel(), isNull);
   });
 }

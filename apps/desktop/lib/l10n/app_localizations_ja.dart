@@ -191,6 +191,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingClaudePathNotFound => '自動検出: 見つかりません';
 
   @override
+  String get settingPiProvider => 'pi の provider（起動時に --provider を渡す）';
+
+  @override
+  String get settingPiModel => 'pi の model（起動時に --model を渡す）';
+
+  @override
+  String get settingPiHint => '空欄で pi の既定に従う';
+
+  @override
+  String get settingPiRestartNote => '※ 反映にはアプリの再起動が必要です';
+
+  @override
   String get settingCopyAnimation => 'コピー成功アニメーション';
 
   @override

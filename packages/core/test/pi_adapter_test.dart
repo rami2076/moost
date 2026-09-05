@@ -167,6 +167,41 @@ void main() {
       );
     });
 
+    group('configured provider/model (Issue #68)', () {
+      test('resume passes --provider and --model', () {
+        final adapter = PiAdapter(
+            provider: 'dspark', model: 'deepseek-v4-flash-0731');
+        final command = adapter.buildResumeCommand(
+          projectPath: '/work/moost',
+          sessionId: '01bbbb',
+        );
+        expect(
+          command,
+          "cd '/work/moost' && pi --session '01bbbb' "
+          "--provider 'dspark' --model 'deepseek-v4-flash-0731'",
+        );
+      });
+
+      test('new session passes --provider and --model', () {
+        final adapter = PiAdapter(
+            provider: 'dspark', model: 'deepseek-v4-flash-0731');
+        expect(
+          adapter.buildNewSessionCommand(projectPath: '/work/moost'),
+          "cd '/work/moost' && pi --provider 'dspark' "
+          "--model 'deepseek-v4-flash-0731'",
+        );
+      });
+
+      test('resume with only model omits --provider', () {
+        final adapter = PiAdapter(model: 'Qwen3-8B-AWQ');
+        final command = adapter.buildResumeCommand(
+          projectPath: '',
+          sessionId: '01cccc',
+        );
+        expect(command, "pi --session '01cccc' --model 'Qwen3-8B-AWQ'");
+      });
+    });
+
     test('recentSessions returns sessions from the directory', () async {
       final root = await sessionsRoot();
       await writeSession(

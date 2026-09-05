@@ -16,10 +16,18 @@ import 'pi_transcript_extractor.dart';
 class PiAdapter implements AgentAdapter {
   static const id = 'pi';
 
+  /// 起動時に指定する provider 名（空なら付けない）。
+  final String provider;
+
+  /// 起動時に指定する model 名（空なら付けない）。
+  final String model;
+
   final PiSessionHistoryReader _historyReader;
   final PiTranscriptExtractor _transcriptExtractor;
 
   PiAdapter({
+    this.provider = '',
+    this.model = '',
     PiSessionHistoryReader? historyReader,
     PiTranscriptExtractor? transcriptExtractor,
   })  : _historyReader = historyReader ?? PiSessionHistoryReader(),
@@ -52,16 +60,26 @@ class PiAdapter implements AgentAdapter {
     required String projectPath,
     required String sessionId,
   }) {
-    final resume = 'pi --session ${shellEscape(sessionId)}';
-    if (projectPath.isEmpty) {
-      return resume;
-    }
-    return 'cd ${shellEscape(projectPath)} && $resume';
+    return _build('pi --session ${shellEscape(sessionId)}', projectPath);
   }
 
   @override
   String buildNewSessionCommand({required String projectPath}) {
-    return 'cd ${shellEscape(projectPath)} && pi';
+    return _build('pi', projectPath);
+  }
+
+  /// `prefix`（例: `pi --session <id>`）にプロジェクト cd と
+  /// provider / model 指定を連結する。
+  String _build(String prefix, String projectPath) {
+    final flags = [
+      if (provider.isNotEmpty) '--provider ${shellEscape(provider)}',
+      if (model.isNotEmpty) '--model ${shellEscape(model)}',
+    ].join(' ');
+    final command = flags.isEmpty ? prefix : '$prefix $flags';
+    if (projectPath.isEmpty) {
+      return command;
+    }
+    return 'cd ${shellEscape(projectPath)} && $command';
   }
 
   @override

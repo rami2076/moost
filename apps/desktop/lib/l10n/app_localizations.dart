@@ -422,6 +422,30 @@ abstract class AppLocalizations {
   /// **'Auto-detect: not found'**
   String get settingClaudePathNotFound;
 
+  /// pi adapter provider
+  ///
+  /// In en, this message translates to:
+  /// **'pi provider (passed as --provider at launch)'**
+  String get settingPiProvider;
+
+  /// pi adapter model
+  ///
+  /// In en, this message translates to:
+  /// **'pi model (passed as --model at launch)'**
+  String get settingPiModel;
+
+  /// placeholder for provider/model inputs
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to use pi\'s default'**
+  String get settingPiHint;
+
+  /// note that settings apply after restart
+  ///
+  /// In en, this message translates to:
+  /// **'* Requires app restart to take effect'**
+  String get settingPiRestartNote;
+
   /// No description provided for @settingCopyAnimation.
   ///
   /// In en, this message translates to:

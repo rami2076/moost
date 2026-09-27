@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "moost projects.json",
+  "description": "登録プロジェクト（~/.moost/v1/projects.json）。v2 でも形式不変。displayName は保存せず projectPath から都度導出する（requirements.md 3.8）。正は packages/core/lib/src/model/project.dart と store/project_store.dart。",
+  "type": "object",
+  "required": ["schemaVersion", "projects"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/project" }
+    }
+  },
+  "definitions": {
+    "project": {
+      "type": "object",
+      "required": ["id", "projectPath", "createdAt"],
+      "properties": {
+        "id": { "type": "string", "description": "UUIDv4" },
+        "projectPath": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "UTC ISO8601" }
+      }
+    }
+  }
+}

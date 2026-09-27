@@ -1,0 +1,10 @@
+{"display":"first prompt","timestamp":1000,"project":"/work/alpha","sessionId":"S1"}
+{"display":"second prompt","timestamp":2000,"project":"/work/alpha","sessionId":"S1"}
+{"display":"normal prompt","timestamp":1500,"project":"/work/beta","sessionId":"S2"}
+{"display":"#MOOST-FORK# 要約用フォークの行","timestamp":3000,"project":"/work/beta","sessionId":"S2"}
+この行は JSON でないので無視される
+{"display":"empty line below","timestamp":2500,"project":"/work/gamma","sessionId":"S3"}
+
+{"display":"third prompt","timestamp":4000,"project":"/work/gamma","sessionId":"S3"}
+{"display":"#MOOST-FORK# 要約プロンプト1","timestamp":5000,"project":"/work/delta","sessionId":"S4"}
+{"display":"#MOOST-FORK# 要約プロンプト2","timestamp":5500,"project":"/work/delta","sessionId":"S4"}

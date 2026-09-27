@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "moost memos.json",
+  "description": "メモ永続化ファイル（~/.moost/v1/memos.json）。v2（native）でも形式不変。実装の正は packages/core/lib/src/model/memo.dart と store/memo_store.dart。",
+  "type": "object",
+  "required": ["schemaVersion", "memos"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "データ契約の版番号。アプリ/プラの版番号から分離（移行計画 5.1）"
+    },
+    "memos": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/memo" }
+    }
+  },
+  "definitions": {
+    "memo": {
+      "type": "object",
+      "required": ["id", "agent", "sessionId", "title", "tags", "body", "projectPath", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "type": "string", "description": "UUIDv4" },
+        "agent": { "type": "string", "description": "エージェント識別子（claude-code / codex 等。ADR-004 で起動時確定）" },
+        "sessionId": { "type": "string", "description": "復帰対象セッション。不変" },
+        "title": { "type": "string", "description": "可変フィールド" },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "可変。カンマ区切り入力 は trim・空要素除去 済みで保存（parseTags）" },
+        "body": { "type": "string", "description": "可変フィールド" },
+        "projectPath": { "type": "string", "description": "不変。復帰コマンドの cd 先" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "UTC ISO8601" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "UTC ISO8601。updateUserFields で必ず更新" }
+      }
+    }
+  }
+}

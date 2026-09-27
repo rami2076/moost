@@ -1,0 +1,7 @@
+{"session_id":"CS1","ts":100,"text":"first prompt"}
+{"session_id":"CS1","ts":200,"text":"second prompt"}
+{"session_id":"CS2","ts":150,"text":"normal prompt"}
+{"session_id":"CS2","ts":300,"text":"#MOOST-FORK# 要約プロンプト"}
+{"session_id":"CS3","ts":400,"text":"#MOOST-FORK# 要約プロンプト"}
+この行は JSON でない
+{"session_id":"CS3","ts":450,"text":"#MOOST-FORK# もう一つ"}

@@ -54,13 +54,15 @@ Fixture `history.jsonl` に対する期待（excludeMarker = `#MOOST-FORK#`）:
 | E3 | フォーク除外 | 除外マーカーで始まるプロンプト行は行単位で除外する。マーカー行のみのセッション（Fixture S4）は一覧から消える。通常プロンプトと混在するセッション（S2）は通常側の最新が残る。要約用フォークは全行がマーカーなので結果的にセッションごと消える |
 | E4 | timestamp | epoch ミリ秒 → UTC の DateTime |
 | E5 | limit | 既定 20 件上限。新しい順 |
+| E6 | codex の履歴集約 | Fixture `codex_history.jsonl`: キーは session_id / ts[epoch 秒] / text（claude と違い project を持たない）。session_id ごとに最新 ts を 1 件に集約（CS1 → "second prompt"）、新しい順。時刻は ts×1000 ms |
+| E7 | codex のフォーク除外 | マーカー text のみのセッション（CS3）は消える。混在（CS2）はマーカー行のみ除外（E3 と同機構） |
 
 ## F. 表題と内容
 
 | ID | 項目 | 期待 |
 |----|------|------|
 | F1 | displayTitle フォールバック | ai-title 無時は lastPrompt の先頭 50 文字（runes 基準。サロゲートペアを分断しない） |
-| F2 | ai-title | セッション JSONL の ai-title 行はファイル末尾側 64KB から探す（正: `ai_title_reader.dart` の既存テスト。Fixture 化はフェーズ B で） |
+| F2 | ai-title | セッション JSONL の ai-title 行はファイル末尾側 64KB から逆順走査で最新を採用（Fixture: `claude_projects/` 配下のセッション JSONL。古い表題→新しい表題の上書きと壊れた行のスキップを検証）。codex は ai-title 非対応で F1 のフォールバックのみ |
 
 ## G. 復帰コマンド
 

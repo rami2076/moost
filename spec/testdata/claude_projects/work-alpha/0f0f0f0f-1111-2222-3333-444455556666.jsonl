@@ -1,0 +1,6 @@
+{"type":"user","message":"first prompt"}
+{"type":"ai-title","aiTitle":"古い表題"}
+{"type":"assistant","message":"応答"}
+この行は "ai-title" を含むが JSON でない（デコード失敗は継続スキップ）
+{"type":"user","message":"second prompt"}
+{"type":"ai-title","aiTitle":"新しい表題"}

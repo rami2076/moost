@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "memos": [
+    {
+      "id": "11111111-2222-3333-4444-555555555555",
+      "agent": "claude-code",
+      "sessionId": "S-OK",
+      "title": "健全な 1 件",
+      "tags": [],
+      "body": "これのみ読めるはず",
+      "projectPath": "/work/ok",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z"
+    },
+    {
+      "id": "broken-entry",
+      "agent": "claude-code",
+      "sessionId": "S-BROKEN",
+      "title": "body 型が数字で不健全",
+      "tags": "tags が配列で無い",
+      "body": 42,
+      "projectPath": "/work/ng",
+      "createdAt": "not-a-date",
+      "updatedAt": "2026-09-01T00:00:00.000Z"
+    }
+  ]
+}

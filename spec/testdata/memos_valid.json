@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "memos": [
+    {
+      "id": "2b1c9a7e-0d3f-4a6b-9c2d-1e2f3a4b5c6d",
+      "agent": "claude-code",
+      "sessionId": "0f0f0f0f-1111-2222-3333-444455556666",
+      "title": "認証リファクタの途中状態",
+      "tags": ["auth", "wip"],
+      "body": "JWT 検証を Middleware に移す途中。トークン更新の競合を直す必要あり。",
+      "projectPath": "/work/auth-service",
+      "createdAt": "2026-09-20T09:00:00.000Z",
+      "updatedAt": "2026-09-21T11:30:00.000Z"
+    },
+    {
+      "id": "7a6b5c4d-3e2f-1a0b-cd9e-8f7e6d5c4b3a",
+      "agent": "codex",
+      "sessionId": "deadbeef-cafe-babe-f00d-0123456789ab",
+      "title": "危険文字を含む表題 `echo $(whoami)` | tee x",
+      "tags": ["backtick `x`", "pipe|"],
+      "body": "シェル escape 回帰レグレッション用。\"バックスラッシュ $VAR `cmd` ; && | リダイレクト >/dev/null",
+      "projectPath": "/work/escape-lab",
+      "createdAt": "2026-09-22T01:00:00.000Z",
+      "updatedAt": "2026-09-22T01:00:00.000Z"
+    }
+  ]
+}

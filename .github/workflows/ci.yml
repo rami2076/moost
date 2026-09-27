@@ -68,6 +68,27 @@ jobs:
         run: flutter test
         working-directory: apps/desktop
 
+  # Phase B (#71): macOS native core conformance gate.
+  # Runs the shared spec/testdata fixtures through the Swift implementation.
+  # A macOS runner is required (Darwin SDK).
+  macos-core:
+    name: macos-core (swift build + test)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The runner default Xcode is used on purpose. Pinning an older Swift
+      # (e.g. 6.0) makes the SDK interop modules fail to build.
+      # platforms: ["macOS": "14"] in Package.swift pins the deployment target.
+      - name: Resolve (no external deps expected)
+        run: swift package dump-package
+        working-directory: apps/macos
+      - name: Build
+        run: swift build
+        working-directory: apps/macos
+      - name: Test (spec conformance)
+        run: swift test
+        working-directory: apps/macos
+
   osv-scan:
     name: osv-scanner (lockfiles)
     runs-on: ubuntu-latest

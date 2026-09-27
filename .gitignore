@@ -1,6 +1,8 @@
 # Dart / Flutter
 .dart_tool/
-build/
+/build/
+
+# IDE
 *.iml
 .idea/
 
@@ -9,3 +11,11 @@ dist/
 
 # macOS
 .DS_Store
+
+# Swift Package Manager (native macOS app)
+# SPM は apps/macos/.build に生成するので ** で全階層を拾う
+**/.build/
+.swiftpm/
+# 外部依存なしでは Package.resolved は生まれい
+Package.resolved
+*.xcodeproj

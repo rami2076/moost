@@ -106,4 +106,45 @@ void main() {
       expect(s1.displayTitle, 'second prompt');
     });
   });
+
+  group('ai-title（F2）', () {
+    test('末尾側から逆順走査で最新の ai-title を採用する', () async {
+      final reader = AiTitleReader(
+        projectsDir: Directory('$_specRelPath/testdata/claude_projects'),
+      );
+      final title = await reader.latestAiTitle(
+        '0f0f0f0f-1111-2222-3333-444455556666',
+      );
+      expect(title, '新しい表題');
+    });
+
+    test('存在しないセッションファイルは null', () async {
+      final reader = AiTitleReader(
+        projectsDir: Directory('$_specRelPath/testdata/claude_projects'),
+      );
+      expect(await reader.latestAiTitle('nonexistent-session'), isNull);
+    });
+  });
+
+  group('codex 履歴（E6-E7）', () {
+    Future<List<CodexHistoryEntry>> readCodex() => CodexHistoryReader(
+          historyFile: _fixture('codex_history.jsonl'),
+          excludeMarker: '#MOOST-FORK#',
+        ).aggregatedEntries();
+
+    test('session_id ごとに最新 ts（秒）を採用する', () async {
+      final entries = await readCodex();
+      expect(entries.map((e) => e.sessionId).toSet(), {'CS1', 'CS2'});
+      final cs1 = entries.singleWhere((e) => e.sessionId == 'CS1');
+      expect(cs1.lastPrompt, 'second prompt');
+      expect(cs1.updatedAt.millisecondsSinceEpoch, 200000);
+    });
+
+    test('マーカー行のみのセッションは除外する', () async {
+      final entries = await readCodex();
+      expect(entries.map((e) => e.sessionId), isNot(contains('CS3')));
+      final cs2 = entries.singleWhere((e) => e.sessionId == 'CS2');
+      expect(cs2.lastPrompt, 'normal prompt');
+    });
+  });
 }

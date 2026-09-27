@@ -68,16 +68,17 @@ jobs:
         run: flutter test
         working-directory: apps/desktop
 
-  # フェーズ B（#71）: macOS native コアの適合ゲート。
-  # spec/testdata の共通 Fixture を Swift 側でも通す。macOS ランナーが必須。
+  # Phase B (#71): macOS native core conformance gate.
+  # Runs the shared spec/testdata fixtures through the Swift implementation.
+  # A macOS runner is required (Darwin SDK).
   macos-core:
     name: macos-core (swift build + test)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: '6.0'
+      # The runner default Xcode is used on purpose. Pinning an older Swift
+      # (e.g. 6.0) makes the SDK interop modules fail to build.
+      # platforms: ["macOS": "14"] in Package.swift pins the deployment target.
       - name: Resolve (no external deps expected)
         run: swift package dump-package
         working-directory: apps/macos

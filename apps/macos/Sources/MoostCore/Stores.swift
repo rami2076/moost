@@ -134,6 +134,10 @@ public struct Settings: Equatable {
     public var claudePath = ""
     public var summaryRallyCount = 1
     public var copyAnimation = true
+    /// pi 起動時に指定する provider 名（空なら付けない）。Issue #68。
+    public var piProvider = ""
+    /// pi 起動時に指定する model 名（空なら付けない）。Issue #68。
+    public var piModel = ""
 
     public init() {}
 }
@@ -168,6 +172,8 @@ public final class SettingsStore {
         if let value = JsonScalar.string(text, "claudePath") { settings.claudePath = value }
         if let value = JsonScalar.integer(text, "summaryRallyCount") { settings.summaryRallyCount = value }
         if let value = JsonScalar.boolean(text, "copyAnimation") { settings.copyAnimation = value }
+        if let value = JsonScalar.string(text, "piProvider") { settings.piProvider = value }
+        if let value = JsonScalar.string(text, "piModel") { settings.piModel = value }
         return settings
     }
 
@@ -179,6 +185,8 @@ public final class SettingsStore {
             "claudePath": settings.claudePath,
             "summaryRallyCount": settings.summaryRallyCount,
             "copyAnimation": settings.copyAnimation,
+            "piProvider": settings.piProvider,
+            "piModel": settings.piModel,
         ])
     }
 }

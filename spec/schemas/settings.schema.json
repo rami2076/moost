@@ -3,17 +3,45 @@
   "title": "moost settings.json",
   "description": "アプリ設定（~/.moost/v1/settings.json）。v2 でも形式不変。読み込みは寛容: 型が想定と違う項目は その項目だけ デフォルトへフォールバックする（落とさない）。正は packages/core/lib/src/store/settings_store.dart。",
   "type": "object",
-  "required": ["schemaVersion"],
+  "required": [
+    "schemaVersion"
+  ],
   "properties": {
-    "schemaVersion": { "type": "integer", "const": 1 },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
     "terminalApp": {
       "type": "string",
       "default": "Terminal.app",
       "description": "ENUM にしない（Issue #41 の教訓: 厳しすぎる検証が現実の遅延を裏切る）。既知 iTerm2.app 等の外部値を受付ける"
     },
-    "recentSessionLimit": { "type": "integer", "default": 20 },
-    "claudePath": { "type": "string", "default": "", "description": "空文字列なら自動検出" },
-    "summaryRallyCount": { "type": "integer", "default": 1 },
-    "copyAnimation": { "type": "boolean", "default": true }
+    "recentSessionLimit": {
+      "type": "integer",
+      "default": 20
+    },
+    "claudePath": {
+      "type": "string",
+      "default": "",
+      "description": "空文字列なら自動検出"
+    },
+    "summaryRallyCount": {
+      "type": "integer",
+      "default": 1
+    },
+    "copyAnimation": {
+      "type": "boolean",
+      "default": true
+    },
+    "piProvider": {
+      "type": "string",
+      "default": "",
+      "description": "pi launch --provider (Issue #68). Empty omits the flag."
+    },
+    "piModel": {
+      "type": "string",
+      "default": "",
+      "description": "pi launch --model (Issue #68). Empty omits the flag."
+    }
   }
 }

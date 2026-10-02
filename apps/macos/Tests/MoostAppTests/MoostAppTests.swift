@@ -7,19 +7,21 @@ import MoostCore
 /// 一切触れない（bootstrap は DataMigration / SMAppService / zsh 検出を
 /// 伴うため呼ばない。refresh はファイル走査のみで軽い）。
 ///
-/// 注意: AppModel は @MainActor。テストも @MainActor で実行する。
+/// 注意: AppModel は @MainActor。メソッドは @MainActor で実行する。
+/// XCTest の setUp/tearDown は nonisolated で呼ばれる（main thread で直列
+/// 実行される）ため、ストレージは nonisolated(unsafe) で持つ。
 /// refresh() 内部の Task 完了はポーリングで待つ。
 @MainActor
 final class MoostAppTests: XCTestCase {
-    private var tempDir: URL!
-    private var home: String!
-    private var memoStore: MemoStore!
-    private var settingsStore: SettingsStore!
-    private var projectStore: ProjectStore!
+    private nonisolated(unsafe) var tempDir: URL!
+    private nonisolated(unsafe) var home: String!
+    private nonisolated(unsafe) var memoStore: MemoStore!
+    private nonisolated(unsafe) var settingsStore: SettingsStore!
+    private nonisolated(unsafe) var projectStore: ProjectStore!
 
-    private var memoFile: URL { tempDir.appendingPathComponent("memos.json") }
-    private var settingsFile: URL { tempDir.appendingPathComponent("settings.json") }
-    private var projectFile: URL { tempDir.appendingPathComponent("projects.json") }
+    private nonisolated var memoFile: URL { tempDir.appendingPathComponent("memos.json") }
+    private nonisolated var settingsFile: URL { tempDir.appendingPathComponent("settings.json") }
+    private nonisolated var projectFile: URL { tempDir.appendingPathComponent("projects.json") }
 
     override func setUpWithError() throws {
         tempDir = FileManager.default.temporaryDirectory

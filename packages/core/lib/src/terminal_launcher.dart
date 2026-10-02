@@ -221,28 +221,40 @@ end tell''';
     // "iTerm2" で tell すると -2741 (syntax error) になる（2026-10-02 実機検証済み）。
     // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
     // 常に create window すると「復元窓 + 新窓」で 2 窓になる（2026-10-03 実機検証済み）。
-    // 復元完了前に (count of windows) を評価すると 0 になり 2 窓になるため、
-    // ウィンドウが現れるまでポーリングで待ってから分岐する（最大 4.5 秒）。
+    // 復元完了前に (count of windows) を評価すると 0 になり 2 窓になるため:
+    // 1) ウィンドウが現れるまでポーリング（最大 4.5 秒）
+    // 2) ユーザーが既に使っている場合（wasRunning=true）は現在のウィンドウにタブ追加
+    // 3) Moost が起動させた場合（wasRunning=false）で復元窓がある場合は、
+    //    復元タブ（新規シェル）を再利用して 1 窓 1 タブを保つ
+    // 4) ウィンドウが無い場合のみ新規ウィンドウ（close は MoostApp 発信で
+    //    1 窓あたり約 9 秒かかり 20 秒タイムアウトになるため不採用）
     final escaped = _escape(command);
     return '''
 tell application "iTerm"
+  set wasRunning to application "iTerm" is running
   activate
   set attemptCount to 0
   repeat while (count of windows) = 0 and attemptCount < 15
     delay 0.3
     set attemptCount to attemptCount + 1
   end repeat
-  if (count of windows) = 0 then
-    set newWindow to (create window with default profile)
-    tell current session of newWindow
-      write text "$escaped"
-    end tell
-  else
+  if wasRunning and (count of windows) > 0 then
     tell current window
       create tab with default profile
       tell current session
         write text "$escaped"
       end tell
+    end tell
+  else if (count of windows) > 0 then
+    tell current window
+      tell current session
+        write text "$escaped"
+      end tell
+    end tell
+  else
+    set newWindow to (create window with default profile)
+    tell current session of newWindow
+      write text "$escaped"
     end tell
   end if
 end tell''';

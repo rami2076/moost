@@ -234,31 +234,44 @@ public final class TerminalLauncher {
         // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
         // "iTerm2" で tell すると -2741 (syntax error) になる（実機検証済み）。
         // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
-        // 常に create window すると「復元窓 + 新窓」で 2 窓になってしまう（実機検証済み）。
+        // 常に create window すると「復元窓 + 新窓」で 2 窓になる。
         // さらに復元はアプリ起動直後に完了するが、復元完了前に (count of windows) を
-        // 評価すると 0 になり無駄な新規ウィンドウを作る。そのためポーリングで
-        // ウィンドウが現れるまで待ってから分岐する（最大 4.5 秒）。
+        // 評価すると 0 になり無駄な新規ウィンドウを作る。そのため:
+        // 1) ウィンドウが現れるまでポーリング（最大 4.5 秒）
+        // 2) ユーザーが既に iTerm2 を使っている（wasRunning）場合は現在の
+        //    ウィンドウにタブ追加（作業を壊さない）
+        // 3) 今回 Moost が起動させ、復元窓がある場合は、復元タブ（新規シェル）を
+        //    再利用して 1 窓 1 タブを保つ（close は MoostApp 発信で 1 窓あたり
+        //    約 9 秒かかり 20 秒タイムアウトになるため不採用）
+        // 4) ウィンドウが無い場合のみ新規ウィンドウ
         let q = scalarQuote
         let nl = scalarNewline
         let escaped = escapeForAppleScript(command)
         return "tell application " + q + "iTerm" + q + nl
+            + "  set wasRunning to application " + q + "iTerm" + q + " is running" + nl
             + "  activate" + nl
             + "  set attemptCount to 0" + nl
             + "  repeat while (count of windows) = 0 and attemptCount < 15" + nl
             + "    delay 0.3" + nl
             + "    set attemptCount to attemptCount + 1" + nl
             + "  end repeat" + nl
-            + "  if (count of windows) = 0 then" + nl
-            + "    set newWindow to (create window with default profile)" + nl
-            + "    tell current session of newWindow" + nl
-            + "      write text " + q + escaped + q + nl
-            + "    end tell" + nl
-            + "  else" + nl
+            + "  if wasRunning and (count of windows) > 0 then" + nl
             + "    tell current window" + nl
             + "      create tab with default profile" + nl
             + "      tell current session" + nl
             + "        write text " + q + escaped + q + nl
             + "      end tell" + nl
+            + "    end tell" + nl
+            + "  else if (count of windows) > 0 then" + nl
+            + "    tell current window" + nl
+            + "      tell current session" + nl
+            + "        write text " + q + escaped + q + nl
+            + "      end tell" + nl
+            + "    end tell" + nl
+            + "  else" + nl
+            + "    set newWindow to (create window with default profile)" + nl
+            + "    tell current session of newWindow" + nl
+            + "      write text " + q + escaped + q + nl
             + "    end tell" + nl
             + "  end if" + nl
             + "end tell"

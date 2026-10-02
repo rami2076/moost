@@ -92,6 +92,9 @@ void main() {
       // 復元完了前に count を評価すると 2 窓になるため、ウィンドウが現れるまでポーリングで待つ
       expect(script, contains('repeat while'));
       expect(script, contains('delay 0.3'));
+      // Moost が起動させた場合（未実行時）は復元タブを再利用して 1 窓 1 タブを保つ
+      expect(script, contains('wasRunning'));
+      expect(script, contains('else if'));
       expect(script, contains('create window with default profile'));
       expect(script, contains('create tab with default profile'));
       expect(script, contains('write text'));

@@ -175,6 +175,9 @@ final class LaunchTests: XCTestCase {
         // 復元完了前に count を評価すると 2 窓になるため、ウィンドウが現れるまでポーリングで待つ
         XCTAssertTrue(script.contains("repeat while"), script)
         XCTAssertTrue(script.contains("delay 0.3"), script)
+        // Moost が起動させた場合（未実行時）は復元タブを再利用して 1 窓 1 タブを保つ
+        XCTAssertTrue(script.contains("wasRunning"), script)
+        XCTAssertTrue(script.contains("else if"), script)
         XCTAssertTrue(script.contains("create window with default profile"), script)
         XCTAssertTrue(script.contains("create tab with default profile"), script)
         XCTAssertTrue(script.contains("write text"), script)

@@ -41,9 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(sender)
         } else {
-            // 開くたびに一覧を再読込する（design.md 6.1「手動リロード不要」）
-            model.refresh()
+            // 表示を先に出して、データはバックグラウンドで更新する
+            // （design.md 6.1「手動リロード不要」、同期 I/O で開きを待たせない）
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            model.refresh()
         }
     }
 

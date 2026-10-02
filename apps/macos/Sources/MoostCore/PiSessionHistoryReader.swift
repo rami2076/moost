@@ -1,7 +1,7 @@
 import Foundation
 
 /// pi セッション 1 件分の抽出結果。
-public struct PiSessionEntry: Equatable {
+public struct PiSessionEntry: Equatable, Sendable {
     public let sessionId: String
     public let projectPath: String
     public let lastPrompt: String

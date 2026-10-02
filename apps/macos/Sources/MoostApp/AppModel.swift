@@ -63,6 +63,10 @@ final class AppModel: ObservableObject {
     private let home: String
     private let terminalLauncher = TerminalLauncher()
     private var toastTask: Task<Void, Never>?
+    /// 一覧・メモの読み込みタスク（最新 1 本だけ生かす）
+    private var refreshTask: Task<Void, Never>?
+    /// claude パス検出タスク（zsh 起動を伴うため必ずバックグラウンド）
+    private var detectTask: Task<Void, Never>?
 
     init(memoStore: MemoStore, settingsStore: SettingsStore, home: String) {
         self.memoStore = memoStore
@@ -84,18 +88,39 @@ final class AppModel: ObservableObject {
         } catch {
             showToast("v1 からの移行に失敗しました: \(error.localizedDescription)")
         }
+        loadSettings()
+        reloadAutoLaunchStatus()
+        detectClaudePath()
         refresh()
     }
 
     /// ポップオーバーを開いたとき・タブを切り替えたとき・フォームから戻ったときに
     /// 呼ぶ（design.md 6.1「手動リロード不要。開きっぱなしの間は更新されない」）。
+    /// UI をブロックしないよう、ファイル走査はバックグラウンドで行い
+    /// 完了後に published を更新する。
     func refresh() {
-        loadSettings()
-        loadSessions()
-        loadMemos()
-        detectClaudePath()
-        reloadAutoLaunchStatus()
-        summaryRallies = settings.summaryRallyCount
+        refreshTask?.cancel()
+        let home = self.home
+        let memoFileURL = memoStore.file
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            self.loadSettings()
+            summaryRallies = self.settings.summaryRallyCount
+            let limit = self.settings.recentSessionLimit
+            if Task.isCancelled { return }
+
+            let sessions = await Task.detached(priority: .userInitiated) {
+                SessionAggregator.recentSessions(homeDirectory: home, limit: limit)
+            }.value
+            guard !Task.isCancelled else { return }
+            self.sessions = sessions
+
+            let memos = await Task.detached(priority: .userInitiated) {
+                (try? MemoStore(file: memoFileURL).load()) ?? []
+            }.value
+            guard !Task.isCancelled else { return }
+            self.memos = memos
+        }
     }
 
     // MARK: - 読み込み
@@ -108,23 +133,19 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func loadSessions() {
-        sessions = SessionAggregator.recentSessions(
-            homeDirectory: home, limit: settings.recentSessionLimit)
-    }
-
-    private func loadMemos() {
-        do {
-            memos = try memoStore.load()
-        } catch {
-            showToast("メモを読み込めませんでした: \(error.localizedDescription)")
-        }
-    }
-
-    /// 設定変更後にも呼べるよう internal。検出結果は published に載せる。
+    /// claude パス検出（zsh 起動を伴い最大 1 秒超のため必ず非同期）。
+    /// 起動時と claudePath 設定変更時のみ呼ぶ。
     func detectClaudePath() {
-        detectedClaudePath = ClaudePathDetect.detect(override: settings.claudePath)
-            ?? "見つかりません（要約機能は claude コマンドが必要）"
+        detectTask?.cancel()
+        let override = settings.claudePath
+        detectTask = Task { [weak self] in
+            let found = await Task.detached(priority: .utility) {
+                ClaudePathDetect.detect(override: override)
+            }.value
+            guard !Task.isCancelled, let self else { return }
+            self.detectedClaudePath = found
+                ?? "見つかりません（要約機能は claude コマンドが必要）"
+        }
     }
 
     // MARK: - 画面遷移（design.md 6.3-3: 遷移はルートに集約）
@@ -229,8 +250,8 @@ final class AppModel: ObservableObject {
             try settingsStore.save(updated)
             settings = updated
             showToast("設定を保存しました")
-            // 表示件数・ターミナルを反映
-            loadSessions()
+            // 表示件数・ターミナルを反映（非同期）
+            refresh()
             detectClaudePath()
         } catch {
             showToast("設定を保存できませんでした: \(error.localizedDescription)")
@@ -260,6 +281,8 @@ final class AppModel: ObservableObject {
         reloadAutoLaunchStatus()
     }
 
+    /// OS の実状態を再読込（SMAppService.status は XPC を伴い遅いため、
+    /// 起動時とトグル操作時のみ。一覧更新のたびには呼ばない）。
     private func reloadAutoLaunchStatus() {
         autoLaunchEnabled = AutoLaunchService.isEnabled()
     }

@@ -67,6 +67,9 @@ public final class MemoStore {
     public static let schemaVersion = 1
     private let store: JsonFileStore
 
+    /// バックグラウンド読み込み用に URL を公開する。
+    public var file: URL { store.file }
+
     public init(file: URL) {
         store = JsonFileStore(file: file)
     }
@@ -128,7 +131,7 @@ public final class MemoStore {
 
 /// アプリ設定（C1-C3）。リファレンス実装: settings_store.dart
 /// 型が違う項目は その項目だけ デフォルトへフォールバックする（落とさない）。
-public struct Settings: Equatable {
+public struct Settings: Equatable, Sendable {
     public var terminalApp = "Terminal.app"
     public var recentSessionLimit = 20
     public var claudePath = ""

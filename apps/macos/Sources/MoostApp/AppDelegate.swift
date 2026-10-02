@@ -143,19 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let dt = String(format: "%.2f", Date().timeIntervalSince(t0))
             print("LAUNCHSMOKE TERMINAL_APP=FAILED \(dt)s \(error)")
         }
-        // 遅延の切り分け: activate / 新規ウィンドウ作成 / write text を個別に計測
-        let steps: [(String, String)] = [
-            ("activate", "tell application \"iTerm\"\n  activate\nend tell"),
-            ("window", "tell application \"iTerm\"\n  set w to (create window with default profile)\nend tell"),
-            ("tab", "tell application \"iTerm\"\n  activate\n  tell current window\n    create tab with default profile\n    tell current session\n      write text \"echo smoke-tab\"\n    end tell\n  end tell\nend tell"),
-            ("full", TerminalLauncher.iterm2Script("echo smoke-timing")),
-        ]
-        for (label, script) in steps {
-            let t0 = Date()
-            let r = TerminalLauncher.execute(["-e", script])
-            let dt = String(format: "%.2f", Date().timeIntervalSince(t0))
-            print("LAUNCHSMOKE TIMING \(label)=\(dt)s exit=\(r.exit) \(r.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
-        }
+        // ウィンドウ数の確認（iTerm2 が 2 窓になる問題の切り分け用）:
+        // 起動後に何枚ウィンドウが増えたかを AppleScript で検査する。
+        let winCount = TerminalLauncher.execute(["-e", "tell application \"iTerm\"\n  count windows\nend tell"])
+        print("LAUNCHSMOKE ITERM_WINDOWS=\(winCount.stdout.trimmingCharacters(in: .whitespacesAndNewlines)) exit=\(winCount.exit)")
     }
 
     private func capturePopover(to path: String) {

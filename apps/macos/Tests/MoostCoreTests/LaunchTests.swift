@@ -170,7 +170,10 @@ final class LaunchTests: XCTestCase {
         let script = args[0][1]
         // iTerm2 の AppleScript 名は "iTerm"（"iTerm2" だと -2741 になる）
         XCTAssertTrue(script.contains("tell application " + q + "iTerm" + q), script)
+        // 既存ウィンドウがあれば新規ウィンドウを増やさずタブを追加する（2 窓問題対策）
+        XCTAssertTrue(script.contains("count of windows"), script)
         XCTAssertTrue(script.contains("create window with default profile"), script)
+        XCTAssertTrue(script.contains("create tab with default profile"), script)
         XCTAssertTrue(script.contains("write text"), script)
     }
 

@@ -219,14 +219,26 @@ end tell''';
   String _iterm2Script(String command) {
     // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
     // "iTerm2" で tell すると -2741 (syntax error) になる（2026-10-02 実機検証済み）。
+    // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
+    // 常に create window すると「復元窓 + 新窓」で 2 窓になる（2026-10-03 実機検証済み）。
+    // 既存ウィンドウがある場合はそのウィンドウに新規タブを追加し、ウィンドウ数を増やさない。
     final escaped = _escape(command);
     return '''
 tell application "iTerm"
   activate
-  set newWindow to (create window with default profile)
-  tell current session of newWindow
-    write text "$escaped"
-  end tell
+  if (count of windows) = 0 then
+    set newWindow to (create window with default profile)
+    tell current session of newWindow
+      write text "$escaped"
+    end tell
+  else
+    tell current window
+      create tab with default profile
+      tell current session
+        write text "$escaped"
+      end tell
+    end tell
+  end if
 end tell''';
   }
 }

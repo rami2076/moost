@@ -87,7 +87,10 @@ void main() {
       );
       final script = calls.single[1];
       expect(script, contains('tell application "iTerm"'));
+      // 既存ウィンドウがあれば新規ウィンドウを増やさずタブを追加する（2 窓問題対策）
+      expect(script, contains('count of windows'));
       expect(script, contains('create window with default profile'));
+      expect(script, contains('create tab with default profile'));
       expect(script, contains('write text'));
     });
 

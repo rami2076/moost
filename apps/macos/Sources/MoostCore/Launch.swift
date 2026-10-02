@@ -233,16 +233,27 @@ public final class TerminalLauncher {
     public static func iterm2Script(_ command: String) -> String {
         // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
         // "iTerm2" で tell すると -2741 (syntax error) になる（実機検証済み）。
-        // リファレンス実装 terminal_launcher.dart と同一の修正を適用。
+        // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
+        // 常に create window すると「復元窓 + 新窓」で 2 窓になってしまう（実機検証済み）。
+        // 既存ウィンドウがある場合はそのウィンドウに新規タブを追加し、ウィンドウ数を増やさない。
         let q = scalarQuote
         let nl = scalarNewline
         let escaped = escapeForAppleScript(command)
         return "tell application " + q + "iTerm" + q + nl
             + "  activate" + nl
-            + "  set newWindow to (create window with default profile)" + nl
-            + "  tell current session of newWindow" + nl
-            + "    write text " + q + escaped + q + nl
-            + "  end tell" + nl
+            + "  if (count of windows) = 0 then" + nl
+            + "    set newWindow to (create window with default profile)" + nl
+            + "    tell current session of newWindow" + nl
+            + "      write text " + q + escaped + q + nl
+            + "    end tell" + nl
+            + "  else" + nl
+            + "    tell current window" + nl
+            + "      create tab with default profile" + nl
+            + "      tell current session" + nl
+            + "        write text " + q + escaped + q + nl
+            + "      end tell" + nl
+            + "    end tell" + nl
+            + "  end if" + nl
             + "end tell"
     }
 

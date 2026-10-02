@@ -82,7 +82,7 @@ void main() {
         command: 'echo hi',
       );
       final script = calls.single[1];
-      expect(script, contains('tell application "iTerm2"'));
+      expect(script, contains('tell application "iTerm"'));
       expect(script, contains('create window with default profile'));
       expect(script, contains('write text'));
     });

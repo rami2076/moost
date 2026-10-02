@@ -1,4 +1,5 @@
 import AppKit
+import MoostCore
 import SwiftUI
 
 /// トレイ常駐本体。Dock アイコンなし（accessory）/ ポップオーバー 570x660 固定。
@@ -92,7 +93,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.switchTab(.projects)
             try? await Task.sleep(nanoseconds: 400_000_000)
             capturePopover(to: "/tmp/moost-popover-3.png")
+            // Terminal 起動テスト（MOOST_UI_SMOKE_LAUNCH=1。TCC 権限の実測用）
+            if ProcessInfo.processInfo.environment["MOOST_UI_SMOKE_LAUNCH"] == "1" {
+                runLaunchSmoke()
+            }
             NSApp.terminate(nil)
+        }
+    }
+
+    /// ターミナル起動経路（openInTerminal と同一）をアプリプロセスから実測する。
+    /// 署名なし SPM バイナリから Apple Events（osascript）が通るか確認するための
+    /// 切り分け用。成功/失敗は stdout に "LAUNCHSMOKE:" で出力する。
+    private func runLaunchSmoke() {
+        let sessionId = ProcessInfo.processInfo.environment["MOOST_TEST_SESSION"] ?? ""
+        guard let session = model.sessions.first(where: { $0.sessionId == sessionId }),
+              let command = ResumeCommand.resume(
+                  agent: session.agentId,
+                  projectPath: session.projectPath,
+                  sessionId: session.sessionId,
+                  provider: model.settings.piProvider,
+                  model: model.settings.piModel)
+        else {
+            print("LAUNCHSMOKE: session not found: \(sessionId)")
+            return
+        }
+        do {
+            try TerminalLauncher().launch(settingValue: model.settings.terminalApp, command: command)
+            print("LAUNCHSMOKE: OK \(command)")
+        } catch {
+            print("LAUNCHSMOKE: FAILED \(error)")
         }
     }
 

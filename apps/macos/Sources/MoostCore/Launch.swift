@@ -205,10 +205,13 @@ public final class TerminalLauncher {
     }
 
     static func iterm2Script(_ command: String) -> String {
+        // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
+        // "iTerm2" で tell すると -2741 (syntax error) になる（実機検証済み）。
+        // リファレンス実装 terminal_launcher.dart と同一の修正を適用。
         let q = scalarQuote
         let nl = scalarNewline
         let escaped = escapeForAppleScript(command)
-        return "tell application " + q + "iTerm2" + q + nl
+        return "tell application " + q + "iTerm" + q + nl
             + "  activate" + nl
             + "  set newWindow to (create window with default profile)" + nl
             + "  tell current session of newWindow" + nl

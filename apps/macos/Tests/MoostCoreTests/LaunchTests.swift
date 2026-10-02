@@ -157,7 +157,8 @@ final class LaunchTests: XCTestCase {
     func test_terminal_script_for_iterm2_opens_window_and_writes_text() {
         let (args, _) = captureLaunch(terminal: .iterm2, command: "echo hi")
         let script = args[0][1]
-        XCTAssertTrue(script.contains("iTerm2"), script)
+        // iTerm2 の AppleScript 名は "iTerm"（"iTerm2" だと -2741 になる）
+        XCTAssertTrue(script.contains("tell application " + q + "iTerm" + q), script)
         XCTAssertTrue(script.contains("create window with default profile"), script)
         XCTAssertTrue(script.contains("write text"), script)
     }
@@ -199,7 +200,7 @@ final class LaunchTests: XCTestCase {
         }
         try launcher.launch(settingValue: "iTerm2", command: "echo hi")
         XCTAssertEqual(received.first, "-e")
-        XCTAssertTrue(received[1].contains("iTerm2"))
+        XCTAssertTrue(received[1].contains("iTerm"))
     }
 
     // MARK: 差し替え経路の契約（実行環境に依存しない検査）

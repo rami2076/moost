@@ -176,9 +176,11 @@ end tell''';
   }
 
   String _iterm2Script(String command) {
+    // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
+    // "iTerm2" で tell すると -2741 (syntax error) になる（2026-10-02 実機検証済み）。
     final escaped = _escape(command);
     return '''
-tell application "iTerm2"
+tell application "iTerm"
   activate
   set newWindow to (create window with default profile)
   tell current session of newWindow

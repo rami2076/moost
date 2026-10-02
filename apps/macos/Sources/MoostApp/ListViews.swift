@@ -1,8 +1,10 @@
 import SwiftUI
 import MoostCore
 
-/// ルートの一覧画面（直近セッション / メモ一覧の 2 タブ + フッター）。
+/// ルートの一覧画面（直近セッション / メモ一覧 / 登録プロジェクトの 3 タブ + フッター）。
 /// 行クリック → メモ登録（セッション）/ メモ編集（メモ）。詳細・コピーのアイコン付き。
+/// プロジェクトタブは v1（Flutter 版）のプロジェクト一覧に相当（design.md 6.1 では
+/// 2 タブだったが、v1 との機能差を埋めるため 2026-10-02 に 3 タブ化）。
 struct ListScreen: View {
     @EnvironmentObject var model: AppModel
 
@@ -11,8 +13,9 @@ struct ListScreen: View {
             Picker("タブ", selection: Binding(
                 get: { model.tab },
                 set: { model.switchTab($0) })) {
-                Text("直近セッション").tag(AppModel.ListTab.sessions)
-                Text("メモ一覧").tag(AppModel.ListTab.memos)
+                Text("セッション").tag(AppModel.ListTab.sessions)
+                Text("メモ").tag(AppModel.ListTab.memos)
+                Text("プロジェクト").tag(AppModel.ListTab.projects)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -24,6 +27,8 @@ struct ListScreen: View {
                 sessionList
             case .memos:
                 memoList
+            case .projects:
+                projectList
             }
 
             footer
@@ -55,6 +60,41 @@ struct ListScreen: View {
                 }
                 if model.memos.isEmpty {
                     EmptyHint(text: "メモがありません。\n直近セッションから登録できます。")
+                }
+            }
+        }
+    }
+
+    private var projectList: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Button {
+                    model.registerProject()
+                } label: {
+                    Image(systemName: "folder.badge.plus")
+                }
+                .buttonStyle(.borderless)
+                .help("ディレクトリを登録")
+                Text("登録したディレクトリからエージェント別に新規セッションを開始できます")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(model.projects, id: \.id) { project in
+                        if model.pendingDeleteProjectId == project.id {
+                            ProjectDeleteConfirmRow(project: project)
+                        } else {
+                            ProjectRow(project: project)
+                        }
+                        Divider()
+                    }
+                    if model.projects.isEmpty {
+                        EmptyHint(text: "登録プロジェクトがありません。\n右上のフォルダアイコンから登録できます。")
+                    }
                 }
             }
         }
@@ -191,5 +231,82 @@ struct MemoRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
+    }
+}
+
+/// 登録プロジェクトの行（v1 の `_ProjectList` 相当）。
+/// 各エージェントのターミナルアイコン（新規セッション開始）と登録解除ボタンを持つ。
+struct ProjectRow: View {
+    let project: Project
+    @EnvironmentObject var model: AppModel
+
+    private let agents = [
+        (ResumeCommand.claudeAgentId, "Claude"),
+        (ResumeCommand.codexAgentId, "Codex"),
+        (ResumeCommand.piAgentId, "pi"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(project.displayName)
+                    .font(.system(size: 14))
+                    .lineLimit(1)
+                Spacer()
+                ForEach(agents, id: \.0) { agent in
+                    Button {
+                        model.launchNewSession(agent: agent.0, projectPath: project.projectPath)
+                    } label: {
+                        Image(systemName: "terminal")
+                            .foregroundStyle(AgentBadge.color(for: agent.0))
+                    }
+                    .buttonStyle(.borderless)
+                    .help("\(agent.1) で新規セッションを開始")
+                }
+                Button {
+                    model.requestDeleteProject(project)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("登録を解除")
+            }
+            HStack(spacing: 6) {
+                Text(project.projectPath)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+                Text("登録: " + AppFormat.dateTime(project.createdAt))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+    }
+}
+
+/// 登録解除のインライン確認行（メモ一覧の確認行と同じ体裁）。
+struct ProjectDeleteConfirmRow: View {
+    let project: Project
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("「\(project.displayName)」の登録を解除しますか？")
+                .font(.system(size: 12))
+                .lineLimit(1)
+            Spacer()
+            Button("キャンセル") { model.cancelDeleteProject() }
+                .buttonStyle(.borderless)
+            Button("削除") { model.confirmDeleteProject(project) }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.red)
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }

@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
     enum ListTab: Hashable {
         case sessions
         case memos
+        case projects
     }
 
     enum Screen {
@@ -31,7 +32,10 @@ final class AppModel: ObservableObject {
 
     @Published private(set) var sessions: [RecentSession] = []
     @Published private(set) var memos: [Memo] = []
+    @Published private(set) var projects: [Project] = []
     @Published private(set) var settings = MoostCore.Settings()
+    /// 登録解除のインライン確認中のプロジェクト（該当行だけ確認表示に置き換える）
+    @Published var pendingDeleteProjectId: String?
 
     // MARK: フォーム下書き（画面遷移で破棄しない）
 
@@ -60,6 +64,7 @@ final class AppModel: ObservableObject {
 
     private let memoStore: MemoStore
     private let settingsStore: SettingsStore
+    private let projectStore: ProjectStore
     private let home: String
     private let terminalLauncher = TerminalLauncher()
     private var toastTask: Task<Void, Never>?
@@ -68,9 +73,11 @@ final class AppModel: ObservableObject {
     /// claude パス検出タスク（zsh 起動を伴うため必ずバックグラウンド）
     private var detectTask: Task<Void, Never>?
 
-    init(memoStore: MemoStore, settingsStore: SettingsStore, home: String) {
+    init(memoStore: MemoStore, settingsStore: SettingsStore,
+         projectStore: ProjectStore, home: String) {
         self.memoStore = memoStore
         self.settingsStore = settingsStore
+        self.projectStore = projectStore
         self.home = home
     }
 
@@ -78,6 +85,7 @@ final class AppModel: ObservableObject {
         let home = ProcessInfo.processInfo.environment["HOME"] ?? ""
         return AppModel(memoStore: MemoStore.defaultLocation(),
                         settingsStore: SettingsStore.defaultLocation(),
+                        projectStore: ProjectStore.defaultLocation(),
                         home: home)
     }
 
@@ -102,6 +110,7 @@ final class AppModel: ObservableObject {
         refreshTask?.cancel()
         let home = self.home
         let memoFileURL = memoStore.file
+        let projectFileURL = projectStore.file
         refreshTask = Task { [weak self] in
             guard let self else { return }
             self.loadSettings()
@@ -120,6 +129,12 @@ final class AppModel: ObservableObject {
             }.value
             guard !Task.isCancelled else { return }
             self.memos = memos
+
+            let projects = await Task.detached(priority: .userInitiated) {
+                (try? ProjectStore(file: projectFileURL).load()) ?? []
+            }.value
+            guard !Task.isCancelled else { return }
+            self.projects = projects
         }
     }
 
@@ -327,6 +342,70 @@ final class AppModel: ObservableObject {
     func resumeFromMemo(_ memo: Memo) {
         openInTerminal(agent: memo.agent, projectPath: memo.projectPath,
                        sessionId: memo.sessionId)
+    }
+
+    // MARK: - 登録プロジェクト（v1 のプロジェクトタブ相当）
+
+    /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして保存する。
+    /// キャンセル時は何も変更しない（Flutter 版の `_registerProject` と同じ挙動）。
+    func registerProject() {
+        let panel = NSOpenPanel()
+        panel.title = "登録プロジェクトの選択"
+        panel.message = "新規セッションを開始したいディレクトリを選択"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "登録"
+        guard panel.runModal() == .OK, let path = panel.url?.path else { return }
+        let project = Project(id: UUID().uuidString, projectPath: path, createdAt: Date())
+        saveProjects(adding: project)
+        showToast("プロジェクトを登録しました")
+        refresh()
+    }
+
+    func requestDeleteProject(_ project: Project) {
+        pendingDeleteProjectId = project.id
+    }
+
+    func cancelDeleteProject() {
+        pendingDeleteProjectId = nil
+    }
+
+    func confirmDeleteProject(_ project: Project) {
+        pendingDeleteProjectId = nil
+        saveProjects(removing: project.id)
+        refresh()
+    }
+
+    private func saveProjects(adding newProject: Project? = nil, removing id: String? = nil) {
+        do {
+            var list = try projectStore.load()
+            if let newProject {
+                list.append(newProject)
+            }
+            if let id {
+                list.removeAll { $0.id == id }
+            }
+            try projectStore.save(list)
+        } catch {
+            showToast("プロジェクトの保存に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
+    /// 登録プロジェクトから新規セッションを開始する（ADR-004: sessionId は取らない）。
+    func launchNewSession(agent: String, projectPath: String) {
+        guard let command = ResumeCommand.newSession(
+            agent: agent, projectPath: projectPath,
+            provider: settings.piProvider, model: settings.piModel)
+        else {
+            showToast("不明なエージェントです: \(agent)")
+            return
+        }
+        do {
+            try terminalLauncher.launch(settingValue: settings.terminalApp, command: command)
+        } catch {
+            showToast("ターミナルを起動できませんでした: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - 要約（次インクリメント）

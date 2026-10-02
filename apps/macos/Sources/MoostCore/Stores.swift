@@ -241,6 +241,9 @@ public final class ProjectStore {
         store = JsonFileStore(file: file)
     }
 
+    /// バックグラウンド読み込み用に URL を公開する。
+    public var file: URL { store.file }
+
     public static func defaultLocation() -> ProjectStore {
         let home = ProcessInfo.processInfo.environment["HOME"] ?? ""
         return ProjectStore(file: URL(fileURLWithPath: home + "/.moost/v2/projects.json", isDirectory: false))

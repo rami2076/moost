@@ -57,6 +57,11 @@ public final class PiSessionHistoryReader {
     }
 
     /// 1 ファイルからヘッダ・最終プロンプト・更新時刻を読む。読めなければ nil。
+    ///
+    /// JSONL は時系列順に追記されるため、末尾から逆順に走査し「最後のユーザー発言」
+    /// と「最新のタイムスタンプ」を見つけた時点で打ち切る。全行パースすると
+    /// 25 ファイル / 23MB / 8,000 行の実機で約 8 秒かかるが、本実装では通常
+    /// 末尾数十行で済む（結果は Dart リファレンスと同一）。
     private func scanFile(_ file: URL) -> PiSessionEntry? {
         let text: String
         do {
@@ -67,14 +72,21 @@ public final class PiSessionHistoryReader {
         let lines = text.components(separatedBy: "\n")
         guard let first = lines.first, let header = parseHeader(first) else { return nil }
 
-        // 末尾の message から「最後のユーザー発言」と「最新時刻」を拾う
         var lastUserText = ""
         var newest = header.timestamp
-        for line in lines.dropFirst() {
-            if let ts = parseMessageTimestamp(line), ts > newest {
+        for line in lines.dropFirst().reversed() {
+            guard lastUserText.isEmpty || newest == header.timestamp else { break }
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let map = (try? MoostJSON.parse(trimmed)) as? [String: Any],
+                  map["type"] as? String == "message"
+            else { continue }
+
+            if let ts = (map["timestamp"] as? String).flatMap(parseISO), ts > newest {
                 newest = ts
             }
-            if let userText = extractUserText(line), !userText.isEmpty {
+            if lastUserText.isEmpty,
+               let userText = userTextFromMessage(map), !userText.isEmpty {
                 lastUserText = userText
             }
         }
@@ -104,14 +116,9 @@ public final class PiSessionHistoryReader {
         return Header(id: id, cwd: cwd, timestamp: timestamp)
     }
 
-    /// message 行からロール user のテキスト（content の text 型）を返す。
-    private func extractUserText(_ line: String) -> String? {
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let decoded = try? MoostJSON.parse(trimmed),
-              let map = decoded as? [String: Any],
-              map["type"] as? String == "message",
-              let message = map["message"] as? [String: Any],
+    /// message 行（decode 済み map）からロール user のテキスト（content の text 型）を返す。
+    private func userTextFromMessage(_ map: [String: Any]) -> String? {
+        guard let message = map["message"] as? [String: Any],
               message["role"] as? String == "user",
               let content = message["content"] as? [Any]
         else { return nil }
@@ -127,16 +134,6 @@ public final class PiSessionHistoryReader {
             }
         }
         return texts.isEmpty ? nil : texts.joined(separator: " ")
-    }
-
-    private func parseMessageTimestamp(_ line: String) -> Date? {
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let decoded = try? MoostJSON.parse(trimmed),
-              let map = decoded as? [String: Any],
-              let timestamp = map["timestamp"] as? String
-        else { return nil }
-        return parseISO(timestamp)
     }
 
     private let epoch = ISOUTC.parse("1970-01-01T00:00:00.000Z") ?? Date(timeIntervalSince1970: 0)

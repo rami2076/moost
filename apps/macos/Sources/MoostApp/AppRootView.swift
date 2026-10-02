@@ -73,16 +73,9 @@ struct ScreenHeader: View {
 struct AgentBadge: View {
     let agentId: String
 
-    private var label: String {
-        switch agentId {
-        case ResumeCommand.claudeAgentId: return "Claude"
-        case ResumeCommand.codexAgentId: return "Codex"
-        case ResumeCommand.piAgentId: return "pi"
-        default: return agentId
-        }
-    }
-
-    private var color: Color {
+    /// エージェント識別子の色（Flutter 側 `_agentColor` と同値）。プロジェクト行の
+    /// ターミナルアイコンなどにも使うため static で公開する。
+    static func color(for agentId: String) -> Color {
         switch agentId {
         case ResumeCommand.claudeAgentId:
             return Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255) // 0xFFD97757
@@ -94,6 +87,17 @@ struct AgentBadge: View {
             return Color.secondary
         }
     }
+
+    private var label: String {
+        switch agentId {
+        case ResumeCommand.claudeAgentId: return "Claude"
+        case ResumeCommand.codexAgentId: return "Codex"
+        case ResumeCommand.piAgentId: return "pi"
+        default: return agentId
+        }
+    }
+
+    private var color: Color { Self.color(for: agentId) }
 
     var body: some View {
         Text(label)

@@ -90,18 +90,36 @@ struct SessionDetailScreen: View {
                 .disabled(!model.summaryScopeIsRecent)
             }
 
-            Button {
-                model.requestSummary(session)
-            } label: {
-                Label("Claude で要約する", systemImage: "sparkles")
+            HStack(spacing: 8) {
+                Button {
+                    model.requestSummary(session)
+                } label: {
+                    Label("\(AgentBadge.displayName(for: session.agentId)) で要約する",
+                          systemImage: "sparkles")
+                }
+                .disabled(model.isSummarizing)
+                if model.isSummarizing {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
-            .disabled(true)
-            .help("要約エンジンは後続インクリメントで対応予定です")
 
-            Text("要約エンジンは対応予定です（次インクリメント）。それまでの間、"
-                 + "復帰コマンドのコピーとメモ登録をご利用ください。")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+            if let error = model.summaryError {
+                Text(error)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+            }
+
+            if !model.summaryText.isEmpty {
+                Text(model.summaryText)
+                    .font(.system(size: 11))
+                    .textSelection(.enabled)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
         }
         .padding(.top, 4)
     }

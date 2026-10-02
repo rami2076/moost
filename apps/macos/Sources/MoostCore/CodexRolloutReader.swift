@@ -6,7 +6,7 @@ import Foundation
 /// セッション本体は `sessions/YYYY/MM/DD/rollout-<日時>-<sessionId>.jsonl`。
 /// 日付ディレクトリの構造には依存せず、「ファイル名末尾が `-<sessionId>.jsonl`」
 /// という性質だけを使って再帰走査で見つける（AiTitleReader と同じ方針）。
-public final class CodexRolloutReader {
+public final class CodexRolloutReader: Sendable {
     private let sessionsDir: URL
 
     public init(sessionsDir: URL) {

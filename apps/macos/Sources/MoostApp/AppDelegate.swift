@@ -101,17 +101,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             print("SMOKE: no window")
             return
         }
+        // 主経路: 実画面キャプチャ（ウィンドウサーバー経由。暗転もそのまま写る）。
+        // 再表示直後はウィンドウが CGWindowList に登録されるまで少し時間がかかる
+        // ことがあるため数回リトライする。
         let windowID = CGWindowID(window.windowNumber)
-        guard let cgImage = CGWindowListCreateImage(
-            .null, .optionIncludingWindow, windowID,
-            [.boundsIgnoreFraming, .bestResolution]) else {
-            print("SMOKE: capture failed window=\(window.windowNumber)")
+        for attempt in 0..<3 {
+            if let cgImage = CGWindowListCreateImage(
+                .null, .optionIncludingWindow, windowID,
+                [.boundsIgnoreFraming, .bestResolution]) {
+                let rep = NSBitmapImageRep(cgImage: cgImage)
+                if let data = rep.representation(using: .png, properties: [:]) {
+                    try? data.write(to: URL(fileURLWithPath: path))
+                    print("SMOKE: captured \(path) key=\(window.isKeyWindow)")
+                    return
+                }
+            } else if attempt == 2 {
+                // macOS 26 ではウィンドウサーバー経由のキャプチャが失敗することが
+                // ある（画面収録権限まわりの制限）。その場合はアプリ自身のビュー
+                // 階層を直接レンダリングして PNG を作る（サーバー不要で確実）。
+                // 暗転（ウィンドウサーバー側の減光）は写らないため、回帰検出は
+                // 後続の key=\(window.isKeyWindow) ログ側で担保する。
+                renderViewFallback(view: window.contentView, label: window.isKeyWindow, to: path)
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        print("SMOKE: capture failed window=\(window.windowNumber)")
+    }
+
+    /// NSView を直接ビットマップへ描画するフォールバック（CGWindowList 不使用）。
+    /// key はウィンドウサーバーを経由しないため暗転は写らないが、キー状態は
+    /// ウィンドウオブジェクトから取得できるので回帰検出はログ側で行う。
+    private func renderViewFallback(view: NSView?, label key: Bool, to path: String) {
+        guard let view,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+            print("SMOKE: render fallback failed")
             return
         }
-        let rep = NSBitmapImageRep(cgImage: cgImage)
+        view.cacheDisplay(in: view.bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else { return }
         try? data.write(to: URL(fileURLWithPath: path))
-        print("SMOKE: captured \(path) key=\(window.isKeyWindow)")
+        print("SMOKE: captured \(path) key=\(key)")
     }
     #endif
 

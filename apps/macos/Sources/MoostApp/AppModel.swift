@@ -14,7 +14,7 @@ final class AppModel: ObservableObject {
         case projects
     }
 
-    enum Screen {
+    enum Screen: Equatable {
         case list
         case newMemo(RecentSession)
         case editMemo(Memo)
@@ -54,6 +54,10 @@ final class AppModel: ObservableObject {
     @Published var summaryScopeIsRecent = true
     @Published var summaryRallies = 1
     @Published var isSummarizing = false
+    /// 最後に実行した要約の結果（成功時のみ）。画面を開き直すとリセットする。
+    @Published var summaryText = ""
+    /// 要約実行の失敗メッセージ。成功時は nil に戻す。
+    @Published var summaryError: String?
 
     // MARK: その他 UI 状態
 
@@ -72,6 +76,8 @@ final class AppModel: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     /// claude パス検出タスク（zsh 起動を伴うため必ずバックグラウンド）
     private var detectTask: Task<Void, Never>?
+    /// 要約結果のメモリキャッシュ（sessionId × scope × ラリー数）
+    private let summaryCache = SummaryCache()
 
     init(memoStore: MemoStore, settingsStore: SettingsStore,
          projectStore: ProjectStore, home: String) {
@@ -155,7 +161,7 @@ final class AppModel: ObservableObject {
         let override = settings.claudePath
         detectTask = Task { [weak self] in
             let found = await Task.detached(priority: .utility) {
-                ClaudePathDetect.detect(override: override)
+                AgentPathDetect.claude(override: override)
             }.value
             guard !Task.isCancelled, let self else { return }
             self.detectedClaudePath = found
@@ -185,6 +191,8 @@ final class AppModel: ObservableObject {
     func openSessionDetail(_ session: RecentSession) {
         summaryScopeIsRecent = true
         isSummarizing = false
+        summaryText = ""
+        summaryError = nil
         screen = .sessionDetail(session)
     }
 
@@ -408,13 +416,51 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: - 要約（次インクリメント）
+    // MARK: - 要約（design.md 5 / 6.6 / 6.1）
 
-    /// design.md 6.1 の要約ボタン。エンジン（transcript 抽出 + claude -p）は
-    /// 後続インクリメントで移植するため、現時点では無効状態（UI 側で disabled）。
+    /// design.md 6.1 の要約ボタン。
+    /// エージェント別に transcript を抽出し、ヘッドレス CLI で要約する
+    /// （pi は抽出テキストをそのまま要約として扱う）。
+    /// 実行結果は SummaryCache にキャッシュし、同じセッション詳細を
+    /// 開き直したときに再実行しない。
     func requestSummary(_ session: RecentSession) {
-        isSummarizing = false
-        showToast("要約エンジンは次インクリメントで対応予定です")
+        let cached = summaryCache.get(
+            session.sessionId,
+            scope: summaryScopeIsRecent ? .recent : .full,
+            rallies: summaryRallies)
+        if let cached {
+            summaryText = cached
+            summaryError = nil
+            return
+        }
+
+        isSummarizing = true
+        summaryError = nil
+        let summarizer = SessionSummarizer(home: home, claudePathOverride: settings.claudePath)
+        let scope: SummaryScope = summaryScopeIsRecent ? .recent : .full
+        let rallies = summaryRallies
+        Task { [weak self] in
+            do {
+                // 要約はファイル走査 + サブプロセス起動を伴うため main をブロックしない
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try await summarizer.summarize(
+                        session: session, scope: scope, rallies: rallies)
+                }.value
+                guard let self else { return }
+                self.summaryCache.put(
+                    session.sessionId, scope: scope, rallies: rallies, summary: summary)
+                self.summaryText = summary
+                self.summaryError = nil
+                self.isSummarizing = false
+            } catch {
+                guard let self else { return }
+                let message = (error as? SummarizeError)?.message
+                    ?? error.localizedDescription
+                self.summaryText = ""
+                self.summaryError = message
+                self.isSummarizing = false
+            }
+        }
     }
 
     // MARK: - トースト

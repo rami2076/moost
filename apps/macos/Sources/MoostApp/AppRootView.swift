@@ -88,7 +88,8 @@ struct AgentBadge: View {
         }
     }
 
-    private var label: String {
+    /// 表示用のエージェント名（要約ボタンのラベルにも使う）。
+    static func displayName(for agentId: String) -> String {
         switch agentId {
         case ResumeCommand.claudeAgentId: return "Claude"
         case ResumeCommand.codexAgentId: return "Codex"
@@ -96,6 +97,8 @@ struct AgentBadge: View {
         default: return agentId
         }
     }
+
+    private var label: String { Self.displayName(for: agentId) }
 
     private var color: Color { Self.color(for: agentId) }
 

@@ -339,10 +339,25 @@ final class AppModel: ObservableObject {
             showToast("不明なエージェントです: \(agent)")
             return
         }
-        do {
-            try terminalLauncher.launch(settingValue: settings.terminalApp, command: command)
-        } catch {
-            showToast("ターミナルを起動できませんでした: \(error.localizedDescription)")
+        launchTerminalCommand(command: command)
+    }
+
+    /// osascript によるターミナル起動をバックグラウンドで実行する。
+    /// iTerm2/Terminal.app が未起動の場合、Apple Events の送信が起動完了まで
+    /// 数秒ブロックするため、メインスレッドで実行するとビーチボールになる。
+    /// 起動中 → 成功/失敗のトーストでフィードバックする。
+    private func launchTerminalCommand(command: String) {
+        let terminalApp = settings.terminalApp
+        showToast("ターミナルを起動しています…")
+        Task { @MainActor in
+            do {
+                try await Task.detached(priority: .userInitiated) {
+                    try TerminalLauncher().launch(settingValue: terminalApp, command: command)
+                }.value
+                showToast("ターミナルを開きました")
+            } catch {
+                showToast("ターミナルを起動できませんでした: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -409,11 +424,7 @@ final class AppModel: ObservableObject {
             showToast("不明なエージェントです: \(agent)")
             return
         }
-        do {
-            try terminalLauncher.launch(settingValue: settings.terminalApp, command: command)
-        } catch {
-            showToast("ターミナルを起動できませんでした: \(error.localizedDescription)")
-        }
+        launchTerminalCommand(command: command)
     }
 
     // MARK: - 要約（design.md 5 / 6.6 / 6.1）

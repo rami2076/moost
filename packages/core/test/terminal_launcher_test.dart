@@ -56,23 +56,27 @@ void main() {
       calls = [];
       launcher = TerminalLauncher(
         isLinux: false,
-        runOsascript: (args) async {
+        runMacosCommand: (args) async {
           calls.add(args);
           return ProcessResult(0, exitCode, '', stderr);
         },
       );
     }
 
-    test('Terminal.app: uses do script with the command', () async {
+    test('Terminal.app: launches via a .command file through open', () async {
       arrange();
       await launcher.launch(
         terminal: TerminalApp.terminal,
-        command: 'cd /tmp && claude --resume abc',
+        command: 'cd /tmp && echo hi',
       );
-      final script = calls.single[1];
-      expect(script, contains('tell application "Terminal"'));
-      expect(script, contains('do script'));
-      expect(script, contains('cd /tmp && claude --resume abc'));
+      final args = calls.single;
+      expect(args[0], '/usr/bin/open');
+      expect(args[1], '-a');
+      expect(args[2], 'Terminal');
+      expect(args[3], endsWith('.command'));
+      final content = File(args[3]).readAsStringSync();
+      expect(content, '#!/bin/zsh\ncd /tmp && echo hi\n');
+      File(args[3]).deleteSync();
     });
 
     test('iTerm2: opens a new window and writes text', () async {
@@ -87,10 +91,10 @@ void main() {
       expect(script, contains('write text'));
     });
 
-    test('escapes quotes and backslashes for AppleScript', () async {
+    test('escapes quotes and backslashes for AppleScript (iTerm2)', () async {
       arrange();
       await launcher.launch(
-        terminal: TerminalApp.terminal,
+        terminal: TerminalApp.iterm2,
         command: r'cd "/a b" && x\y',
       );
       final script = calls.single[1];
@@ -99,11 +103,11 @@ void main() {
       expect(script, contains(r'x\\y'));
     });
 
-    test('throws on non-zero exit code', () async {
+    test('throws on non-zero exit code (iTerm2)', () async {
       arrange(exitCode: 1, stderr: 'boom');
       await expectLater(
         launcher.launch(
-          terminal: TerminalApp.terminal,
+          terminal: TerminalApp.iterm2,
           command: 'x',
         ),
         throwsA(isA<TerminalLaunchException>()

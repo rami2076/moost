@@ -140,28 +140,54 @@ public enum ResumeCommand {
 /// リファレンス実装: terminal_launcher.dart の _launchMacos 系。
 /// osascript への受け渡しは「-e + スクリプト 1 本」の単一経路に絞る。
 public final class TerminalLauncher {
-    /// osascript 実行を差し替え可能にする（テスト用）。
-    public let runOsascript: ([String]) -> (exit: Int32, stdout: String, stderr: String)
+    /// コマンド実行を差し替え可能にする（テスト用）。
+    /// osascript（iTerm2）と /usr/bin/open（Terminal.app）の両方を受け止める。
+    public let runCommand: ([String]) -> (exit: Int32, stdout: String, stderr: String)
 
-    public init(runOsascript: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil) {
-        self.runOsascript = runOsascript ?? TerminalLauncher.execute
+    public init(runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil) {
+        // デフォルト引数のある execute は関数参照にできないためクロージャで包む。
+        self.runCommand = runCommand ?? { TerminalLauncher.execute($0) }
     }
 
     public func launch(terminal: TerminalApp, command: String) throws {
         // macOS 上で gnome-terminal が選ばれることはないが、万一に備えて
         // Terminal.app 相当にフォールバックする（Dart 実装と同じ判断）。
-        let script: String
+        let args: [String]
         switch terminal {
-        case .terminal, .gnomeTerminal:
-            script = TerminalLauncher.terminalScript(command)
+        case .terminal:
+            // Terminal.app は AppleScript (do script) ではなく .command ファイル + open で開く。
+            // 署名なしアプリからの Apple Events は tccd への確認が 9 秒かかり、
+            // メインスレッドをブロックする要因になる（2026-10-02 実機計測済み）。
+            // open は LaunchServices 経由で 0.2 秒程度（シェルからの実測 0.15s）。
+            let file = try TerminalLauncher.writeCommandFile(command: command)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
+                try? FileManager.default.removeItem(atPath: file)
+            }
+            args = ["/usr/bin/open", "-a", "Terminal", file]
         case .iterm2:
-            script = TerminalLauncher.iterm2Script(command)
+            args = ["-e", TerminalLauncher.iterm2Script(command)]
+        case .gnomeTerminal:
+            args = ["-e", TerminalLauncher.terminalScript(command)]
         }
-        let result = runOsascript(["-e", script])
+        let result = runCommand(args)
         if result.exit != 0 {
             let reason = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             throw TerminalLaunchError(terminal.rawValue + ": " + reason)
         }
+    }
+
+    /// .command 実行ファイルを一時ディレクトリに書き出す（Terminal.app 用）。
+    /// Terminal.app は LaunchServices 経由で .command を新しいウィンドウで実行する
+    /// （iTerm2 は .command を実行しないため iTerm2 では使えない）。
+    public static func writeCommandFile(command: String) throws -> String {
+        let dir = FileManager.default.temporaryDirectory
+        let url = dir.appendingPathComponent("moost-" + UUID().uuidString + ".command")
+        // 先頭にシェルを明示する（実行ビット付きでも拡張子 .command でシェルに渡されるため
+        // 実質は任意だが、エディタや diff で中身が分かりやすいように付ける）。
+        let content = "#!/bin/zsh\n" + command + "\n"
+        try content.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        return url.path
     }
 
     /// settings.json の terminalApp 値（文字列）から起動する。
@@ -194,7 +220,7 @@ public final class TerminalLauncher {
         return out
     }
 
-    static func terminalScript(_ command: String) -> String {
+    public static func terminalScript(_ command: String) -> String {
         let q = scalarQuote
         let nl = scalarNewline
         let escaped = escapeForAppleScript(command)
@@ -204,7 +230,7 @@ public final class TerminalLauncher {
             + "end tell"
     }
 
-    static func iterm2Script(_ command: String) -> String {
+    public static func iterm2Script(_ command: String) -> String {
         // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
         // "iTerm2" で tell すると -2741 (syntax error) になる（実機検証済み）。
         // リファレンス実装 terminal_launcher.dart と同一の修正を適用。
@@ -220,14 +246,29 @@ public final class TerminalLauncher {
             + "end tell"
     }
 
-    /// 既定の実装。osascript を単発し、stdout / stderr を集める。
+    /// 既定の実装。コマンドを単発し、stdout / stderr を集める。
+    ///
+    /// 先頭要素が絶対パス（"/" 始まり）ならそれを実行ファイルとして起動し、
+    /// それ以外は /usr/bin/osascript として扱う（iTerm2 の AppleScript 経路と
+    /// Terminal.app の /usr/bin/open 経路を 1 つの実行フックにまとめるため）。
     ///
     /// パイプのデッドロック回避（design.md 7 章）: waitUntilExit() より先に
     /// 両ハンドルを読み切る。先に待つと、大容量の出力でパイプが満杯になることがある。
-    private static func execute(_ args: [String]) -> (exit: Int32, stdout: String, stderr: String) {
+    /// タイムアウト（デフォルト 20 秒）付き。Apple Events が返らない場合に
+    /// ハングしないよう terminate() で打ち切る。
+    public static func execute(_ args: [String], timeout: TimeInterval = 20) -> (exit: Int32, stdout: String, stderr: String) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript", isDirectory: false)
-        process.arguments = args
+        let executable: String
+        let processArgs: [String]
+        if let first = args.first, first.hasPrefix("/") {
+            executable = first
+            processArgs = Array(args.dropFirst())
+        } else {
+            executable = "/usr/bin/osascript"
+            processArgs = args
+        }
+        process.executableURL = URL(fileURLWithPath: executable, isDirectory: false)
+        process.arguments = processArgs
         let out = Pipe()
         let err = Pipe()
         process.standardOutput = out
@@ -236,11 +277,54 @@ public final class TerminalLauncher {
             try process.run()
         } catch {
             let detail = String(describing: error)
-            return (-1, "", "osascript を起動できませんでした: " + detail)
+            return (-1, "", "\(executable) を起動できませんでした: " + detail)
         }
-        let collectedOut = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let collectedErr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        process.waitUntilExit()
-        return (process.terminationStatus, collectedOut, collectedErr)
+        // 出力はバックグラウンドで読み、終了待ちはタイムアウト付きセマフォで行う。
+        // 読み込みを先にブロッキングするとタイムアウト監視が始まらないため、
+        // readabilityHandler で常時回収する（パイプ満杯も起きない）。
+        let outData = ThreadSafeOutput()
+        let errData = ThreadSafeOutput()
+        out.fileHandleForReading.readabilityHandler = { handle in
+            outData.append(handle.availableData)
+        }
+        err.fileHandleForReading.readabilityHandler = { handle in
+            errData.append(handle.availableData)
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in semaphore.signal() }
+        let timer = DispatchSource.makeTimerSource(queue: .global())
+        timer.schedule(deadline: .now() + timeout)
+        timer.setEventHandler {
+            if process.isRunning { process.terminate() }
+        }
+        timer.resume()
+        semaphore.wait()
+        timer.cancel()
+        out.fileHandleForReading.readabilityHandler = nil
+        err.fileHandleForReading.readabilityHandler = nil
+        let stdout = String(data: outData.data, encoding: .utf8) ?? ""
+        let stderr = String(data: errData.data, encoding: .utf8) ?? ""
+        if process.terminationReason == .uncaughtSignal, process.terminationStatus == SIGTERM {
+            return (124, stdout, "osascript が \(timeout) 秒以内に終了しませんでした（タイムアウト）")
+        }
+        return (process.terminationStatus, stdout, stderr)
+    }
+}
+
+/// readabilityHandler（@Sendable）から追記されるスレッドセーフな出力バッファ。
+private final class ThreadSafeOutput: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = Data()
+
+    func append(_ data: Data) {
+        lock.lock()
+        storage.append(data)
+        lock.unlock()
+    }
+
+    var data: Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
     }
 }

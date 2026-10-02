@@ -106,22 +106,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 切り分け用。成功/失敗は stdout に "LAUNCHSMOKE:" で出力する。
     private func runLaunchSmoke() {
         let sessionId = ProcessInfo.processInfo.environment["MOOST_TEST_SESSION"] ?? ""
-        guard let session = model.sessions.first(where: { $0.sessionId == sessionId }),
-              let command = ResumeCommand.resume(
-                  agent: session.agentId,
-                  projectPath: session.projectPath,
-                  sessionId: session.sessionId,
-                  provider: model.settings.piProvider,
-                  model: model.settings.piModel)
-        else {
-            print("LAUNCHSMOKE: session not found: \(sessionId)")
-            return
+        // スモークはセッション一覧の読み込み（非同期）に依存しないよう、
+        // 見つからない場合は固定コマンドで起動経路だけを確認する。
+        let command: String
+        if let session = model.sessions.first(where: { $0.sessionId == sessionId }),
+           let c = ResumeCommand.resume(
+               agent: session.agentId,
+               projectPath: session.projectPath,
+               sessionId: session.sessionId,
+               provider: model.settings.piProvider,
+               model: model.settings.piModel) {
+            command = c
+        } else {
+            print("LAUNCHSMOKE: session not found (\(sessionId)), using fallback command")
+            command = "echo moost-smoke"
         }
+        let start = Date()
         do {
             try TerminalLauncher().launch(settingValue: model.settings.terminalApp, command: command)
-            print("LAUNCHSMOKE: OK \(command)")
+            let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+            print("LAUNCHSMOKE: OK \(elapsed)s \(command)")
         } catch {
-            print("LAUNCHSMOKE: FAILED \(error)")
+            let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+            print("LAUNCHSMOKE: FAILED \(elapsed)s \(error)")
+        }
+        // Terminal.app（.command + open）経路の実測。Apple Events を使わないため
+        // 0.2 秒程度で返り、数秒後に Terminal が新規ウィンドウで実行するはず。
+        let marker = "/tmp/moost-terminal-command-ran"
+        try? FileManager.default.removeItem(atPath: marker)
+        let t0 = Date()
+        do {
+            try TerminalLauncher().launch(terminal: .terminal, command: "touch " + marker)
+            let dt = String(format: "%.2f", Date().timeIntervalSince(t0))
+            print("LAUNCHSMOKE TERMINAL_APP=OK \(dt)s marker=\(marker)")
+        } catch {
+            let dt = String(format: "%.2f", Date().timeIntervalSince(t0))
+            print("LAUNCHSMOKE TERMINAL_APP=FAILED \(dt)s \(error)")
+        }
+        // 遅延の切り分け: activate / 新規ウィンドウ作成 / write text を個別に計測
+        let steps: [(String, String)] = [
+            ("activate", "tell application \"iTerm\"\n  activate\nend tell"),
+            ("window", "tell application \"iTerm\"\n  set w to (create window with default profile)\nend tell"),
+            ("tab", "tell application \"iTerm\"\n  activate\n  tell current window\n    create tab with default profile\n    tell current session\n      write text \"echo smoke-tab\"\n    end tell\n  end tell\nend tell"),
+            ("full", TerminalLauncher.iterm2Script("echo smoke-timing")),
+        ]
+        for (label, script) in steps {
+            let t0 = Date()
+            let r = TerminalLauncher.execute(["-e", script])
+            let dt = String(format: "%.2f", Date().timeIntervalSince(t0))
+            print("LAUNCHSMOKE TIMING \(label)=\(dt)s exit=\(r.exit) \(r.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
     }
 

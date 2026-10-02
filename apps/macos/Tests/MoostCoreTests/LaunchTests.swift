@@ -141,17 +141,28 @@ final class LaunchTests: XCTestCase {
         return (args, thrown)
     }
 
-    func test_terminal_script_for_terminal_app() {
-        let (args, error) = captureLaunch(
-            terminal: .terminal, command: "cd /tmp && claude --resume abc")
-        XCTAssertNil(error)
-        XCTAssertEqual(args.count, 1)
-        XCTAssertEqual(args[0].first, "-e")
-        XCTAssertEqual(args[0].count, 2, "-e は 1 本にまとめる")
-        let script = args[0][1]
-        XCTAssertTrue(script.contains("tell application " + q + "Terminal" + q), script)
-        XCTAssertTrue(script.contains("do script"), script)
-        XCTAssertTrue(script.contains("cd /tmp && claude --resume abc"), script)
+    func test_terminal_launch_uses_command_file_via_open() throws {
+        // Terminal.app は AppleScript ではなく .command ファイル + open（LaunchServices）で開く。
+        // 署名なしアプリからの Apple Events は tccd の確認で 9 秒ブロックするため（実機計測）。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher { args in
+            received.append(args)
+            return (0, "", "")
+        }
+        try launcher.launch(terminal: .terminal, command: "cd /tmp && echo hi")
+        XCTAssertEqual(received.count, 1)
+        XCTAssertEqual(received[0].first, "/usr/bin/open")
+        XCTAssertEqual(received[0][1], "-a")
+        XCTAssertEqual(received[0][2], "Terminal")
+        guard received[0].count == 4 else {
+            XCTFail("open の引数は 4 つ想定: \(received[0])"); return
+        }
+        let file = received[0][3]
+        XCTAssertTrue(file.hasSuffix(".command"), file)
+        let content = try String(contentsOfFile: file, encoding: .utf8)
+        XCTAssertEqual(content, "#!/bin/zsh\ncd /tmp && echo hi\n")
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: file))
+        try? FileManager.default.removeItem(atPath: file)
     }
 
     func test_terminal_script_for_iterm2_opens_window_and_writes_text() {
@@ -165,7 +176,7 @@ final class LaunchTests: XCTestCase {
 
     func test_applescript_escapes_quotes_and_backslashes() {
         let (args, _) = captureLaunch(
-            terminal: .terminal,
+            terminal: .iterm2,
             command: "cd " + q + "/a b" + q + " && x" + bs + "y")
         let script = args[0][1]
         let escapedQuote = bs + q
@@ -185,11 +196,11 @@ final class LaunchTests: XCTestCase {
     }
 
     func test_launch_error_carries_stderr_reason() {
-        let (_, error) = captureLaunch(terminal: .terminal, command: "x",
+        let (_, error) = captureLaunch(terminal: .iterm2, command: "x",
                                       exit: 1, stderr: "boom\n")
         XCTAssertNotNil(error)
         XCTAssertTrue(error?.message.contains("boom") ?? false, error?.message ?? "")
-        XCTAssertTrue(error?.message.hasPrefix("Terminal.app:") ?? false)
+        XCTAssertTrue(error?.message.hasPrefix("iTerm2:") ?? false)
     }
 
     func test_launch_with_setting_value_string() throws {
@@ -206,18 +217,19 @@ final class LaunchTests: XCTestCase {
     // MARK: 差し替え経路の契約（実行環境に依存しない検査）
 
     func test_injected_runner_receives_dash_e_and_single_script() throws {
-        // 既定実装と同じ受け渡しになっていることを、差し替えた実行で確かめる。
+        // iTerm2 経路の既定実装と同じ受け渡しになっていることを、差し替えた実行で確かめる。
         var received: [[String]] = []
         let launcher = TerminalLauncher { args in
             received.append(args)
             return (0, "", "")
         }
-        try launcher.launch(terminal: .terminal, command: "echo hi")
-        XCTAssertEqual(received, [["-e", TerminalLauncher.terminalScript("echo hi")]])
+        try launcher.launch(terminal: .iterm2, command: "echo hi")
+        XCTAssertEqual(received, [["-e", TerminalLauncher.iterm2Script("echo hi")]])
     }
 
     func test_scripts_keep_the_dart_reference_shape() {
-        // Dart の _terminalScript / _iterm2Script と同じ構成（tell / activate / do script）。
+        // Dart の _iterm2Script / _terminalScript と同じ構成（tell / activate / do script）。
+        // terminalScript は gnome-terminal フォールバック用に残っている。
         let terminal = TerminalLauncher.terminalScript("x")
         let iterm = TerminalLauncher.iterm2Script("x")
         XCTAssertTrue(terminal.hasPrefix("tell application "))
@@ -226,5 +238,20 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(iterm.contains("create window with default profile"))
         XCTAssertTrue(iterm.contains("write text"))
         XCTAssertFalse(terminal.contains("iTerm"))
+    }
+
+    // MARK: 既定実装（execute）のタイムアウト
+
+    func test_execute_times_out_and_reports_reason() {
+        // osascript の delay 5 を 1 秒で打ち切り、exit 124 + タイムアウト文言を返す。
+        let (exit, stdout, stderr) = TerminalLauncher.execute(["-e", "delay 5"], timeout: 1)
+        XCTAssertEqual(exit, 124, stderr)
+        XCTAssertTrue(stderr.contains("タイムアウト"), stderr)
+        _ = stdout
+    }
+
+    func test_execute_returns_fast_for_short_script() {
+        let (exit, _, stderr) = TerminalLauncher.execute(["-e", "return 0"], timeout: 5)
+        XCTAssertEqual(exit, 0, stderr)
     }
 }

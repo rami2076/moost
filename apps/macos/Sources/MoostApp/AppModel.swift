@@ -1,0 +1,329 @@
+import AppKit
+import Combine
+import Foundation
+import SwiftUI
+import MoostCore
+
+/// ポップオーバー単一画面のステートマシンとデータ保持（design.md 6.2 / 6.3）。
+/// 各画面はコールバックで遷移をモデルに依頼するだけで、画面状態を自分で書き換えない。
+@MainActor
+final class AppModel: ObservableObject {
+    enum ListTab: Hashable {
+        case sessions
+        case memos
+    }
+
+    enum Screen {
+        case list
+        case newMemo(RecentSession)
+        case editMemo(Memo)
+        case sessionDetail(RecentSession)
+        case settings
+        case notes
+    }
+
+    // MARK: 画面状態（単一の状態変数 + switch）
+
+    @Published var screen: Screen = .list
+    @Published var tab: ListTab = .sessions
+
+    // MARK: データ
+
+    @Published private(set) var sessions: [RecentSession] = []
+    @Published private(set) var memos: [Memo] = []
+    @Published private(set) var settings = MoostCore.Settings()
+
+    // MARK: フォーム下書き（画面遷移で破棄しない）
+
+    @Published var draftTitle = ""
+    @Published var draftTags = ""
+    @Published var draftBody = ""
+    @Published var editingMemoId: String?
+    @Published var editTitle = ""
+    @Published var editTags = ""
+    @Published var editBody = ""
+    /// 登録フォーム内のインレイン詳細（design.md 6.3-2。下書きを守る例外的な重ね表示）
+    @Published var newMemoShowsDetail = false
+
+    // MARK: 要約
+
+    @Published var summaryScopeIsRecent = true
+    @Published var summaryRallies = 1
+    @Published var isSummarizing = false
+
+    // MARK: その他 UI 状態
+
+    @Published var toast: String?
+    @Published var detectedClaudePath = ""
+    @Published var autoLaunchEnabled = false
+    @Published var deleteConfirmVisible = false
+
+    private let memoStore: MemoStore
+    private let settingsStore: SettingsStore
+    private let home: String
+    private let terminalLauncher = TerminalLauncher()
+    private var toastTask: Task<Void, Never>?
+
+    init(memoStore: MemoStore, settingsStore: SettingsStore, home: String) {
+        self.memoStore = memoStore
+        self.settingsStore = settingsStore
+        self.home = home
+    }
+
+    static func defaultApp() -> AppModel {
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? ""
+        return AppModel(memoStore: MemoStore.defaultLocation(),
+                        settingsStore: SettingsStore.defaultLocation(),
+                        home: home)
+    }
+
+    /// 初回起動（v1 → v2 移行を含む）。
+    func bootstrap() {
+        do {
+            _ = try DataMigration.migrateIfNeeded(homeDirectoryPath: home)
+        } catch {
+            showToast("v1 からの移行に失敗しました: \(error.localizedDescription)")
+        }
+        refresh()
+    }
+
+    /// ポップオーバーを開いたとき・タブを切り替えたとき・フォームから戻ったときに
+    /// 呼ぶ（design.md 6.1「手動リロード不要。開きっぱなしの間は更新されない」）。
+    func refresh() {
+        loadSettings()
+        loadSessions()
+        loadMemos()
+        detectClaudePath()
+        reloadAutoLaunchStatus()
+        summaryRallies = settings.summaryRallyCount
+    }
+
+    // MARK: - 読み込み
+
+    private func loadSettings() {
+        do {
+            settings = try settingsStore.load()
+        } catch {
+            showToast("設定を読み込めませんでした: \(error.localizedDescription)")
+        }
+    }
+
+    private func loadSessions() {
+        sessions = SessionAggregator.recentSessions(
+            homeDirectory: home, limit: settings.recentSessionLimit)
+    }
+
+    private func loadMemos() {
+        do {
+            memos = try memoStore.load()
+        } catch {
+            showToast("メモを読み込めませんでした: \(error.localizedDescription)")
+        }
+    }
+
+    /// 設定変更後にも呼べるよう internal。検出結果は published に載せる。
+    func detectClaudePath() {
+        detectedClaudePath = ClaudePathDetect.detect(override: settings.claudePath)
+            ?? "見つかりません（要約機能は claude コマンドが必要）"
+    }
+
+    // MARK: - 画面遷移（design.md 6.3-3: 遷移はルートに集約）
+
+    func openNewMemo(for session: RecentSession) {
+        draftTitle = session.aiTitle ?? String(session.lastPrompt.prefix(80))
+        draftTags = ""
+        draftBody = ""
+        newMemoShowsDetail = false
+        screen = .newMemo(session)
+    }
+
+    func openEditMemo(_ memo: Memo) {
+        editingMemoId = memo.id
+        editTitle = memo.title
+        editTags = memo.tags.joined(separator: ", ")
+        editBody = memo.body
+        deleteConfirmVisible = false
+        screen = .editMemo(memo)
+    }
+
+    func openSessionDetail(_ session: RecentSession) {
+        summaryScopeIsRecent = true
+        isSummarizing = false
+        screen = .sessionDetail(session)
+    }
+
+    func openSettings() { screen = .settings }
+    func openNotes() { screen = .notes }
+    func backToList(returningTo tab: ListTab) {
+        screen = .list
+        self.tab = tab
+        refresh()
+    }
+
+    func switchTab(_ tab: ListTab) {
+        self.tab = tab
+        refresh()
+    }
+
+    // MARK: - メモ CRUD
+
+    func saveNewMemo(for session: RecentSession) {
+        let title = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            showToast("タイトルを入力してください")
+            return
+        }
+        let memo = Memo(
+            id: UUID().uuidString.lowercased(),
+            agent: session.agentId,
+            sessionId: session.sessionId,
+            title: title,
+            tags: parseTags(draftTags),
+            body: draftBody,
+            projectPath: session.projectPath,
+            createdAt: Date(),
+            updatedAt: Date())
+        do {
+            try memoStore.add(memo)
+            showToast("メモを保存しました")
+            backToList(returningTo: .memos) // 登録したメモを確認できるように（6.3-1）
+        } catch {
+            showToast("保存に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
+    func cancelNewMemo() {
+        backToList(returningTo: .sessions) // 入口だった画面へ（6.3-1）
+    }
+
+    func updateMemo(_ memo: Memo) {
+        let title = editTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            showToast("タイトルを入力してください")
+            return
+        }
+        do {
+            _ = try memoStore.update(memo.id, title: title,
+                                     tags: parseTags(editTags), body: editBody)
+            showToast("メモを更新しました")
+            backToList(returningTo: .memos)
+        } catch {
+            showToast("更新に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
+    func deleteMemo(_ memo: Memo) {
+        do {
+            _ = try memoStore.delete(memo.id)
+            showToast("メモを削除しました")
+            backToList(returningTo: .memos)
+        } catch {
+            showToast("削除に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - 設定
+
+    func saveSettings(_ updated: MoostCore.Settings) {
+        do {
+            try settingsStore.save(updated)
+            settings = updated
+            showToast("設定を保存しました")
+            // 表示件数・ターミナルを反映
+            loadSessions()
+            detectClaudePath()
+        } catch {
+            showToast("設定を保存できませんでした: \(error.localizedDescription)")
+        }
+    }
+
+    /// 要約対象のラリー数。設定画面に出さないが永続化する（design.md 6.6）。
+    func setSummaryRallies(_ count: Int) {
+        summaryRallies = count
+        var updated = settings
+        updated.summaryRallyCount = count
+        settings = updated
+        do {
+            try settingsStore.save(updated)
+        } catch {
+            showToast("ラリー数の保存に失敗しました: \(error.localizedDescription)")
+        }
+    }
+
+    func setAutoLaunch(_ enabled: Bool) {
+        do {
+            try AutoLaunchService.setEnabled(enabled)
+            autoLaunchEnabled = enabled
+        } catch {
+            showToast("ログイン時自動起動の変更に失敗しました: \(error.localizedDescription)")
+        }
+        reloadAutoLaunchStatus()
+    }
+
+    private func reloadAutoLaunchStatus() {
+        autoLaunchEnabled = AutoLaunchService.isEnabled()
+    }
+
+    func quit() {
+        NSApplication.shared.terminate(nil)
+    }
+
+    // MARK: - 復帰・コピー（spec G1 / G2 をこの層から使う）
+
+    private func resumeCommand(agent: String, projectPath: String, sessionId: String) -> String? {
+        ResumeCommand.resume(agent: agent, projectPath: projectPath, sessionId: sessionId,
+                             provider: settings.piProvider, model: settings.piModel)
+    }
+
+    func copyResumeCommand(agent: String, projectPath: String, sessionId: String) {
+        guard let command = resumeCommand(agent: agent, projectPath: projectPath, sessionId: sessionId)
+        else {
+            showToast("不明なエージェントです: \(agent)")
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(command, forType: .string)
+        showToast("復帰コマンドをコピーしました")
+    }
+
+    func openInTerminal(agent: String, projectPath: String, sessionId: String) {
+        guard let command = resumeCommand(agent: agent, projectPath: projectPath, sessionId: sessionId)
+        else {
+            showToast("不明なエージェントです: \(agent)")
+            return
+        }
+        do {
+            try terminalLauncher.launch(settingValue: settings.terminalApp, command: command)
+        } catch {
+            showToast("ターミナルを起動できませんでした: \(error.localizedDescription)")
+        }
+    }
+
+    /// メモからの復帰動線（メモは復帰情報を自己完結で持つ）。
+    func resumeFromMemo(_ memo: Memo) {
+        openInTerminal(agent: memo.agent, projectPath: memo.projectPath,
+                       sessionId: memo.sessionId)
+    }
+
+    // MARK: - 要約（次インクリメント）
+
+    /// design.md 6.1 の要約ボタン。エンジン（transcript 抽出 + claude -p）は
+    /// 後続インクリメントで移植するため、現時点では無効状態（UI 側で disabled）。
+    func requestSummary(_ session: RecentSession) {
+        isSummarizing = false
+        showToast("要約エンジンは次インクリメントで対応予定です")
+    }
+
+    // MARK: - トースト
+
+    func showToast(_ message: String) {
+        toast = message
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
+    }
+}

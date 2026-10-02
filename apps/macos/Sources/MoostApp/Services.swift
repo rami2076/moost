@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import MoostCore
 import ServiceManagement
 
 /// ログイン時自動起動（design.md 6.6）。
@@ -21,11 +22,13 @@ enum AutoLaunchService {
 }
 
 /// `moost mcp` の CLI サブコマンド（アプリ内蔵 MCP サーバー、stdio JSON-RPC）。
-/// Node 前提にしない。実装は第 3 インクリメント（Main.swift の方針を引き継ぐ）。
+/// Node 前提にしない。実態は MoostCore の MCPServer（Issue #43 の Dart 実装の移植）。
 enum MCPServerCLI {
     static func run() {
-        fputs("moost mcp: 実装は第 3 インクリメントで対応予定です（#78 の残タスク）。\n", stderr)
-        exit(0)
+        let home = ProcessInfo.processInfo.environment["HOME"]
+            ?? FileManager.default.homeDirectoryForCurrentUser.path
+        let server = MCPServer(home: home, serverVersion: AppInfo.version)
+        server.serve(channel: StdioMCPChannel())
     }
 }
 

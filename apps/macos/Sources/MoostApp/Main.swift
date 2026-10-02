@@ -3,7 +3,7 @@ import Foundation
 
 // moost のエントリ。
 // - 引数なし / GUI 起動: トレイ常駐アプリ（NSStatusItem + NSPopover、Dock アイコンなし）
-// - `moost mcp`: アプリ内蔵 MCP サーバー（stdio JSON-RPC。第 3 インクリメント）
+// - `moost mcp`: アプリ内蔵 MCP サーバー（stdio JSON-RPC。MoostCore/MCPServer.swift）
 // - `moost --version`: バージョン表示
 @main
 struct MoostMain {

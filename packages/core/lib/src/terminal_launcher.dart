@@ -221,11 +221,17 @@ end tell''';
     // "iTerm2" で tell すると -2741 (syntax error) になる（2026-10-02 実機検証済み）。
     // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
     // 常に create window すると「復元窓 + 新窓」で 2 窓になる（2026-10-03 実機検証済み）。
-    // 既存ウィンドウがある場合はそのウィンドウに新規タブを追加し、ウィンドウ数を増やさない。
+    // 復元完了前に (count of windows) を評価すると 0 になり 2 窓になるため、
+    // ウィンドウが現れるまでポーリングで待ってから分岐する（最大 4.5 秒）。
     final escaped = _escape(command);
     return '''
 tell application "iTerm"
   activate
+  set attemptCount to 0
+  repeat while (count of windows) = 0 and attemptCount < 15
+    delay 0.3
+    set attemptCount to attemptCount + 1
+  end repeat
   if (count of windows) = 0 then
     set newWindow to (create window with default profile)
     tell current session of newWindow

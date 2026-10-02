@@ -172,6 +172,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(script.contains("tell application " + q + "iTerm" + q), script)
         // 既存ウィンドウがあれば新規ウィンドウを増やさずタブを追加する（2 窓問題対策）
         XCTAssertTrue(script.contains("count of windows"), script)
+        // 復元完了前に count を評価すると 2 窓になるため、ウィンドウが現れるまでポーリングで待つ
+        XCTAssertTrue(script.contains("repeat while"), script)
+        XCTAssertTrue(script.contains("delay 0.3"), script)
         XCTAssertTrue(script.contains("create window with default profile"), script)
         XCTAssertTrue(script.contains("create tab with default profile"), script)
         XCTAssertTrue(script.contains("write text"), script)

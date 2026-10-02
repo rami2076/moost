@@ -89,6 +89,9 @@ void main() {
       expect(script, contains('tell application "iTerm"'));
       // 既存ウィンドウがあれば新規ウィンドウを増やさずタブを追加する（2 窓問題対策）
       expect(script, contains('count of windows'));
+      // 復元完了前に count を評価すると 2 窓になるため、ウィンドウが現れるまでポーリングで待つ
+      expect(script, contains('repeat while'));
+      expect(script, contains('delay 0.3'));
       expect(script, contains('create window with default profile'));
       expect(script, contains('create tab with default profile'));
       expect(script, contains('write text'));

@@ -235,12 +235,19 @@ public final class TerminalLauncher {
         // "iTerm2" で tell すると -2741 (syntax error) になる（実機検証済み）。
         // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
         // 常に create window すると「復元窓 + 新窓」で 2 窓になってしまう（実機検証済み）。
-        // 既存ウィンドウがある場合はそのウィンドウに新規タブを追加し、ウィンドウ数を増やさない。
+        // さらに復元はアプリ起動直後に完了するが、復元完了前に (count of windows) を
+        // 評価すると 0 になり無駄な新規ウィンドウを作る。そのためポーリングで
+        // ウィンドウが現れるまで待ってから分岐する（最大 4.5 秒）。
         let q = scalarQuote
         let nl = scalarNewline
         let escaped = escapeForAppleScript(command)
         return "tell application " + q + "iTerm" + q + nl
             + "  activate" + nl
+            + "  set attemptCount to 0" + nl
+            + "  repeat while (count of windows) = 0 and attemptCount < 15" + nl
+            + "    delay 0.3" + nl
+            + "    set attemptCount to attemptCount + 1" + nl
+            + "  end repeat" + nl
             + "  if (count of windows) = 0 then" + nl
             + "    set newWindow to (create window with default profile)" + nl
             + "    tell current session of newWindow" + nl

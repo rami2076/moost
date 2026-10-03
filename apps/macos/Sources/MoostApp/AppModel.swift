@@ -261,7 +261,8 @@ final class AppModel: ObservableObject {
     func deleteMemo(_ memo: Memo) {
         do {
             _ = try memoStore.delete(memo.id)
-            showToast("メモを削除しました")
+            // v1（Flutter 版）と同じく成功時はトーストを出さない。
+            // 行が消えるだけで十分（ユーザー要望: 削除ボタンで即座に消える）。
             backToList(returningTo: .memos)
         } catch {
             showToast("削除に失敗しました: \(error.localizedDescription)")

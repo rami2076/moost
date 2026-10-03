@@ -41,15 +41,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let popoverWindow = popover?.contentViewController?.view.window {
             panel.level = NSWindow.Level(rawValue: popoverWindow.level.rawValue + 1)
         }
-        // ピッカーをカーソル位置を中心に表示する。
-        // ユーザー要望 2026-10-03: 「カーソルがある位置を中心にして表示。moost と重なっても OK」。
+        // ピッカーをカーソル位置に「ヘッダー（上端）」が来るように表示する。
+        // ユーザー要望 2026-10-03: 「カーソル位置からピッカーのヘッダーが来るように」。
+        // カーソルがヘッダー部分（タイトルバー）に乗る位置 = カーソルのすぐ下に展開。
         // 画面外にはみ出さないようマウスがある画面内にクランプする。
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             var f = panel.frame
             let mouse = NSEvent.mouseLocation // 左下原点のグローバル座標
             var x = mouse.x - f.width / 2
-            var y = mouse.y - f.height / 2
+            var y = mouse.y - 14 // カーソルがヘッダー（タイトルバー ~28px）中央に乗る
             if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) {
                 let r = screen.frame
                 x = max(r.minX + 16, min(x, r.maxX - f.width - 16))

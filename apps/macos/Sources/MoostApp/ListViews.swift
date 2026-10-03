@@ -72,7 +72,7 @@ struct ListScreen: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Button {
-                    model.registerProject()
+                    model.requestRegisterProject()
                 } label: {
                     Image(systemName: "folder.badge.plus")
                 }
@@ -99,6 +99,15 @@ struct ListScreen: View {
                         EmptyHint(text: "登録プロジェクトがありません。\n右上のフォルダアイコンから登録できます。")
                     }
                 }
+            }
+        }
+        // NSOpenPanel.runModal() はポップオーバーを閉じてしまうため、
+        // SwiftUI の fileImporter（シート）でディレクトリを選択する（ユーザー報告）。
+        .fileImporter(isPresented: $model.showProjectImporter,
+                      allowedContentTypes: [.folder],
+                      allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                model.registerProject(path: url.path)
             }
         }
     }

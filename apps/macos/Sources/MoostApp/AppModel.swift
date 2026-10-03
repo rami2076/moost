@@ -406,16 +406,17 @@ final class AppModel: ObservableObject {
     // MARK: - 登録プロジェクト（v1 のプロジェクトタブ相当）
 
     /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして保存する。
-    /// キャンセル時は何も変更しない（Flutter 版の `_registerProject` と同じ挙動）。
-    func registerProject() {
-        let panel = NSOpenPanel()
-        panel.title = "登録プロジェクトの選択"
-        panel.message = "新規セッションを開始したいディレクトリを選択"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "登録"
-        guard panel.runModal() == .OK, let path = panel.url?.path else { return }
+    /// ディレクトリ選択シート（fileImporter）の表示制御。
+    @Published var showProjectImporter = false
+
+    /// プロジェクトタブのフォルダ追加ボタンから呼ぶ（ポップオーバーを閉じない）。
+    func requestRegisterProject() {
+        showProjectImporter = true
+    }
+
+    /// fileImporter で選択されたディレクトリを登録する。
+    /// NSOpenPanel.runModal() はポップオーバーを閉じてしまうため使わない（ユーザー報告）。
+    func registerProject(path: String) {
         let project = Project(id: UUID().uuidString, projectPath: path, createdAt: Date())
         saveProjects(adding: project)
         // refresh() は全セッション集計を含み重いため、プロジェクト一覧だけを

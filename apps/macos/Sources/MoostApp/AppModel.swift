@@ -51,6 +51,9 @@ final class AppModel: ObservableObject {
     /// 登録フォーム内のインレイン詳細（design.md 6.3-2。下書きを守る例外的な重ね表示）
     @Published var newMemoShowsDetail = false
 
+    /// プロジェクトタブの「フォルダ追加」ボタンのグローバル座標（スモーク検証用・本番影響なし）。
+    @Published var projectAddButtonFrame: CGRect = .zero
+
     // MARK: 要約
 
     @Published var summaryScopeIsRecent = true
@@ -408,10 +411,14 @@ final class AppModel: ObservableObject {
     /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして保存する。
     /// プロジェクトタブのフォルダ追加ボタンから呼ぶ。
     /// SwiftUI の .fileImporter はポップオーバーの transient 挙動（外側クリックで閉じる）
-    /// を壊すため、AppKit の beginSheetModal（ポップオーバーにシートを付ける）を使う。
+    /// を壊すため、AppKit の begin（独立ウィンドウ）+ 自前 transient を使う。
     /// （ユーザー報告 2026-10-03: 選択/キャンセル後も外側クリックで閉じない）
     func requestRegisterProject() {
-        AppDelegate.shared?.beginProjectPanel { [weak self] path in
+        // 人間の操作ではクリック直後のマウスはボタンの上にあるため、現在位置で十分。
+        // NSApp.currentEvent はスモークからの呼び出しや non-event 経路で別イベントを
+        // 拾うことがあり、クリック位置が化ける（2026-10-03 実測）ため使わない。
+        let clickPoint = NSEvent.mouseLocation
+        AppDelegate.shared?.beginProjectPanel(at: clickPoint) { [weak self] path in
             guard let self, let path else { return } // キャンセル: 何も変更しない
             self.registerProject(path: path)
         }

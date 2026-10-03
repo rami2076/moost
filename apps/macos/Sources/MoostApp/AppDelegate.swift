@@ -15,8 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// プロジェクト登録用の NSOpenPanel を表示する（ポップオーバーは閉じない）。
     /// 完了時はポップオーバーを表示したままキーのみ戻す（restoreTransientPopover）。
+    /// - Parameter anchor: ピッカーのヘッダーを合わせる地点（クリック位置 = マウス位置）。
     @MainActor
-    func beginProjectPanel(onSelect: @escaping (String?) -> Void) {
+    func beginProjectPanel(at anchor: NSPoint, onSelect: @escaping (String?) -> Void) {
         let panel = NSOpenPanel()
         panel.title = "登録プロジェクトの選択"
         panel.message = "新規セッションを開始したいディレクトリを選択"
@@ -24,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "登録"
+        // ピッカーを小さくして、画面上端（メニューバー直下）のボタン付近でも
+        // ヘッダーをカーソル位置に置いたまま画面内に収まるようにする。
+        // （デフォルト 880x448 ではカーソルが上端にあるとクランプで離れてしまう）
+        panel.setContentSize(NSSize(width: 660, height: 420))
         let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             if response == .OK, let url = panel.url {
                 onSelect(url.path)
@@ -41,25 +46,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let popoverWindow = popover?.contentViewController?.view.window {
             panel.level = NSWindow.Level(rawValue: popoverWindow.level.rawValue + 1)
         }
-        // ピッカーをカーソル位置に「ヘッダー（上端）」が来るように表示する。
+        // ピッカーのヘッダーをアンカー（ボタン上のマウス位置）に合わせる。
         // ユーザー要望 2026-10-03: 「カーソル位置からピッカーのヘッダーが来るように」。
-        // カーソルがヘッダー部分（タイトルバー）に乗る位置 = カーソルのすぐ下に展開。
-        // 画面外にはみ出さないようマウスがある画面内にクランプする。
+        // アンカーがある画面内にクランプする。画面が見つからない場合はメイン画面。
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             var f = panel.frame
-            let mouse = NSEvent.mouseLocation // 左下原点のグローバル座標
-            var x = mouse.x - f.width / 2
-            var y = mouse.y - 14 // カーソルがヘッダー（タイトルバー ~28px）中央に乗る
-            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) {
-                let r = screen.frame
-                x = max(r.minX + 16, min(x, r.maxX - f.width - 16))
-                y = max(r.minY + 16, min(y, r.maxY - f.height - 16))
+            // 高さのみ縮小（幅は NSOpenPanel が最小 ~820 に戻すため触らない。2026-10-03 実測）
+            f.size.height = 420
+            let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) }) ?? NSScreen.main
+            guard let screen else { return }
+            let r = screen.frame
+            // ヘッダー（上端 = origin.y + height）をアンカーに合わせる: origin.y = anchor.y - 14 - h
+            let yBelow = anchor.y - 14 - f.height // 下方向展開（ヘッダーがアンカーの直下）
+            let yAbove = anchor.y + 14 // 上方向展開（下端がアンカーの直上）
+            let originY: CGFloat
+            if yBelow >= r.minY + 16 {
+                originY = yBelow
+            } else if yAbove + f.height <= r.maxY - 16 {
+                originY = yAbove
+            } else {
+                originY = max(r.minY + 16, min(yBelow, r.maxY - f.height - 16))
             }
-            f.origin.x = x
-            f.origin.y = y
+            let originX = max(r.minX + 16, min(anchor.x - f.width / 2, r.maxX - f.width - 16))
+            f.origin.x = originX
+            f.origin.y = originY
             panel.setFrame(f, display: true)
-            print("SMOKE panel-reposition to \(panel.frame) mouse=\(mouse)")
+            print("SMOKE panel-reposition to \(panel.frame) anchor=\(anchor)")
         }
         panel.orderFrontRegardless()
     }
@@ -213,7 +226,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             togglePopover(nil)
             try? await Task.sleep(nanoseconds: 500_000_000)
-            model.requestRegisterProject()
+            // 人間の操作の再現: マウスは「フォルダ追加ボタン」の上にある。
+            // ボタンの AppKit グローバル座標（ScreenPointReporter 報告）へカーソルを Warp し、
+            // 本番経路（requestRegisterProject → NSEvent.mouseLocation）を検証する。
+            model.switchTab(.projects)
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            let btn = model.projectAddButtonFrame
+            print("SMOKE addButtonFrame(AppKit global)=\(btn)")
+            if btn != .zero {
+                let anchor = CGPoint(x: btn.midX, y: btn.midY)
+                // CGWarpMouseCursorPosition は左上原点（Quartz）を期待するため変換
+                if let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) }) {
+                    CGWarpMouseCursorPosition(CGPoint(x: anchor.x, y: screen.frame.maxY - anchor.y))
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                let loc = NSEvent.mouseLocation
+                let near = abs(loc.x - anchor.x) < 8 && abs(loc.y - anchor.y) < 8
+                print("SMOKE anchor=\(anchor) mouse=\(loc) warpOK=\(near)")
+                if near {
+                    model.requestRegisterProject() // 本番経路（mouseLocation）
+                } else {
+                    // Warp が効かない環境でも実操作を再現するためボタン中心を直接渡す
+                    AppDelegate.shared?.beginProjectPanel(at: anchor) { _ in }
+                }
+            } else {
+                model.requestRegisterProject()
+            }
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             for (i, s) in NSScreen.screens.enumerated() {
                 print("SMOKE screen[\(i)] frame=\(s.frame) isMain=\(NSScreen.main === s)")

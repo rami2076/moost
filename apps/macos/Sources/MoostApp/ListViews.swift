@@ -1,6 +1,26 @@
 import SwiftUI
 import MoostCore
 
+/// ビューのグローバル座標を **AppKit 座標（左下原点）** で報告する NSViewRepresentable。
+/// SwiftUI の geo.frame(in: .global) は左上原点で NSOpenPanel.frame / NSEvent.mouseLocation
+/// （左下原点）と混同しやすく、そのまま使うと y が反転する（2026-10-03 実測）。
+/// そのため NSView の convertToScreen で正確な AppKit グローバル座標を取得する。
+struct ScreenPointReporter: NSViewRepresentable {
+    let onReport: (CGRect) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async {
+            guard let window = v.window else { return }
+            let inWindow = v.convert(v.bounds, to: nil)
+            onReport(window.convertToScreen(inWindow))
+        }
+        return v
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
 /// ルートの一覧画面（直近セッション / メモ一覧 / 登録プロジェクトの 3 タブ + フッター）。
 /// 行クリック → メモ登録（セッション）/ メモ編集（メモ）。詳細・コピーのアイコン付き。
 /// プロジェクトタブは v1（Flutter 版）のプロジェクト一覧に相当（design.md 6.1 では
@@ -78,6 +98,11 @@ struct ListScreen: View {
                 }
                 .buttonStyle(.borderless)
                 .help("ディレクトリを登録")
+                .background(
+                    ScreenPointReporter { frame in
+                        model.projectAddButtonFrame = frame
+                    }
+                )
                 Text("登録したディレクトリからエージェント別に新規セッションを開始できます")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)

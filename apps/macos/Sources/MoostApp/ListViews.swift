@@ -101,15 +101,6 @@ struct ListScreen: View {
                 }
             }
         }
-        // NSOpenPanel.runModal() はポップオーバーを閉じてしまうため、
-        // SwiftUI の fileImporter（シート）でディレクトリを選択する（ユーザー報告）。
-        .fileImporter(isPresented: $model.showProjectImporter,
-                      allowedContentTypes: [.folder],
-                      allowsMultipleSelection: false) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                model.registerProject(path: url.path)
-            }
-        }
     }
 
     private var footer: some View {

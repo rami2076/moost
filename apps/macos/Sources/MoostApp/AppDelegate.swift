@@ -6,13 +6,57 @@ import SwiftUI
 /// design.md 6 章（NSStatusItem + NSPopover）の native 実装。
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// fileImporter などのシート/パネル完了後にポップオーバー状態を戻すための参照。
+    static weak var shared: AppDelegate?
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
 
     let model = AppModel.defaultApp()
 
+    /// fileImporter（NSOpenPanel）を閉じた後、ポップオーバーを通常の transient
+    /// 挙動（外側クリックで閉じる）に戻す。SwiftUI の .fileImporter は NSOpenPanel を
+    /// 独立ウィンドウで表示するため、閉じた後もポップオーバーがキーにならず
+    /// 外側クリックで閉じない状態が残ることがある（ユーザー報告 2026-10-03）。
+    func restoreTransientPopover() {
+        guard let popover, let window = popover.contentViewController?.view.window else { return }
+        popover.behavior = .transient
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            window.makeKey()
+        }
+    }
+
+    /// プロジェクト登録用の NSOpenPanel をポップオーバーのシートとして表示する。
+    /// SwiftUI の .fileImporter はポップオーバーの transient 挙動を壊すため使わず、
+    /// beginSheetModal でポップオーバー自身にシートを付けることで、
+    /// 選択/キャンセル後も「外側クリックで閉じる」本来の挙動を保つ。
+    @MainActor
+    func beginProjectPanel(onSelect: @escaping (String?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.title = "登録プロジェクトの選択"
+        panel.message = "新規セッションを開始したいディレクトリを選択"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "登録"
+        let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            if response == .OK, let url = panel.url {
+                onSelect(url.path)
+            } else {
+                onSelect(nil) // キャンセル: 何も変更しない（Flutter 版と同挙動）
+            }
+            self?.restoreTransientPopover()
+        }
+        if let window = popover?.contentViewController?.view.window {
+            panel.beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            panel.begin(completionHandler: completion)
+        }
+    }
+
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
         let statusItem = NSStatusBar.system.statusItem(
             withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -108,7 +152,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 model.openNewMemo(for: first)
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 capturePopover(to: "/tmp/moost-popover-6.png")
+                model.backToList(returningTo: .sessions)
+                try? await Task.sleep(nanoseconds: 300_000_000)
             }
+            // fileImporter（ポップオーバーの挙動検証: 閉じた後も transient が維持されるか）
+            model.switchTab(.projects)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            print("SMOKE before behavior=\(popover?.behavior.rawValue ?? -1)")
+            model.requestRegisterProject()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            let keyPanel = NSApp.keyWindow as? NSSavePanel
+            let panels = NSApp.windows.compactMap { $0 as? NSSavePanel }
+            print("SMOKE importer sheet=\(keyPanel != nil) panels=\(panels.count) behavior=\(popover?.behavior.rawValue ?? -1) keyPopup=\(NSApp.keyWindow === popover?.contentViewController?.view.window)")
+            capturePopover(to: "/tmp/moost-popover-7.png")
+            keyPanel?.cancel(nil)
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            print("SMOKE after cancel behavior=\(popover?.behavior.rawValue ?? -1)")
+            // 修正検証: restoreTransientPopover 後にポップオーバーが再びキーになるか
+            AppDelegate.shared?.restoreTransientPopover()
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            let popoverWindow = popover?.contentViewController?.view.window
+            print("SMOKE after restore behavior=\(popover?.behavior.rawValue ?? -1) keyPopup=\(NSApp.keyWindow === popoverWindow)")
+            // 外側クリックのシミュレート（権限があれば popover が閉じるはず）
+            let point = CGPoint(x: 5, y: 5)
+            if let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
+                                  mouseCursorPosition: point, mouseButton: .left),
+               let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp,
+                                mouseCursorPosition: point, mouseButton: .left) {
+                down.post(tap: .cghidEventTap)
+                up.post(tap: .cghidEventTap)
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            print("SMOKE after outside click shown=\(popover?.isShown ?? false)")
             // Terminal 起動テスト（MOOST_UI_SMOKE_LAUNCH=1。TCC 権限の実測用）
             if ProcessInfo.processInfo.environment["MOOST_UI_SMOKE_LAUNCH"] == "1" {
                 runLaunchSmoke()

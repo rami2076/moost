@@ -406,12 +406,15 @@ final class AppModel: ObservableObject {
     // MARK: - 登録プロジェクト（v1 のプロジェクトタブ相当）
 
     /// フォルダ選択ダイアログを開き、選ばれたディレクトリを登録プロジェクトとして保存する。
-    /// ディレクトリ選択シート（fileImporter）の表示制御。
-    @Published var showProjectImporter = false
-
-    /// プロジェクトタブのフォルダ追加ボタンから呼ぶ（ポップオーバーを閉じない）。
+    /// プロジェクトタブのフォルダ追加ボタンから呼ぶ。
+    /// SwiftUI の .fileImporter はポップオーバーの transient 挙動（外側クリックで閉じる）
+    /// を壊すため、AppKit の beginSheetModal（ポップオーバーにシートを付ける）を使う。
+    /// （ユーザー報告 2026-10-03: 選択/キャンセル後も外側クリックで閉じない）
     func requestRegisterProject() {
-        showProjectImporter = true
+        AppDelegate.shared?.beginProjectPanel { [weak self] path in
+            guard let self, let path else { return } // キャンセル: 何も変更しない
+            self.registerProject(path: path)
+        }
     }
 
     /// fileImporter で選択されたディレクトリを登録する。

@@ -12,6 +12,22 @@ struct SettingsScreen: View {
     @State private var piProvider = ""
     @State private var piModel = ""
 
+    // MCP 連携（保存先: 外部ツール側。moost の設定ファイルには持たない）
+    @State private var mcpClaudeCodeConnected = false
+    @State private var mcpCodexConnected = false
+    @State private var mcpClaudeDesktopConnected = false
+    @State private var mcpBusy = false
+    @State private var mcpBusyTarget: String?
+    @State private var mcpMessage: String?
+
+    private let mcpService = McpSetupService()
+
+    /// 実行中バイナリ自身を MCP サーバーとして登録する（<binary> mcp）。
+    private var mcpBinaryPath: String {
+        let raw = Bundle.main.executablePath ?? CommandLine.arguments[0]
+        return URL(fileURLWithPath: raw).standardizedFileURL.path
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: "設定") {
@@ -82,12 +98,116 @@ struct SettingsScreen: View {
                     Text("OS のログイン項目として管理されます（設定ファイルには保存しません）")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+
+                    divider()
+
+                    label("MCP 連携（Claude Code / Codex CLI / Claude Desktop へ登録）")
+                    Text("実行中の MoostApp（\(mcpBinaryPath)）を mcp サブコマンド付きで")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Text("各エージェントの MCP サーバーとして登録します")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    mcpTargetRow(
+                        title: "Claude Code",
+                        connected: mcpClaudeCodeConnected,
+                        connect: { try mcpService.registerClaudeCode(binaryPath: mcpBinaryPath) },
+                        disconnect: { try mcpService.unregisterClaudeCode() })
+                    mcpTargetRow(
+                        title: "Codex CLI",
+                        connected: mcpCodexConnected,
+                        connect: { try mcpService.registerCodex(binaryPath: mcpBinaryPath) },
+                        disconnect: { try mcpService.unregisterCodex() })
+                    mcpTargetRow(
+                        title: "Claude Desktop",
+                        connected: mcpClaudeDesktopConnected,
+                        connect: { try mcpService.registerClaudeDesktop(binaryPath: mcpBinaryPath) },
+                        disconnect: { try mcpService.unregisterClaudeDesktop() })
+                    if let mcpMessage {
+                        Text(mcpMessage)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
         }
-        .onAppear(perform: loadFromModel)
+        .onAppear {
+            loadFromModel()
+            refreshMcpState()
+        }
+    }
+
+    private func mcpTargetRow(
+        title: String,
+        connected: Bool,
+        connect: @escaping @Sendable () throws -> Void,
+        disconnect: @escaping @Sendable () throws -> Void
+    ) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12))
+            Spacer()
+            if mcpBusyTarget == title {
+                ProgressView()
+                    .controlSize(.small)
+            } else if connected {
+                Text("連携済み")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Button("解除") {
+                    runMcpAction(title, disconnect, success: "解除しました")
+                }
+                .controlSize(.small)
+                .disabled(mcpBusy)
+            } else {
+                Button("連携") {
+                    runMcpAction(title, connect, success: "連携しました")
+                }
+                .controlSize(.small)
+                .disabled(mcpBusy)
+            }
+        }
+    }
+
+    private func runMcpAction(_ title: String, _ action: @escaping @Sendable () throws -> Void, success: String) {
+        mcpBusy = true
+        mcpBusyTarget = title
+        mcpMessage = nil
+        Task {
+            let result: Result<String, Error>
+            result = await Task.detached {
+                do {
+                    try action()
+                    return .success(success)
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+            switch result {
+            case .success(let message): mcpMessage = "\(title): \(message)"
+            case .failure(let error): mcpMessage = "\(title): \(error.localizedDescription)"
+            }
+            mcpBusy = false
+            mcpBusyTarget = nil
+            refreshMcpState()
+        }
+    }
+
+    private func refreshMcpState() {
+        Task {
+            let values = await Task.detached(priority: .utility) { () -> (Bool, Bool, Bool) in
+                let service = McpSetupService()
+                return (service.isClaudeCodeConnected(),
+                        service.isCodexConnected(),
+                        service.isClaudeDesktopConnected())
+            }.value
+            mcpClaudeCodeConnected = values.0
+            mcpCodexConnected = values.1
+            mcpClaudeDesktopConnected = values.2
+        }
     }
 
     private func divider() -> some View {
@@ -140,7 +260,7 @@ struct NotesScreen: View {
                          "要約は claude -p（モデル: Haiku）で実行され、実行のたびに利用枠を消費します。"
                          + "「直近」はローカルで抜粋するため高速・低コスト、"
                          + "「全体」はセッション全体を読むため時間と枠を多く消費します。"
-                         + "※ ネイティブ版の要約ボタンは現在準備中です。")
+                         + "要約ボタンはセッション詳細画面にあります（native 版対応済み）。")
                     note("一覧の更新タイミング",
                          "直近セッション一覧は、アプリを開いたとき・タブを切り替えたとき・"
                          + "フォームから戻ったときに更新されます。手動リロードはなく、"

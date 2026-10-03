@@ -177,7 +177,8 @@ final class AppModel: ObservableObject {
         draftTitle = session.aiTitle ?? String(session.lastPrompt.prefix(80))
         draftTags = ""
         draftBody = ""
-        newMemoShowsDetail = false
+        // セッション詳細は初めから見えるようにする（ユーザー要望。隠したい時はトグルで）。
+        newMemoShowsDetail = true
         screen = .newMemo(session)
     }
 

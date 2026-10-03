@@ -97,6 +97,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.switchTab(.memos)
             try? await Task.sleep(nanoseconds: 400_000_000)
             capturePopover(to: "/tmp/moost-popover-4.png")
+            // セッション詳細（初期表示の折りたたみ確認用）
+            model.switchTab(.sessions)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if let first = model.sessions.first {
+                model.openSessionDetail(first)
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                capturePopover(to: "/tmp/moost-popover-5.png")
+                // メモ登録（インラインセッション詳細の確認用）
+                model.openNewMemo(for: first)
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                capturePopover(to: "/tmp/moost-popover-6.png")
+            }
             // Terminal 起動テスト（MOOST_UI_SMOKE_LAUNCH=1。TCC 権限の実測用）
             if ProcessInfo.processInfo.environment["MOOST_UI_SMOKE_LAUNCH"] == "1" {
                 runLaunchSmoke()

@@ -36,7 +36,7 @@ struct NewMemoScreen: View {
             HStack {
                 Button("キャンセル") { model.cancelNewMemo() }
                 Spacer()
-                Button("セッション詳細を表示") {
+                Button(model.newMemoShowsDetail ? "セッション詳細を隠す" : "セッション詳細を表示") {
                     model.newMemoShowsDetail.toggle()
                 }
                 .buttonStyle(.borderless)

@@ -41,29 +41,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let popoverWindow = popover?.contentViewController?.view.window {
             panel.level = NSWindow.Level(rawValue: popoverWindow.level.rawValue + 1)
         }
-        // ピッカーをポップオーバーのすぐ左隣（同じ画面内）に配置する。
-        // ユーザー報告 2026-10-03: メイン画面中央/別画面だと「全く違うところに開く」
-        // と違和感。ポップオーバーの横に置けば moost も見えたまま、ピッカーも近い。
-        // （左に収まらない画面では真下、それも無理なら画面中央）
+        // ピッカーをカーソル位置を中心に表示する。
+        // ユーザー要望 2026-10-03: 「カーソルがある位置を中心にして表示。moost と重なっても OK」。
+        // 画面外にはみ出さないようマウスがある画面内にクランプする。
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            guard let pw = self.popover?.contentViewController?.view.window,
-                  let screen = pw.screen ?? NSScreen.main else { return }
             var f = panel.frame
-            f.origin.x = pw.frame.minX - f.width - 16
-            f.origin.y = pw.frame.midY - f.height / 2 // ポップオーバーの縦位置に揃える
-            if f.minX < screen.frame.minX + 16 {
-                // 左に収まらない: ポップオーバーの真下へ
-                f.origin.x = pw.frame.midX - f.width / 2
-                f.origin.y = max(pw.frame.minY - f.height - 16, screen.frame.minY + 16)
+            let mouse = NSEvent.mouseLocation // 左下原点のグローバル座標
+            var x = mouse.x - f.width / 2
+            var y = mouse.y - f.height / 2
+            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) {
+                let r = screen.frame
+                x = max(r.minX + 16, min(x, r.maxX - f.width - 16))
+                y = max(r.minY + 16, min(y, r.maxY - f.height - 16))
             }
-            if f.minY < screen.frame.minY + 16 {
-                // それも無理なら画面中央
-                f.origin.x = screen.frame.midX - f.width / 2
-                f.origin.y = screen.frame.midY - f.height / 2
-            }
+            f.origin.x = x
+            f.origin.y = y
             panel.setFrame(f, display: true)
-            print("SMOKE panel-reposition to \(panel.frame) popover=\(pw.frame)")
+            print("SMOKE panel-reposition to \(panel.frame) mouse=\(mouse)")
         }
         panel.orderFrontRegardless()
     }

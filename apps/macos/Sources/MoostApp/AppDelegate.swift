@@ -276,6 +276,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             deactivateByActivatingFinder()
             try? await Task.sleep(nanoseconds: 800_000_000)
             print("SMOKE transient-after shown=\(popover?.isShown ?? false)") // 期待 false（シート後も閉じる）
+            // 設定画面（MCP 連携セクション確認用）
+            model.openSettings()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            capturePopover(to: "/tmp/moost-popover-8.png")
+            print("SMOKE settings mcpBinary=\(Bundle.main.executablePath ?? CommandLine.arguments[0])")
             // Terminal 起動テスト（MOOST_UI_SMOKE_LAUNCH=1。TCC 権限の実測用）
             if ProcessInfo.processInfo.environment["MOOST_UI_SMOKE_LAUNCH"] == "1" {
                 runLaunchSmoke()

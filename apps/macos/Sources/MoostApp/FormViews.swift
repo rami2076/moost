@@ -19,9 +19,7 @@ struct NewMemoScreen: View {
                 sessionId: session.sessionId,
                 updatedAt: session.updatedAt)
 
-            if model.newMemoShowsDetail {
-                InlineSessionDetail(session: session)
-            }
+            InlineSessionDetail(session: session)
 
             Form {
                 TextField("タイトル", text: $model.draftTitle)
@@ -36,11 +34,6 @@ struct NewMemoScreen: View {
             HStack {
                 Button("キャンセル") { model.cancelNewMemo() }
                 Spacer()
-                Button(model.newMemoShowsDetail ? "セッション詳細を隠す" : "セッション詳細を表示") {
-                    model.newMemoShowsDetail.toggle()
-                }
-                .buttonStyle(.borderless)
-                .font(.system(size: 11))
                 Button("保存") { model.saveNewMemo(for: session) }
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.draftTitle
@@ -150,6 +143,7 @@ struct MetaPanel: View {
 }
 
 /// インレインのセッション詳細（メモ登録フォーム内の重ね表示。6.3-2）。
+/// 要約ボタンもここから実行できる（SummarySection を共用）。
 struct InlineSessionDetail: View {
     let session: RecentSession
     @EnvironmentObject var model: AppModel
@@ -170,15 +164,7 @@ struct InlineSessionDetail: View {
             Text("最後のあなたの発言: \(session.lastPrompt)")
                 .font(.system(size: 11))
                 .lineLimit(3)
-            HStack {
-                Text("要約時のラリー数: \(model.summaryRallies)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Stepper("", value: Binding(
-                    get: { model.summaryRallies },
-                    set: { model.setSummaryRallies($0) }), in: 1...20)
-            }
+            SummarySection(session: session)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

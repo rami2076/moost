@@ -48,8 +48,6 @@ final class AppModel: ObservableObject {
     @Published var editTitle = ""
     @Published var editTags = ""
     @Published var editBody = ""
-    /// 登録フォーム内のインレイン詳細（design.md 6.3-2。下書きを守る例外的な重ね表示）
-    @Published var newMemoShowsDetail = false
 
     /// プロジェクトタブの「フォルダ追加」ボタンのグローバル座標（スモーク検証用・本番影響なし）。
     @Published var projectAddButtonFrame: CGRect = .zero
@@ -180,8 +178,7 @@ final class AppModel: ObservableObject {
         draftTitle = session.aiTitle ?? String(session.lastPrompt.prefix(80))
         draftTags = ""
         draftBody = ""
-        // セッション詳細は初めから見えるようにする（ユーザー要望。隠したい時はトグルで）。
-        newMemoShowsDetail = true
+        // セッション詳細は常時表示（ユーザー要望: トグル削除・要約もここから）。
         screen = .newMemo(session)
     }
 

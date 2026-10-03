@@ -93,6 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.switchTab(.projects)
             try? await Task.sleep(nanoseconds: 400_000_000)
             capturePopover(to: "/tmp/moost-popover-3.png")
+            // メモタブ（行ボタン確認用）
+            model.switchTab(.memos)
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            capturePopover(to: "/tmp/moost-popover-4.png")
             // Terminal 起動テスト（MOOST_UI_SMOKE_LAUNCH=1。TCC 権限の実測用）
             if ProcessInfo.processInfo.environment["MOOST_UI_SMOKE_LAUNCH"] == "1" {
                 runLaunchSmoke()

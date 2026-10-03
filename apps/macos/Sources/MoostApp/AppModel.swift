@@ -36,6 +36,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var settings = MoostCore.Settings()
     /// 登録解除のインライン確認中のプロジェクト（該当行だけ確認表示に置き換える）
     @Published var pendingDeleteProjectId: String?
+    /// メモ一覧の行から削除ボタンが押されたメモ（該当行だけ確認表示に置き換える）。
+    @Published var pendingDeleteMemoId: String?
 
     // MARK: フォーム下書き（画面遷移で破棄しない）
 
@@ -264,6 +266,22 @@ final class AppModel: ObservableObject {
         } catch {
             showToast("削除に失敗しました: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - メモ削除（一覧行の削除ボタン → インライン確認行。v1 互換）
+
+    /// メモ一覧の行から削除ボタンが押された。該当行だけ確認表示に置き換える。
+    func requestDeleteMemo(_ memo: Memo) {
+        pendingDeleteMemoId = memo.id
+    }
+
+    func cancelDeleteMemo() {
+        pendingDeleteMemoId = nil
+    }
+
+    func confirmDeleteMemo(_ memo: Memo) {
+        pendingDeleteMemoId = nil
+        deleteMemo(memo)
     }
 
     // MARK: - 設定

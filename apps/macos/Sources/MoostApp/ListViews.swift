@@ -54,8 +54,11 @@ struct ListScreen: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(model.memos, id: \.id) { memo in
-                    MemoRow(memo: memo)
-                        .onTapGesture { model.openEditMemo(memo) }
+                    if model.pendingDeleteMemoId == memo.id {
+                        MemoDeleteConfirmRow(memo: memo)
+                    } else {
+                        MemoRow(memo: memo)
+                    }
                     Divider()
                 }
                 if model.memos.isEmpty {
@@ -155,6 +158,15 @@ struct SessionRow: View {
                     .lineLimit(1)
                 Spacer()
                 Button {
+                    model.openInTerminal(agent: session.agentId,
+                                         projectPath: session.projectPath,
+                                         sessionId: session.sessionId)
+                } label: {
+                    Image(systemName: "terminal")
+                }
+                .buttonStyle(.borderless)
+                .help("ターミナルで再開")
+                Button {
                     model.copyResumeCommand(agent: session.agentId,
                                             projectPath: session.projectPath,
                                             sessionId: session.sessionId)
@@ -201,6 +213,13 @@ struct MemoRow: View {
                     .lineLimit(1)
                 Spacer()
                 Button {
+                    model.resumeFromMemo(memo)
+                } label: {
+                    Image(systemName: "terminal")
+                }
+                .buttonStyle(.borderless)
+                .help("ターミナルで再開")
+                Button {
                     model.copyResumeCommand(agent: memo.agent,
                                             projectPath: memo.projectPath,
                                             sessionId: memo.sessionId)
@@ -209,6 +228,13 @@ struct MemoRow: View {
                 }
                 .buttonStyle(.borderless)
                 .help("復帰コマンドをコピー")
+                Button {
+                    model.requestDeleteMemo(memo)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("削除")
             }
             HStack(spacing: 6) {
                 AgentBadge(agentId: memo.agent)
@@ -302,6 +328,29 @@ struct ProjectDeleteConfirmRow: View {
             Button("キャンセル") { model.cancelDeleteProject() }
                 .buttonStyle(.borderless)
             Button("削除") { model.confirmDeleteProject(project) }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.red)
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+}
+
+/// メモ一覧の行から削除ボタンが押されたときのインライン確認行（v1 互換）。
+struct MemoDeleteConfirmRow: View {
+    let memo: Memo
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("このメモを削除しますか？")
+                .font(.system(size: 12))
+                .lineLimit(1)
+            Spacer()
+            Button("キャンセル") { model.cancelDeleteMemo() }
+                .buttonStyle(.borderless)
+            Button("削除") { model.confirmDeleteMemo(memo) }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.red)
         }

@@ -154,6 +154,25 @@ final class SpecConformanceTests: XCTestCase {
         XCTAssertEqual(try jsonDict(dir.appendingPathComponent("settings.json"))["schemaVersion"] as? Int, 1)
     }
 
+    func test_settings_round_trip_preserves_pi_provider_and_model() throws {
+        // Dart の settings_store.dart は piProvider / piModel を保存する（Issue #68）。
+        // 型式は schemaVersion のみ必須のため、追加キーは保存・再読込で失われてはならない。
+        let dir = try makeTempDir("settings-pi")
+        let store = SettingsStore(file: dir.appendingPathComponent("settings.json"))
+        var settings = Settings()
+        settings.piProvider = "dspark"
+        settings.piModel = "deepseek-v4-flash-0731"
+        try store.save(settings)
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.piProvider, "dspark")
+        XCTAssertEqual(loaded.piModel, "deepseek-v4-flash-0731")
+        // 未設定（空）のまま保存してもキーは付く（Dart と同じ書き出し）
+        settings.piProvider = ""
+        settings.piModel = ""
+        try store.save(settings)
+        XCTAssertEqual(try store.load(), settings)
+    }
+
     // MARK: projects.json（D1-D3）
 
     func test_projects_permissive_load_and_derived_display_name() throws {

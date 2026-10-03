@@ -67,6 +67,9 @@ public final class MemoStore {
     public static let schemaVersion = 1
     private let store: JsonFileStore
 
+    /// バックグラウンド読み込み用に URL を公開する。
+    public var file: URL { store.file }
+
     public init(file: URL) {
         store = JsonFileStore(file: file)
     }
@@ -128,12 +131,16 @@ public final class MemoStore {
 
 /// アプリ設定（C1-C3）。リファレンス実装: settings_store.dart
 /// 型が違う項目は その項目だけ デフォルトへフォールバックする（落とさない）。
-public struct Settings: Equatable {
+public struct Settings: Equatable, Sendable {
     public var terminalApp = "Terminal.app"
     public var recentSessionLimit = 20
     public var claudePath = ""
     public var summaryRallyCount = 1
     public var copyAnimation = true
+    /// pi 起動時に指定する provider 名（空なら付けない）。Issue #68。
+    public var piProvider = ""
+    /// pi 起動時に指定する model 名（空なら付けない）。Issue #68。
+    public var piModel = ""
 
     public init() {}
 }
@@ -168,6 +175,8 @@ public final class SettingsStore {
         if let value = JsonScalar.string(text, "claudePath") { settings.claudePath = value }
         if let value = JsonScalar.integer(text, "summaryRallyCount") { settings.summaryRallyCount = value }
         if let value = JsonScalar.boolean(text, "copyAnimation") { settings.copyAnimation = value }
+        if let value = JsonScalar.string(text, "piProvider") { settings.piProvider = value }
+        if let value = JsonScalar.string(text, "piModel") { settings.piModel = value }
         return settings
     }
 
@@ -179,6 +188,8 @@ public final class SettingsStore {
             "claudePath": settings.claudePath,
             "summaryRallyCount": settings.summaryRallyCount,
             "copyAnimation": settings.copyAnimation,
+            "piProvider": settings.piProvider,
+            "piModel": settings.piModel,
         ])
     }
 }
@@ -229,6 +240,9 @@ public final class ProjectStore {
     public init(file: URL) {
         store = JsonFileStore(file: file)
     }
+
+    /// バックグラウンド読み込み用に URL を公開する。
+    public var file: URL { store.file }
 
     public static func defaultLocation() -> ProjectStore {
         let home = ProcessInfo.processInfo.environment["HOME"] ?? ""

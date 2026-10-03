@@ -27,7 +27,7 @@ private func decodeLine(_ line: String) -> [String: Any]? {
     return (try? MoostJSON.parse(trimmed)) as? [String: Any]
 }
 
-public struct CodexHistoryEntry: Equatable {
+public struct CodexHistoryEntry: Equatable, Sendable {
     public let sessionId: String
     public let lastPrompt: String
     public let updatedAt: Date

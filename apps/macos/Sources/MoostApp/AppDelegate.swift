@@ -13,17 +13,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let model = AppModel.defaultApp()
 
-    /// fileImporter（NSOpenPanel）を閉じた後、ポップオーバーを通常の transient
-    /// 挙動（外側クリックで閉じる）に戻す。SwiftUI の .fileImporter は NSOpenPanel を
-    /// 独立ウィンドウで表示するため、閉じた後もポップオーバーがキーにならず
-    /// 外側クリックで閉じない状態が残ることがある（ユーザー報告 2026-10-03）。
+    /// fileImporter（NSOpenPanel シート）を閉じた後、ポップオーバーの transient 挙動
+    /// （外側クリックで閉じる）を復元する。スモーク実測（2026-10-03）: シート表示の前後で
+    /// 「別アプリを前面にしたときポップオーバーが閉じるか」を検証したところ、
+    /// シートの後は閉じなくなった（NSPopover がシート終了で非アクティブ監視を失う）。
+    /// behavior 再設定やキー復元では直らないため、performClose → show で
+    /// ポップオーバーの内部監視を作り直す（ユーザー報告 2026-10-03）。
     func restoreTransientPopover() {
-        guard let popover, let window = popover.contentViewController?.view.window else { return }
-        popover.behavior = .transient
-        NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.async {
-            window.makeKey()
+        guard let popover, let button = statusItem?.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
         }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        DispatchQueue.main.async {
+            if let window = popover.contentViewController?.view.window, !window.isKeyWindow {
+                window.makeKey()
+            }
+        }
+    }
+
+    /// アプリが非アクティブになったらポップオーバーを閉じる（自前 transient）。
+    /// NSPopover の .transient は NSOpenPanel の表示（シート/独立ウィンドウとも）後に
+    /// 非アクティブ監視を失うことがスモーク実測で判明（2026-10-03）。そのため
+    /// .applicationDefined + didResignActive 通知で「moost 以外の場所をクリックで閉じる」
+    /// を確実に再現する（ユーザー報告 2026-10-03）。
+    private var didResignActiveObserver: NSObjectProtocol?
+
+    @objc private func closePopoverWhenInactive() {
+        guard let popover, popover.isShown else { return }
+        popover.performClose(nil)
+        // didResignActive 後に閉じる。クリックによって resignActive された場合の一瞬の
+        // 再表示を防ぐ（メニューバー再クリックで開くのは togglePopover が担当）。
     }
 
     /// プロジェクト登録用の NSOpenPanel をポップオーバーのシートとして表示する。
@@ -47,11 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             self?.restoreTransientPopover()
         }
-        if let window = popover?.contentViewController?.view.window {
-            panel.beginSheetModal(for: window, completionHandler: completion)
-        } else {
-            panel.begin(completionHandler: completion)
-        }
+        // 2026-10-03 検証: beginSheetModal はポップオーバーの transient（外側クリックで
+        // 閉じる）を恒久的に壊すことがスモーク実測で判明。シートを使わず、
+        // 独立ウィンドウとして表示する（ポップオーバー自体は閉じない）。
+        panel.begin(completionHandler: completion)
     }
 
     @MainActor
@@ -70,11 +90,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItem = statusItem
 
         let popover = NSPopover()
-        popover.behavior = .transient
+        // .transient は NSOpenPanel 表示後に非アクティブ監視を失う（スモーク実測 2026-10-03）
+        // ため、.applicationDefined + didResignActive の自前実装で外側クリック閉じるを再現する。
+        popover.behavior = .applicationDefined
         popover.contentSize = AppInfo.popoverSize
         let host = NSHostingController(rootView: AppRootView().environmentObject(model))
         popover.contentViewController = host
         self.popover = popover
+        didResignActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil, queue: .main) { [weak self] _ in
+            self?.closePopoverWhenInactive()
+        }
 
         // 初回起動時は v1 → v2 移行もここで走る（DataMigration）
         model.bootstrap()
@@ -155,35 +182,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 model.backToList(returningTo: .sessions)
                 try? await Task.sleep(nanoseconds: 300_000_000)
             }
-            // fileImporter（ポップオーバーの挙動検証: 閉じた後も transient が維持されるか）
+            // transient の実測（外側クリック相当 = Finder を前面に = アプリ非アクティブ化）
             model.switchTab(.projects)
             try? await Task.sleep(nanoseconds: 300_000_000)
-            print("SMOKE before behavior=\(popover?.behavior.rawValue ?? -1)")
+            deactivateByActivatingFinder()
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            print("SMOKE transient-before shown=\(popover?.isShown ?? false)") // 期待 false（正常なら閉じる）
+            // シートを開く（まず再表示）
+            NSApp.activate(ignoringOtherApps: true)
+            togglePopover(nil)
+            try? await Task.sleep(nanoseconds: 500_000_000)
             model.requestRegisterProject()
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             let keyPanel = NSApp.keyWindow as? NSSavePanel
-            let panels = NSApp.windows.compactMap { $0 as? NSSavePanel }
-            print("SMOKE importer sheet=\(keyPanel != nil) panels=\(panels.count) behavior=\(popover?.behavior.rawValue ?? -1) keyPopup=\(NSApp.keyWindow === popover?.contentViewController?.view.window)")
+            print("SMOKE importer sheet=\(keyPanel != nil) behavior=\(popover?.behavior.rawValue ?? -1)")
             capturePopover(to: "/tmp/moost-popover-7.png")
             keyPanel?.cancel(nil)
             try? await Task.sleep(nanoseconds: 500_000_000)
-            print("SMOKE after cancel behavior=\(popover?.behavior.rawValue ?? -1)")
             // 修正検証: restoreTransientPopover 後にポップオーバーが再びキーになるか
             AppDelegate.shared?.restoreTransientPopover()
             try? await Task.sleep(nanoseconds: 300_000_000)
-            let popoverWindow = popover?.contentViewController?.view.window
-            print("SMOKE after restore behavior=\(popover?.behavior.rawValue ?? -1) keyPopup=\(NSApp.keyWindow === popoverWindow)")
-            // 外側クリックのシミュレート（権限があれば popover が閉じるはず）
-            let point = CGPoint(x: 5, y: 5)
-            if let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
-                                  mouseCursorPosition: point, mouseButton: .left),
-               let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp,
-                                mouseCursorPosition: point, mouseButton: .left) {
-                down.post(tap: .cghidEventTap)
-                up.post(tap: .cghidEventTap)
-            }
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            print("SMOKE after outside click shown=\(popover?.isShown ?? false)")
+            print("SMOKE after restore keyPopup=\(NSApp.keyWindow === popover?.contentViewController?.view.window)")
+            deactivateByActivatingFinder()
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            print("SMOKE transient-after shown=\(popover?.isShown ?? false)") // 期待 false（シート後も閉じる）
             // Terminal 起動テスト（MOOST_UI_SMOKE_LAUNCH=1。TCC 権限の実測用）
             if ProcessInfo.processInfo.environment["MOOST_UI_SMOKE_LAUNCH"] == "1" {
                 runLaunchSmoke()
@@ -195,6 +217,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// ターミナル起動経路（openInTerminal と同一）をアプリプロセスから実測する。
     /// 署名なし SPM バイナリから Apple Events（osascript）が通るか確認するための
     /// 切り分け用。成功/失敗は stdout に "LAUNCHSMOKE:" で出力する。
+    /// 外側クリック相当の transient 実測: Finder を前面に出す（アプリ非アクティブ化）。
+    /// CGEventPost はアクセシビリティ権限が要るため、別アプリの activate で代用する。
+    private func deactivateByActivatingFinder() {
+        if let finder = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.finder" }) {
+            finder.activate(options: [])
+            print("SMOKE: finder activated")
+        } else {
+            print("SMOKE: finder not found")
+        }
+    }
+
     private func runLaunchSmoke() {
         let sessionId = ProcessInfo.processInfo.environment["MOOST_TEST_SESSION"] ?? ""
         // スモークはセッション一覧の読み込み（非同期）に依存しないよう、

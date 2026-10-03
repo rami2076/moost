@@ -13,44 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let model = AppModel.defaultApp()
 
-    /// fileImporter（NSOpenPanel シート）を閉じた後、ポップオーバーの transient 挙動
-    /// （外側クリックで閉じる）を復元する。スモーク実測（2026-10-03）: シート表示の前後で
-    /// 「別アプリを前面にしたときポップオーバーが閉じるか」を検証したところ、
-    /// シートの後は閉じなくなった（NSPopover がシート終了で非アクティブ監視を失う）。
-    /// behavior 再設定やキー復元では直らないため、performClose → show で
-    /// ポップオーバーの内部監視を作り直す（ユーザー報告 2026-10-03）。
-    func restoreTransientPopover() {
-        guard let popover, let button = statusItem?.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        DispatchQueue.main.async {
-            if let window = popover.contentViewController?.view.window, !window.isKeyWindow {
-                window.makeKey()
-            }
-        }
-    }
-
-    /// アプリが非アクティブになったらポップオーバーを閉じる（自前 transient）。
-    /// NSPopover の .transient は NSOpenPanel の表示（シート/独立ウィンドウとも）後に
-    /// 非アクティブ監視を失うことがスモーク実測で判明（2026-10-03）。そのため
-    /// .applicationDefined + didResignActive 通知で「moost 以外の場所をクリックで閉じる」
-    /// を確実に再現する（ユーザー報告 2026-10-03）。
-    private var didResignActiveObserver: NSObjectProtocol?
-
-    @objc private func closePopoverWhenInactive() {
-        guard let popover, popover.isShown else { return }
-        popover.performClose(nil)
-        // didResignActive 後に閉じる。クリックによって resignActive された場合の一瞬の
-        // 再表示を防ぐ（メニューバー再クリックで開くのは togglePopover が担当）。
-    }
-
-    /// プロジェクト登録用の NSOpenPanel をポップオーバーのシートとして表示する。
-    /// SwiftUI の .fileImporter はポップオーバーの transient 挙動を壊すため使わず、
-    /// beginSheetModal でポップオーバー自身にシートを付けることで、
-    /// 選択/キャンセル後も「外側クリックで閉じる」本来の挙動を保つ。
+    /// プロジェクト登録用の NSOpenPanel を表示する（ポップオーバーは閉じない）。
+    /// 完了時はポップオーバーを表示したままキーのみ戻す（restoreTransientPopover）。
     @MainActor
     func beginProjectPanel(onSelect: @escaping (String?) -> Void) {
         let panel = NSOpenPanel()
@@ -77,7 +41,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let popoverWindow = popover?.contentViewController?.view.window {
             panel.level = NSWindow.Level(rawValue: popoverWindow.level.rawValue + 1)
         }
+        // ピッカーをポップオーバー（ステータスバー直下）と重ならない位置へ。
+        // ユーザー報告 2026-10-03: メイン画面中央に出ると moost（右上）を覆い
+        // 「moost が閉じた」ように見える。ポップオーバーがある画面以外の画面の中央へ。
+        // （1 画面構成ならメイン画面中央。setFrame は有効: 前回実測で midX/midY に一致）
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let popoverScreen = self.popover?.contentViewController?.view.window?.screen
+            let target = NSScreen.screens.first(where: { $0 !== popoverScreen }) ?? NSScreen.main
+            guard let target else { return }
+            let rect = target.frame
+            var f = panel.frame
+            f.origin.x = rect.midX - f.width / 2
+            f.origin.y = rect.midY - f.height / 2
+            panel.setFrame(f, display: true)
+            print("SMOKE panel-reposition to \(panel.frame) (target=\(rect))")
+        }
         panel.orderFrontRegardless()
+    }
+
+    /// パネル完了後にポップオーバーの表示を維持したままキーを戻す。
+    /// 以前の performClose → show は「閉じる、開く」の点滅に見えたため廃止
+    /// （ユーザー報告 2026-10-03: フォルダ追加で moost が閉じる/開く）。
+    func restoreTransientPopover() {
+        guard let popover else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+            if !popover.isShown, let button = self.statusItem?.button {
+                // 何らかの理由で閉じていた場合のみ再表示（通常は表示されたまま）
+                popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            }
+            if let window = popover.contentViewController?.view.window, !window.isKeyWindow {
+                window.makeKey()
+            }
+        }
+    }
+
+    /// アプリが非アクティブになったらポップオーバーを閉じる（自前 transient）。
+    /// NSPopover の .transient は NSOpenPanel の表示（シート/独立ウィンドウとも）後に
+    /// 非アクティブ監視を失うことがスモーク実測で判明（2026-10-03）。そのため
+    /// .applicationDefined + didResignActive 通知で「moost 以外の場所をクリックで閉じる」
+    /// を確実に再現する（ユーザー報告 2026-10-03）。
+    private var didResignActiveObserver: NSObjectProtocol?
+
+    @objc private func closePopoverWhenInactive() {
+        guard let popover, popover.isShown else { return }
+        popover.performClose(nil)
+        // didResignActive 後に閉じる。クリックによって resignActive された場合の一瞬の
+        // 再表示を防ぐ（メニューバー再クリックで開くのは togglePopover が担当）。
     }
 
     @MainActor
@@ -200,17 +211,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? await Task.sleep(nanoseconds: 500_000_000)
             model.requestRegisterProject()
             try? await Task.sleep(nanoseconds: 1_500_000_000)
+            for (i, s) in NSScreen.screens.enumerated() {
+                print("SMOKE screen[\(i)] frame=\(s.frame) isMain=\(NSScreen.main === s)")
+            }
             let keyPanel = NSApp.keyWindow as? NSSavePanel
-            print("SMOKE importer sheet=\(keyPanel != nil) behavior=\(popover?.behavior.rawValue ?? -1)")
+            print("SMOKE importer sheet=\(keyPanel != nil) behavior=\(popover?.behavior.rawValue ?? -1) popoverShown=\(popover?.isShown ?? false)")
             logZOrder("importer") // NSOpenPanel とポップオーバーの z 順（前面から）
+            if let pw = popover?.contentViewController?.view.window,
+               let pn = NSApp.windows.first(where: { $0 is NSSavePanel }) {
+                print("SMOKE frames panel=\(pn.frame) popover=\(pw.frame)")
+            }
             captureScreen(to: "/tmp/moost-fullscreen-panel.png")
             capturePopover(to: "/tmp/moost-popover-7.png")
             keyPanel?.cancel(nil)
             try? await Task.sleep(nanoseconds: 500_000_000)
+            print("SMOKE after cancel popoverShown=\(popover?.isShown ?? false) keyPopup=\(NSApp.keyWindow === popover?.contentViewController?.view.window)")
             // 修正検証: restoreTransientPopover 後にポップオーバーが再びキーになるか
             AppDelegate.shared?.restoreTransientPopover()
             try? await Task.sleep(nanoseconds: 300_000_000)
-            print("SMOKE after restore keyPopup=\(NSApp.keyWindow === popover?.contentViewController?.view.window)")
+            print("SMOKE after restore popoverShown=\(popover?.isShown ?? false) keyPopup=\(NSApp.keyWindow === popover?.contentViewController?.view.window)")
+            captureScreen(to: "/tmp/moost-fullscreen-after.png")
             deactivateByActivatingFinder()
             try? await Task.sleep(nanoseconds: 800_000_000)
             print("SMOKE transient-after shown=\(popover?.isShown ?? false)") // 期待 false（シート後も閉じる）

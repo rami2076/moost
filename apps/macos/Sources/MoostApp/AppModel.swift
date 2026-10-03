@@ -231,8 +231,12 @@ final class AppModel: ObservableObject {
             updatedAt: Date())
         do {
             try memoStore.add(memo)
+            // refresh() は全セッション集計（約 0.7 秒）を含み重いため、
+            // メモ一覧だけをローカル即時更新して一覧へ戻す（ラグ解消）。
+            memos.append(memo)
             showToast("メモを保存しました")
-            backToList(returningTo: .memos) // 登録したメモを確認できるように（6.3-1）
+            screen = .list
+            tab = .memos // 登録したメモを確認できるように（6.3-1）
         } catch {
             showToast("保存に失敗しました: \(error.localizedDescription)")
         }
@@ -251,8 +255,17 @@ final class AppModel: ObservableObject {
         do {
             _ = try memoStore.update(memo.id, title: title,
                                      tags: parseTags(editTags), body: editBody)
+            // refresh() は全セッション集計を含み重いため、メモ一覧をローカル即時更新する。
+            let updated = memo.updateUserFields(
+                title: title, tags: parseTags(editTags), body: editBody, updatedAt: Date())
+            if let index = memos.firstIndex(where: { $0.id == memo.id }) {
+                memos[index] = updated
+            } else {
+                memos.append(updated)
+            }
             showToast("メモを更新しました")
-            backToList(returningTo: .memos)
+            screen = .list
+            tab = .memos
         } catch {
             showToast("更新に失敗しました: \(error.localizedDescription)")
         }
@@ -263,7 +276,10 @@ final class AppModel: ObservableObject {
             _ = try memoStore.delete(memo.id)
             // v1（Flutter 版）と同じく成功時はトーストを出さない。
             // 行が消えるだけで十分（ユーザー要望: 削除ボタンで即座に消える）。
-            backToList(returningTo: .memos)
+            // refresh() は全セッション集計を含み重いため、メモ一覧だけを即時更新する。
+            memos.removeAll { $0.id == memo.id }
+            screen = .list
+            tab = .memos
         } catch {
             showToast("削除に失敗しました: \(error.localizedDescription)")
         }

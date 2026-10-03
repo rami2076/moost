@@ -72,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 閉じる）を恒久的に壊すことがスモーク実測で判明。シートを使わず、
         // 独立ウィンドウとして表示する（ポップオーバー自体は閉じない）。
         panel.begin(completionHandler: completion)
+        // ポップオーバー（NSStatusWindowLevel=25）より背面にならないよう前面に出す。
+        // 通常レベル（0）だとピッカーが moost の背面に隠れる（ユーザー報告 2026-10-03）。
+        if let popoverWindow = popover?.contentViewController?.view.window {
+            panel.level = NSWindow.Level(rawValue: popoverWindow.level.rawValue + 1)
+        }
+        panel.orderFrontRegardless()
     }
 
     @MainActor
@@ -196,6 +202,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             let keyPanel = NSApp.keyWindow as? NSSavePanel
             print("SMOKE importer sheet=\(keyPanel != nil) behavior=\(popover?.behavior.rawValue ?? -1)")
+            logZOrder("importer") // NSOpenPanel とポップオーバーの z 順（前面から）
+            captureScreen(to: "/tmp/moost-fullscreen-panel.png")
             capturePopover(to: "/tmp/moost-popover-7.png")
             keyPanel?.cancel(nil)
             try? await Task.sleep(nanoseconds: 500_000_000)
@@ -225,6 +233,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             print("SMOKE: finder activated")
         } else {
             print("SMOKE: finder not found")
+        }
+    }
+
+    /// 画面上のウィンドウ z 順（前面→背面）を出力し、MoostApp のウィンドウ位置を確認する。
+    /// NSOpenPanel がポップオーバーの背面に隠れる問題の切り分け用（2026-10-03）。
+    private func logZOrder(_ label: String) {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)
+            as? [[String: Any]] else { return }
+        var pos = 0
+        for info in list {
+            let owner = info[kCGWindowOwnerName as String] as? String ?? "?"
+            if owner.contains("Moost") {
+                let name = info[kCGWindowName as String] as? String ?? "?"
+                let layer = info[kCGWindowLayer as String] as? Int ?? -1
+                let bounds = info[kCGWindowBounds as String] as? [String: Any] ?? [:]
+                print("SMOKE zorder[\(label)] pos=\(pos) owner=\(owner) name=\(name) layer=\(layer) bounds=\(bounds)")
+            }
+            pos += 1
+        }
+    }
+
+    /// 画面全体をキャプチャする（MoostApp 自身のウィンドウは権限なしで写る）。
+    private func captureScreen(to path: String) {
+        if let cgImage = CGWindowListCreateImage(.null, .optionOnScreenOnly, kCGNullWindowID,
+                                                 [.bestResolution]) {
+            let rep = NSBitmapImageRep(cgImage: cgImage)
+            if let data = rep.representation(using: .png, properties: [:]) {
+                try? data.write(to: URL(fileURLWithPath: path))
+                print("SMOKE: captured screen \(path)")
+            }
         }
     }
 

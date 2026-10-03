@@ -417,8 +417,10 @@ final class AppModel: ObservableObject {
         guard panel.runModal() == .OK, let path = panel.url?.path else { return }
         let project = Project(id: UUID().uuidString, projectPath: path, createdAt: Date())
         saveProjects(adding: project)
+        // refresh() は全セッション集計を含み重いため、プロジェクト一覧だけを
+        // ローカル即時更新する（メモ CRUD と同じラグ対策）。
+        projects.append(project)
         showToast("プロジェクトを登録しました")
-        refresh()
     }
 
     func requestDeleteProject(_ project: Project) {
@@ -432,7 +434,9 @@ final class AppModel: ObservableObject {
     func confirmDeleteProject(_ project: Project) {
         pendingDeleteProjectId = nil
         saveProjects(removing: project.id)
-        refresh()
+        // refresh() は全セッション集計を含み重いため、プロジェクト一覧だけを
+        // ローカル即時更新する（メモ削除と同じく成功トーストは出さない）。
+        projects.removeAll { $0.id == project.id }
     }
 
     private func saveProjects(adding newProject: Project? = nil, removing id: String? = nil) {

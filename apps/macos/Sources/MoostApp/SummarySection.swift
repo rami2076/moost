@@ -2,7 +2,7 @@ import SwiftUI
 import MoostCore
 
 /// 要約セクション（design.md 6.3-2 / 6.1-3）。
-/// セッション詳細画面とメモ登録フォーム内のインライン詳細で共用する。
+/// セッション詳細画面（info アイコン）で使用する。
 struct SummarySection: View {
     let session: RecentSession
     @EnvironmentObject var model: AppModel

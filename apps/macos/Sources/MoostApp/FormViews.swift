@@ -143,7 +143,7 @@ struct MetaPanel: View {
 }
 
 /// インレインのセッション詳細（メモ登録フォーム内の重ね表示。6.3-2）。
-/// 要約ボタンもここから実行できる（SummarySection を共用）。
+/// メタ情報のみ。要約はセッション詳細画面（info アイコン）から行う。
 struct InlineSessionDetail: View {
     let session: RecentSession
     @EnvironmentObject var model: AppModel
@@ -164,7 +164,6 @@ struct InlineSessionDetail: View {
             Text("最後のあなたの発言: \(session.lastPrompt)")
                 .font(.system(size: 11))
                 .lineLimit(3)
-            SummarySection(session: session)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

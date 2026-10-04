@@ -2,7 +2,7 @@ import Foundation
 
 /// モデルの読み取りと適合に関する規約（リファレンス実装: packages/core/lib/src/model/）
 
-public struct Memo: Equatable {
+public struct Memo: Equatable, Sendable {
     public let id: String
     public let agent: String
     public let sessionId: String
@@ -87,7 +87,7 @@ public func parseTags(_ input: String) -> [String] {
          .filter { !$0.isEmpty }
 }
 
-public struct Project: Equatable {
+public struct Project: Equatable, Sendable {
     public let id: String
     public let projectPath: String
     public let createdAt: Date
@@ -132,7 +132,7 @@ public struct Project: Equatable {
     }
 }
 
-public struct RecentSession: Equatable {
+public struct RecentSession: Equatable, Sendable {
     public let agentId: String
     public let sessionId: String
     public let projectPath: String

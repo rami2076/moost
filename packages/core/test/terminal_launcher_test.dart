@@ -56,23 +56,27 @@ void main() {
       calls = [];
       launcher = TerminalLauncher(
         isLinux: false,
-        runOsascript: (args) async {
+        runMacosCommand: (args) async {
           calls.add(args);
           return ProcessResult(0, exitCode, '', stderr);
         },
       );
     }
 
-    test('Terminal.app: uses do script with the command', () async {
+    test('Terminal.app: launches via a .command file through open', () async {
       arrange();
       await launcher.launch(
         terminal: TerminalApp.terminal,
-        command: 'cd /tmp && claude --resume abc',
+        command: 'cd /tmp && echo hi',
       );
-      final script = calls.single[1];
-      expect(script, contains('tell application "Terminal"'));
-      expect(script, contains('do script'));
-      expect(script, contains('cd /tmp && claude --resume abc'));
+      final args = calls.single;
+      expect(args[0], '/usr/bin/open');
+      expect(args[1], '-a');
+      expect(args[2], 'Terminal');
+      expect(args[3], endsWith('.command'));
+      final content = File(args[3]).readAsStringSync();
+      expect(content, '#!/bin/zsh\ncd /tmp && echo hi\n');
+      File(args[3]).deleteSync();
     });
 
     test('iTerm2: opens a new window and writes text', () async {
@@ -82,15 +86,24 @@ void main() {
         command: 'echo hi',
       );
       final script = calls.single[1];
-      expect(script, contains('tell application "iTerm2"'));
+      expect(script, contains('tell application "iTerm"'));
+      // 既存ウィンドウがあれば新規ウィンドウを増やさずタブを追加する（2 窓問題対策）
+      expect(script, contains('count of windows'));
+      // 復元完了前に count を評価すると 2 窓になるため、ウィンドウが現れるまでポーリングで待つ
+      expect(script, contains('repeat while'));
+      expect(script, contains('delay 0.3'));
+      // Moost が起動させた場合（未実行時）は復元タブを再利用して 1 窓 1 タブを保つ
+      expect(script, contains('wasRunning'));
+      expect(script, contains('else if'));
       expect(script, contains('create window with default profile'));
+      expect(script, contains('create tab with default profile'));
       expect(script, contains('write text'));
     });
 
-    test('escapes quotes and backslashes for AppleScript', () async {
+    test('escapes quotes and backslashes for AppleScript (iTerm2)', () async {
       arrange();
       await launcher.launch(
-        terminal: TerminalApp.terminal,
+        terminal: TerminalApp.iterm2,
         command: r'cd "/a b" && x\y',
       );
       final script = calls.single[1];
@@ -99,11 +112,11 @@ void main() {
       expect(script, contains(r'x\\y'));
     });
 
-    test('throws on non-zero exit code', () async {
+    test('throws on non-zero exit code (iTerm2)', () async {
       arrange(exitCode: 1, stderr: 'boom');
       await expectLater(
         launcher.launch(
-          terminal: TerminalApp.terminal,
+          terminal: TerminalApp.iterm2,
           command: 'x',
         ),
         throwsA(isA<TerminalLaunchException>()

@@ -62,8 +62,9 @@ enum TerminalApp {
 /// 組み立てられる（macOS の AppleScript 埋め込みや Linux の bash 実行に
 /// 共通して使えるため）。
 class TerminalLauncher {
-  /// macOS: osascript 実行を差し替え可能にする（テスト用）。
-  final Future<ProcessResult> Function(List<String> args) runOsascript;
+  /// macOS: コマンド実行を差し替え可能にする（テスト用）。
+  /// osascript（iTerm2）と /usr/bin/open（Terminal.app の .command 起動）の両方を受け止める。
+  final Future<ProcessResult> Function(List<String> args) runMacosCommand;
 
   /// Linux: ターミナル起動コマンドの実行を差し替え可能にする（テスト用）。
   final Future<ProcessResult> Function(List<String> args) runLinuxCommand;
@@ -72,11 +73,11 @@ class TerminalLauncher {
   final bool _isLinux;
 
   TerminalLauncher({
-    Future<ProcessResult> Function(List<String> args)? runOsascript,
+    Future<ProcessResult> Function(List<String> args)? runMacosCommand,
     Future<ProcessResult> Function(List<String> args)? runLinuxCommand,
     bool? isLinux,
-  })  : runOsascript = runOsascript ??
-            ((args) => Process.run('osascript', args)),
+  })  : runMacosCommand = runMacosCommand ??
+            ((args) => Process.run(args.first, args.sublist(1))),
         runLinuxCommand = runLinuxCommand ??
             ((args) => Process.run(args.first, args.sublist(1))),
         _isLinux = isLinux ?? Platform.isLinux;
@@ -147,17 +148,57 @@ class TerminalLauncher {
     TerminalApp terminal,
     String command,
   ) async {
+    if (terminal == TerminalApp.terminal) {
+      // Terminal.app は AppleScript (do script) ではなく .command ファイル + open で開く。
+      // 署名なしアプリからの Apple Events は tccd への確認が 9 秒かかり、
+      // UI がブロックされる要因になる（2026-10-02 実機計測済み）。
+      // open は LaunchServices 経由で 0.2 秒程度（シェルからの実測 0.15s）。
+      await _launchTerminalAppViaCommandFile(command);
+      return;
+    }
     final script = switch (terminal) {
-      TerminalApp.terminal => _terminalScript(command),
       TerminalApp.iterm2 => _iterm2Script(command),
       // macOS 上で gnome-terminal が選ばれることはないが、
       // 万一のため Terminal.app 相当にフォールバックする
       TerminalApp.gnomeTerminal => _terminalScript(command),
+      // 上の分岐で return 済み
+      TerminalApp.terminal => _terminalScript(command),
     };
-    final result = await runOsascript(['-e', script]);
+    final result = await runMacosCommand(['-e', script]);
     if (result.exitCode != 0) {
       throw TerminalLaunchException(
         '${terminal.settingValue}: ${result.stderr}',
+      );
+    }
+  }
+
+  /// .command 実行ファイルを一時ディレクトリに書き出し、open で Terminal.app を開く。
+  /// Terminal.app は LaunchServices 経由で .command を新しいウィンドウで実行する
+  /// （iTerm2 は .command を実行しないため iTerm2 では使えない）。
+  Future<void> _launchTerminalAppViaCommandFile(String command) async {
+    final file = File(
+      '${Directory.systemTemp.path}/moost-'
+      '${DateTime.now().microsecondsSinceEpoch}.command',
+    );
+    await file.writeAsString('#!/bin/zsh\n$command\n');
+    await Process.run('chmod', ['+x', file.path]);
+    final result = await runMacosCommand([
+      '/usr/bin/open',
+      '-a',
+      'Terminal',
+      file.path,
+    ]);
+    // open は即座に返る。ファイルは起動完了を妨げないよう 30 秒後に削除する。
+    Future.delayed(const Duration(seconds: 30), () {
+      try {
+        file.deleteSync();
+      } catch (_) {
+        // 既に消えている etc. は無視
+      }
+    });
+    if (result.exitCode != 0) {
+      throw TerminalLaunchException(
+        '${TerminalApp.terminal.settingValue}: ${result.stderr}',
       );
     }
   }
@@ -176,14 +217,46 @@ end tell''';
   }
 
   String _iterm2Script(String command) {
+    // iTerm2 の AppleScript アプリケーション名は "iTerm"（表示名は iTerm2）。
+    // "iTerm2" で tell すると -2741 (syntax error) になる（2026-10-02 実機検証済み）。
+    // iTerm2 は強制終了（kill）後でも次回起動時に前回のウィンドウを復元するため、
+    // 常に create window すると「復元窓 + 新窓」で 2 窓になる（2026-10-03 実機検証済み）。
+    // 復元完了前に (count of windows) を評価すると 0 になり 2 窓になるため:
+    // 1) ウィンドウが現れるまでポーリング（最大 4.5 秒）
+    // 2) ユーザーが既に使っている場合（wasRunning=true）は現在のウィンドウにタブ追加
+    // 3) Moost が起動させた場合（wasRunning=false）で復元窓がある場合は、
+    //    復元タブ（新規シェル）を再利用して 1 窓 1 タブを保つ
+    // 4) ウィンドウが無い場合のみ新規ウィンドウ（close は MoostApp 発信で
+    //    1 窓あたり約 9 秒かかり 20 秒タイムアウトになるため不採用）
     final escaped = _escape(command);
     return '''
-tell application "iTerm2"
+tell application "iTerm"
+  set wasRunning to application "iTerm" is running
   activate
-  set newWindow to (create window with default profile)
-  tell current session of newWindow
-    write text "$escaped"
-  end tell
+  set attemptCount to 0
+  repeat while (count of windows) = 0 and attemptCount < 15
+    delay 0.3
+    set attemptCount to attemptCount + 1
+  end repeat
+  if wasRunning and (count of windows) > 0 then
+    tell current window
+      create tab with default profile
+      tell current session
+        write text "$escaped"
+      end tell
+    end tell
+  else if (count of windows) > 0 then
+    tell current window
+      tell current session
+        write text "$escaped"
+      end tell
+    end tell
+  else
+    set newWindow to (create window with default profile)
+    tell current session of newWindow
+      write text "$escaped"
+    end tell
+  end if
 end tell''';
   }
 }

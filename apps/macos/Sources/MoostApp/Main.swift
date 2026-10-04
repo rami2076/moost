@@ -1,6 +1,29 @@
+import AppKit
 import Foundation
 
-// moost CLI エントリ。`moost mcp`（アプリ内蔵 MCP サーバー、stdio JSON-RPC）は第 3 インクリメント。
-// トレイ常駐本体は NSApplication 側の起動となり、ここでは検証できないため最小の主とする。
+// moost のエントリ。
+// - 引数なし / GUI 起動: トレイ常駐アプリ（NSStatusItem + NSPopover、Dock アイコンなし）
+// - `moost mcp`: アプリ内蔵 MCP サーバー（stdio JSON-RPC。MoostCore/MCPServer.swift）
+// - `moost --version`: バージョン表示
+@main
+struct MoostMain {
+    static func main() {
+        let arguments = CommandLine.arguments.dropFirst()
+        if arguments.contains("--version") {
+            print(AppInfo.version)
+            return
+        }
+        if arguments.first == "mcp" {
+            MCPServerCLI.run()
+            return
+        }
 
-print("moost (native, development build)")
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        // LSUIElement=true 相当（Info.plist を持たない SPM 実行ファイルのため）。
+        // applicationShouldTerminateAfterLastWindowClosed も false を返す。
+        app.setActivationPolicy(.accessory)
+        app.run()
+    }
+}

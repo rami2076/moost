@@ -2,9 +2,9 @@ import SwiftUI
 import MoostCore
 
 /// メモ登録フォーム（design.md 6.3-1: 入口のセッションを見失わない）。
-/// メタ情報（エージェント・プロジェクト・日時）を上部に固定し、
-/// タイトル / タグ / 本文を入力。インレイン「セッション詳細」で要約時の
-/// 迷子を防ぐ（6.3-2）。
+/// 元セッションのメタ情報（エージェント・プロジェクト・ID・日時・最終発言）を
+/// 「このメモの元セッション」1 ブロックに統合して上部に固定し、
+/// タイトル / タグ / 本文を左揃えで入力（6.3-2）。
 struct NewMemoScreen: View {
     let session: RecentSession
     @EnvironmentObject var model: AppModel
@@ -13,22 +13,34 @@ struct NewMemoScreen: View {
         VStack(spacing: 0) {
             ScreenHeader(title: "メモを登録")
 
-            MetaPanel(
-                agentId: session.agentId,
-                projectPath: session.projectPath,
-                sessionId: session.sessionId,
-                updatedAt: session.updatedAt)
-
             InlineSessionDetail(session: session)
 
-            Form {
-                TextField("タイトル", text: $model.draftTitle)
-                TextField("タグ（カンマ区切り）", text: $model.draftTags)
-                TextEditor(text: $model.draftBody)
-                    .font(.system(size: 12))
-                    .frame(minHeight: 120)
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("タイトル")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField("タイトル", text: $model.draftTitle)
+                        .textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("タグ（カンマ区切り）")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField("タグ（カンマ区切り）", text: $model.draftTags)
+                        .textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("本文")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $model.draftBody)
+                        .font(.system(size: 12))
+                        .frame(minHeight: 120)
+                }
             }
-            .formStyle(.grouped)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             // フォーム下部のボタン（ScrollView と混ぜず固定）
             HStack {
@@ -60,14 +72,32 @@ struct EditMemoScreen: View {
                 sessionId: memo.sessionId,
                 updatedAt: memo.updatedAt)
 
-            Form {
-                TextField("タイトル", text: $model.editTitle)
-                TextField("タグ（カンマ区切り）", text: $model.editTags)
-                TextEditor(text: $model.editBody)
-                    .font(.system(size: 12))
-                    .frame(minHeight: 110)
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("タイトル")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField("タイトル", text: $model.editTitle)
+                        .textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("タグ（カンマ区切り）")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField("タグ（カンマ区切り）", text: $model.editTags)
+                        .textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("本文")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $model.editBody)
+                        .font(.system(size: 12))
+                        .frame(minHeight: 110)
+                }
             }
-            .formStyle(.grouped)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             if model.deleteConfirmVisible {
                 HStack {
@@ -152,15 +182,22 @@ struct InlineSessionDetail: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("このメモの元セッション")
                 .font(.system(size: 11, weight: .medium))
-            Text(session.projectPath.isEmpty ? "(パス不明)" : session.projectPath)
-                .font(.system(size: 11))
-            Text("ID: \(session.sessionId)")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-            Text(AppFormat.dateTime(session.updatedAt))
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                AgentBadge(agentId: session.agentId)
+                Text(session.projectPath.isEmpty ? "(パス不明)" : session.projectPath)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            HStack(spacing: 6) {
+                Text("ID: \(session.sessionId)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                Text(AppFormat.dateTime(session.updatedAt))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
             Text("最後のあなたの発言: \(session.lastPrompt)")
                 .font(.system(size: 11))
                 .lineLimit(3)

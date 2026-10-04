@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
+	<key>CFBundleExecutable</key>
+	<string>MoostApp</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.rami2076.moost</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Moost</string>
+	<key>CFBundleDisplayName</key>
+	<string>Moost</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<!-- CFBundleShortVersionString は SemVer 本体（例: 2.0.0）。
+	     プラットフォーム記号を含む完全版（2.0.0-macos）は CFBundleVersion に持つ -->
+	<key>CFBundleShortVersionString</key>
+	<string>@SEMVER@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<!-- トレイ常駐アプリ: Dock アイコン・メニューバーを出さない -->
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 rami2076. All rights reserved.</string>
+</dict>
+</plist>

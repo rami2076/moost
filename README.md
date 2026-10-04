@@ -7,43 +7,23 @@ Memo + Roost — AI コーディングエージェント CLI のセッション�
 
 ## できること
 
-- **直近セッション一覧**: `claude`/`codex` の履歴を自動集約し、最新順に一覧表示
+- **直近セッション一覧**: `claude`/`codex`/`pi` の履歴を自動集約し、最新順に一覧表示
 - **ワンクリック復帰**: 一覧の行からターミナルを開いて `--resume` を自動実行
 - **メモ**: セッションにタイトル・タグ・本文を付けて記録。元のセッションが
   履歴から消えても、メモからの復帰は機能し続ける
 - **登録プロジェクト**: セッション履歴がまだ1件もないディレクトリでも、
   あらかじめ登録しておけば新規セッションをワンクリックで開始できる
-- **マルチエージェント対応**: Claude Code / Codex CLI の両方に対応
+- **マルチエージェント対応**: Claude Code / Codex CLI / pi の 3 エージェントに対応
+- **セッション要約**: Claude（haiku）/ Codex / pi で直近・全体の要約を取得。書いた
+  メモの元セッションに自動で貼り付け
+- **MCP 連携**: `moost mcp` を Claude Code / Codex CLI / Claude Desktop の
+  MCP サーバーとして登録（JSON-RPC 2.0 over stdio・外部依存なし）
 - **アプリ内更新通知**: 新しいバージョンが出ると通知し、Homebrew 導入なら
-  ワンクリックで更新できる（Linux はリリースページへの案内のみ）
+  ワンクリックで更新できる
 
-## インストール（macOS / Linux）
+## インストール
 
-### Linux (Ubuntu / Debian)
-
-[Releases](https://github.com/rami2076/moost/releases) から `.deb` をダウンロードし、
-以下のどちらかで導入する（Ubuntu 24.04 で検証済み）。
-
-```bash
-# gh CLI なら
-gh release download -R rami2076/moost -p '*.deb' -D ~/Downloads
-sudo apt install ~/Downloads/moost_*.deb
-```
-
-- ランチャーから「Moost」で起動できるほか、`moost` コマンドでも起動できる
-  （シンボリックリンク経由）。
-- トレイアイコンは AppIndicator 経由。Ubuntu 標準の GNOME では既定で有効。
-  出ない場合は拡張機能「AppIndicator and KStatusNotifierItem Support」を
-  有効にする:
-
-  ```bash
-  gnome-extensions enable ubuntu-appindicators@ubuntu.com
-  ```
-
-  拡張を入れられない環境では、通常ウィンドウとして動作する（フォールバック）。
-- 更新通知が来たらボタンでリリースページが開く。`.deb` を入れ替えて更新する。
-
-### macOS
+### macOS（本リリース: v2.0.0-macos）
 
 ### Homebrew（推奨）
 
@@ -69,20 +49,31 @@ Gatekeeper 警告なしで起動できる）。
 > **初回起動時の注意**: 当面 ad-hoc 署名のため Gatekeeper の警告が出る。
 > Finder で `Moost.app` を右クリック →「開く」を選ぶと以後は起動できる。
 
+### Linux / Windows
+
+フェーズ D（#73）で native 対応予定（Linux は `v2.0.0-linux`、Windows は
+`v2.0.0-windows` として配布予定）。それまでは macOS のみ。
+
 ## 構成
 
 ```
-packages/core/   ロジック層（pure Dart・UI 非依存）
-apps/desktop/    Flutter デスクトップ UI（フェーズ 2）
+apps/macos/      Swift/AppKit native アプリ（MoostCore + MoostApp・MCP 内蔵）
+packages/core/   リファレンス実装（pure Dart・UI 非依存）
 ```
 
 ## 開発
 
 ```bash
-cd packages/core
-dart pub get
-dart test
-dart run bin/moost.dart --help   # CLI サンプル
+cd apps/macos
+swift build
+swift test
+.build/debug/MoostApp --version   # 例: 2.0.0-macos
+```
+
+MCP サーバーはアプリに内蔵。CLI から使う場合は:
+
+```bash
+.build/debug/MoostApp mcp
 ```
 
 ## ドキュメント

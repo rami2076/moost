@@ -1,13 +1,16 @@
-# タグ push で起動するリリース自動化（RELEASE.md 3.2）。
-# analyze / test を再実行してから macOS の dmg と Linux (Ubuntu) の .deb を
-# ビルドし、両方を GitHub Release へ添付する。
+# タグ push で起動するリリース自動化（RELEASE.md 3.2 / プラットフォーム規約）。
+# Swift 版（apps/macos）のみをビルドする。Flutter 版は ADR-005 で廃止済み、
+# Linux / Windows はフェーズ D（#73）でプラットフォームジョブを追加する。
+#
+# タグ規約: v<semver>-<platform>（例: v2.0.0-macos）。
+#   - `-macos` / `-linux` / `-windows` は正式リリース（prerelease にしない）
+#   - `-rc*` 等の prerelease タグは GitHub 上 prerelease として扱う
 #
 # 使い方:
 #   1. CHANGELOG の [Unreleased] を [x.y.z] - YYYY-MM-DD に確定
-#   2. apps/desktop/pubspec.yaml の version を上げてコミット（PR → マージ）
-#   3. git tag v<x.y.z> && git push origin v<x.y.z>
-#
-# `-` を含むタグ（例: v0.0.1-citest）は prerelease として作成される。
+#   2. apps/macos/Sources/MoostApp/AppInfo.swift の version を上げてコミット
+#      （PR → マージ）
+#   3. git tag v<x.y.z>-<platform> && git push origin v<x.y.z>-<platform>
 name: Release
 
 on:
@@ -18,60 +21,51 @@ permissions:
   contents: write
 
 jobs:
-  # === macOS: dmg ビルド（既存フロー） ===
+  # === macOS: Swift 版ビルド + .app バンドル + dmg ===
   build-macos:
     name: Build macOS (dmg)
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: 3.44.5
-          cache: true
-
-      - name: Enforce lockfiles
+      - name: Extract version parts from tag
         run: |
-          (cd packages/core && dart pub get --enforce-lockfile)
-          (cd apps/desktop && flutter pub get --enforce-lockfile)
-          (cd apps/mcp_server && dart pub get --enforce-lockfile)
+          # タグ: v2.0.0-macos  → VERSION=2.0.0-macos / SEMVER=2.0.0 / PLATFORM=macos
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          SEMVER="${VERSION%-*}"
+          PLATFORM="${VERSION##*-}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SEMVER=$SEMVER" >> "$GITHUB_ENV"
+          echo "PLATFORM=$PLATFORM" >> "$GITHUB_ENV"
+          echo "tag=$TAG version=$VERSION semver=$SEMVER platform=$PLATFORM"
 
-      - name: Analyze and test
+      - name: Swift build (release)
+        run: swift build -c release
+        working-directory: apps/macos
+
+      - name: Assemble app bundle
+        shell: bash
         run: |
-          (cd packages/core && dart analyze && dart test)
-          (cd apps/desktop && flutter analyze && flutter test)
-          (cd apps/mcp_server && dart analyze && dart test)
-
-      - name: Build macOS app (release)
-        run: flutter build macos --release
-        working-directory: apps/desktop
-
-      # MCP サーバーを単体バイナリにし、.app へ同梱する（Issue #45）
-      - name: Build and embed moost-mcp binary
-        run: |
-          dart compile exe bin/moost_mcp.dart -o moost-mcp
-          mkdir -p "../desktop/build/macos/Build/Products/Release/moost_desktop.app/Contents/Resources"
-          cp moost-mcp \
-            "../desktop/build/macos/Build/Products/Release/moost_desktop.app/Contents/Resources/moost-mcp"
-        working-directory: apps/mcp_server
+          APP="dist/Moost.app"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp apps/macos/.build/release/MoostApp "$APP/Contents/MacOS/MoostApp"
+          cp apps/macos/Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+          sed -e "s/@SEMVER@/$SEMVER/g" -e "s/@VERSION@/$VERSION/g" \
+            apps/macos/Resources/Info.plist > "$APP/Contents/Info.plist"
+          ls -la "$APP/Contents/MacOS"
 
       - name: Ad-hoc sign
-        run: >
-          codesign --force --deep --sign -
-          "apps/desktop/build/macos/Build/Products/Release/moost_desktop.app"
+        run: codesign --force --deep --sign - "dist/Moost.app"
 
       - name: Create dmg
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist/dmg
-          cp -R "apps/desktop/build/macos/Build/Products/Release/moost_desktop.app" \
-            "dist/dmg/Moost.app"
+          cp -R dist/Moost.app dist/dmg/Moost.app
           ln -s /Applications dist/dmg/Applications
           hdiutil create -volname "Moost $VERSION" -srcfolder dist/dmg \
             -ov -format UDZO "dist/Moost-$VERSION.dmg"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "artifact dir already populated"
+          ls -la dist/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -79,65 +73,10 @@ jobs:
           path: dist/Moost-*.dmg
           if-no-files-found: error
 
-  # === Linux (Ubuntu): .deb ビルド ===
-  build-linux:
-    name: Build Linux (.deb)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: 3.44.5
-          cache: true
-
-      - name: Enforce lockfiles
-        run: |
-          (cd packages/core && dart pub get --enforce-lockfile)
-          (cd apps/desktop && flutter pub get --enforce-lockfile)
-          (cd apps/mcp_server && dart pub get --enforce-lockfile)
-
-      - name: Analyze and test
-        run: |
-          (cd packages/core && dart analyze && dart test)
-          (cd apps/desktop && flutter analyze && flutter test)
-          (cd apps/mcp_server && dart analyze && dart test)
-
-      # Linux ビルドに必要なシステムライブラリ（本番 .deb の Depends と一致）
-      - name: Install Linux build deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            clang cmake ninja-build pkg-config libgtk-3-dev \
-            libayatana-appindicator3-dev libxtst-dev dpkg-dev
-
-      - name: Build Linux app (release)
-        run: flutter build linux --release
-        working-directory: apps/desktop
-
-      # MCP サーバーを単体バイナリにし、Linux バンドルの実行ファイル直下へ
-      # 同梱する（McpBinaryLocator の Linux 分岐に対応）
-      - name: Build and embed moost-mcp binary into the Linux bundle
-        run: |
-          dart compile exe bin/moost_mcp.dart -o moost-mcp
-          cp moost-mcp ../desktop/build/linux/x64/release/bundle/moost-mcp
-          chmod +x ../desktop/build/linux/x64/release/bundle/moost-mcp
-        working-directory: apps/mcp_server
-
-      - name: Package .deb
-        run: ./scripts/linux/package_deb.sh
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: moost-linux
-          path: dist/moost_*.deb
-          if-no-files-found: error
-
-  # === リリース作成（両成果物を添付） ===
+  # === リリース作成（dmg を添付）+ Homebrew tap bump ===
   release:
     name: Create GitHub Release
-    needs: [build-macos, build-linux]
+    needs: [build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -146,34 +85,23 @@ jobs:
         with:
           name: moost-macos
           path: dist/macos
-      - uses: actions/download-artifact@v4
-        with:
-          name: moost-linux
-          path: dist/linux
 
       - name: Collect artifacts and compute hashes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          ls -l dist/macos dist/linux
+          ls -l dist/macos
           DMG=$(ls dist/macos/Moost-*.dmg)
-          DEB=$(ls dist/linux/moost_*.deb)
           echo "DMG_PATH=$DMG" >> "$GITHUB_ENV"
-          echo "DEB_PATH=$DEB" >> "$GITHUB_ENV"
           DMG_SHA=$(sha256sum "$DMG" | awk '{print $1}')
           echo "DMG_SHA=$DMG_SHA" >> "$GITHUB_ENV"
 
-      # CHANGELOG から該当節を抜き出す。
-      # タグ名が v1.2.3-rc1 のような prerelease の場合も、CHANGELOG の見出し
-      # （## [1.2.3]）と一致するよう、タグから「-以降」を取り除いて検索する。
-      # 正規表現はシェルクォートを挟むと バックスラッシュが暴れるため、
-      # 文字列正規表現（$0 ~ "..."）形式で書く。
+      # CHANGELOG から該当節を抜き出す。タグ名が v2.0.0-macos のような場合も
+      # CHANGELOG の見出し（## [2.0.0]）と一致するよう、最初の「-」で切る。
       - name: Extract changelog section
         run: |
           V="$(echo "$VERSION" | cut -d- -f1)"
           echo "VERSION=$VERSION (changelog 検索用: $V)"
-          # バックスラッシュに依存せず mawk/gawk 両方で確実な index() 方式
-          # （文字列の先頭が "## [<ver>]" であるかを判定。正規表現は使わない）
           awk -v ver="$V" '
             index($0, "## [" ver "]") == 1 {flag=1; next}
             index($0, "## [") == 1 {flag=0}
@@ -182,14 +110,11 @@ jobs:
             echo "(CHANGELOG に $V の節がありません)" > RELEASE_NOTES.md
           fi
 
-      # プラットフォーム別のインストールコマンドをノート末尾に付ける
       - name: Append install commands
         run: |
           cat >> RELEASE_NOTES.md << EOF
 
-          ## インストール
-
-          ### macOS
+          ## インストール（macOS）
 
           Homebrew を使っている場合:
 
@@ -204,38 +129,34 @@ jobs:
           open ~/Downloads/Moost.dmg
           \`\`\`
 
-          ### Linux (Ubuntu / Debian)
+          インストール後に MCP サーバーを登録する場合:
 
           \`\`\`bash
-          gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.deb' -O ~/Downloads/Moost.deb
-          sudo apt install ~/Downloads/Moost.deb
+          moost mcp
           \`\`\`
-
-          GNOME でトレイアイコンが出ない場合は、拡張機能「AppIndicator and
-          KStatusNotifierItem Support」を有効にしてください（Ubuntu は既定で有効）。
-          \`gnome-extensions enable ubuntu-appindicators@ubuntu.com\` で確認できます。
           EOF
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # プラットフォーム記号（-macos 等）は正式リリース。prerelease は -rc 系のみ
           PRERELEASE_FLAG=""
           case "$GITHUB_REF_NAME" in
-            *-*) PRERELEASE_FLAG="--prerelease" ;;
+            *-rc*|*-beta*|*-alpha*) PRERELEASE_FLAG="--prerelease" ;;
           esac
           gh release create "$GITHUB_REF_NAME" \
-            "$DMG_PATH" "$DEB_PATH" \
+            "$DMG_PATH" \
             --title "$GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \
             $PRERELEASE_FLAG
 
-      # Homebrew tap の cask を新バージョンへ書き換える（Issue #11）。
-      # GITHUB_TOKEN は自リポジトリにしか効かないため、tap への push は
-      # 書き込み可 deploy key（secret: TAP_DEPLOY_KEY）で行う。
-      # prerelease（タグに '-' 入り）は brew に流さない
+      # Homebrew tap の cask を新バージョンへ書き換える。cask の version は
+      # タグ規約に合わせ「2.0.0-macos」とし、URL がアセット名と完全一致する。
+      # 以前の Flutter 版 cask にあった moost-mcp symlink は廃止（MCP サーバーは
+      # MoostApp バイナリに内蔵。代わりに `moost` コマンドを切る）。
       - name: Bump Homebrew tap
-        if: ${{ !contains(github.ref_name, '-') }}
+        if: ${{ !contains(github.ref_name, '-rc') }}
         env:
           TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
         run: |
@@ -247,7 +168,6 @@ jobs:
           git clone --depth 1 git@github.com:rami2076/homebrew-tap.git tap
           cd tap
 
-          # sed での部分置換はフォーマット変化に弱いため、cask は毎回丸ごと生成する
           cat > Casks/moost.rb << EOF
           cask "moost" do
             version "$VERSION"
@@ -259,11 +179,9 @@ jobs:
             homepage "https://github.com/${{ github.repository }}"
 
             app "Moost.app"
-            # Moost.app に同梱した MCP サーバーを CLI からも直接叩けるように
-            # symlink する（Issue #45）。設定画面から連携登録する際は、
-            # インストール先アプリの中の実体パスを直接指定するため
-            # この symlink 自体は経由しない
-            binary "#{appdir}/Moost.app/Contents/Resources/moost-mcp"
+            # MoostApp は MCP サーバー内蔵の単一バイナリ。
+            # `moost mcp` / `moost --version` を CLI から使えるようにする
+            binary "#{appdir}/Moost.app/Contents/MacOS/MoostApp", target: "moost"
 
             caveats <<~EOS
               Moost is currently ad-hoc signed. If Gatekeeper blocks the first launch,

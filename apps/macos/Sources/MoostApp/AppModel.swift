@@ -19,6 +19,7 @@ final class AppModel: ObservableObject {
         case newMemo(RecentSession)
         case editMemo(Memo)
         case sessionDetail(RecentSession)
+        case summary(RecentSession)
         case settings
         case notes
     }
@@ -48,6 +49,9 @@ final class AppModel: ObservableObject {
     @Published var editTitle = ""
     @Published var editTags = ""
     @Published var editBody = ""
+
+    /// 詳細/要約画面の「戻る」で戻る先の画面（メモ登録など）。nil なら一覧へ。
+    @Published var detailReturnTo: Screen?
 
     /// プロジェクトタブの「フォルダ追加」ボタンのグローバル座標（スモーク検証用・本番影響なし）。
     @Published var projectAddButtonFrame: CGRect = .zero
@@ -192,11 +196,32 @@ final class AppModel: ObservableObject {
     }
 
     func openSessionDetail(_ session: RecentSession) {
+        detailReturnTo = screen
         summaryScopeIsRecent = true
         isSummarizing = false
         summaryText = ""
         summaryError = nil
         screen = .sessionDetail(session)
+    }
+
+    func openSummary(_ session: RecentSession) {
+        detailReturnTo = screen
+        summaryScopeIsRecent = true
+        isSummarizing = false
+        summaryText = ""
+        summaryError = nil
+        screen = .summary(session)
+    }
+
+    /// 詳細/要約画面からの戻り。開く前にいた画面（メモ登録など）があればそこへ戻す。
+    /// なければ従来どおりセッション一覧へ（一覧の info アイコンから開いた場合）。
+    func backFromDetail() {
+        if let target = detailReturnTo {
+            detailReturnTo = nil
+            screen = target
+        } else {
+            backToList(returningTo: .sessions)
+        }
     }
 
     func openSettings() { screen = .settings }

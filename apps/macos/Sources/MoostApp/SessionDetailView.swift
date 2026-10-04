@@ -11,7 +11,7 @@ struct SessionDetailScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: "セッション詳細") {
-                model.backToList(returningTo: .sessions)
+                model.backFromDetail()
             }
 
             ScrollView {
@@ -66,6 +66,44 @@ struct SessionDetailScreen: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+        }
+    }
+}
+
+/// 要約画面（メモ登録フォームのフッター「要約」から開く）。
+/// 要約エンジンは MoostCore（バックグラウンド実行）。戻るでフォーム（下書き保持）へ。
+struct SummaryScreen: View {
+    let session: RecentSession
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScreenHeader(title: "要約") {
+                model.backFromDetail()
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    MetaPanel(
+                        agentId: session.agentId,
+                        projectPath: session.projectPath,
+                        sessionId: session.sessionId,
+                        updatedAt: session.updatedAt)
+
+                    SummarySection(session: session)
+
+                    Text("最後のあなたの発言")
+                        .font(.system(size: 11, weight: .medium))
+                    Text(session.lastPrompt)
+                        .font(.system(size: 11))
+                        .textSelection(.enabled)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .padding(.horizontal, 12)
+            }
         }
     }
 }

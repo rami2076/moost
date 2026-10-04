@@ -21,6 +21,8 @@ struct AppRootView: View {
                     EditMemoScreen(memo: memo)
                 case .sessionDetail(let session):
                     SessionDetailScreen(session: session)
+                case .summary(let session):
+                    SummaryScreen(session: session)
                 case .settings:
                     SettingsScreen()
                 case .notes:

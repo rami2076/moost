@@ -43,8 +43,18 @@ struct NewMemoScreen: View {
             .padding(.vertical, 8)
 
             // フォーム下部のボタン（ScrollView と混ぜず固定）
-            HStack {
+            HStack(spacing: 8) {
                 Button("キャンセル") { model.cancelNewMemo() }
+                Button {
+                    model.openSummary(session)
+                } label: {
+                    Label("要約", systemImage: "sparkles")
+                }
+                Button {
+                    model.openSessionDetail(session)
+                } label: {
+                    Label("詳細", systemImage: "info.circle")
+                }
                 Spacer()
                 Button("保存") { model.saveNewMemo(for: session) }
                     .keyboardShortcut(.defaultAction)

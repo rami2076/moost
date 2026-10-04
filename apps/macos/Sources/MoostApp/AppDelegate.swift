@@ -213,6 +213,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 model.openNewMemo(for: first)
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 capturePopover(to: "/tmp/moost-popover-6.png")
+                // フッター「要約」→ 要約画面 → 戻る（フォーム下書き保持の確認）
+                model.openSummary(first)
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                capturePopover(to: "/tmp/moost-popover-summary.png")
+                model.backFromDetail()
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                print("SMOKE back-from-summary screen=\(model.screen)")
+                capturePopover(to: "/tmp/moost-popover-back.png")
                 model.backToList(returningTo: .sessions)
                 try? await Task.sleep(nanoseconds: 300_000_000)
             }

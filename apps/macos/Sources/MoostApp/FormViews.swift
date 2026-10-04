@@ -211,6 +211,6 @@ struct InlineSessionDetail: View {
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1))
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 12)
     }
 }

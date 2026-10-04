@@ -10,7 +10,7 @@ struct MoostMain {
     static func main() {
         let arguments = CommandLine.arguments.dropFirst()
         if arguments.contains("--version") {
-            print(AppInfo.version)
+            print(AppInfo.displayVersion)
             return
         }
         if arguments.first == "mcp" {

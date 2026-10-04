@@ -3,10 +3,35 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [Unreleased]
+## [2.0.0] - 2026-10-04
+
+macOS 向け **native（Swift/AppKit）版** の正式リリース（Flutter 版から移行・ADR-005）。
+タグ規約を **`v<semver>-<platform>`** に変更（本リリース = `v2.0.0-macos`。
+Linux / Windows はフェーズ D で `v2.0.0-linux` / `v2.0.0-windows` として追加予定）。
+
+### Added
+
+- **macOS native 版**（SwiftPM / AppKit・`apps/macos`）: トレイ常駐アプリとして
+  一覧 3 タブ（直近セッション / メモ一覧 / プロジェクト）・メモ登録・編集・
+  セッション詳細・要約・設定・注意の 8 画面
+- **セッション要約**: Claude（haiku 固定）/ Codex / pi の **3 経路**・直近 NB（1〜20）/
+  全体の 2 範囲・バックグラウンド実行 + メモリキャッシュ・`[Moost要約]` マーカー排除
+- **MCP 連携**: アプリ内蔵 `moost mcp`（JSON-RPC 2.0 over stdio・自前実装）と
+  設定画面からの Claude Code / Codex CLI / Claude Desktop への登録
+- **メモ登録 ⇄ 要約 ⇄ 詳細の相互遷移**: 要約画面（SummaryScreen）新設・
+  フッターボタン統一（メモ登録 / 要約 / 詳細）・`detailReturnTo` で下書き保持
+- **プロジェクトタブ**: モノレポ・複数プロジェクトのセッションを切り分けて表示
+- **一覧行のワンクリック再開**・メモ削除ボタン・セッション詳細の常時表示（トグル廃止）
+- **pi モデル 404 対策**: 設定の `piProvider` / `piModel` + `PiModelProbe` による自動検出
+- **データ移行**: `~/.moost/v1` → `~/.moost/v2`（`DataMigration`・memos.json /
+  settings.json の形式は v1 と同一のまま）
 
 ### Fixed
 
+- **iTerm2 復帰の -2741 でターミナルが起動しない問題**（AppleScript アプリ名 "iTerm"）
+- **iTerm2 で 2 窓が開く問題**（復元タブ再利用方式・フロント化タイミング）
+- **メモ・プロジェクト CRUD のラグ**・起動時の暗転・ピッカーが moost の背面に
+  回る問題・一覧行の重複表示
 - **Issue #68: pi セッションの再開・新規作成でモデル 404 になる問題**:
   pi は起動時に現在の既定 model/provider を使うため、セッションが使っていた
   ローカルモデルがサーバーで配信されていないと再開・新規作成とも最初の
@@ -17,6 +42,11 @@
     `/v1/models` を問い合わせ、実際にサーバーが配信しているモデルを
     1 組選んで渡す（PiModelProbe）。配信なし・接続不可なら設定なし起動に
     戻る
+
+### Removed
+
+- **Flutter 版のビルド・配布**（`apps/desktop` / `apps/mcp_server` / Linux `.deb`）: リリース
+  ワークフローは Swift 版（macOS）のみに変更（Linux / Windows はフェーズ D で native 版）
 
 ## [1.11.0] - 2026-09-03
 

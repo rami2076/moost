@@ -27,7 +27,7 @@ enum MCPServerCLI {
     static func run() {
         let home = ProcessInfo.processInfo.environment["HOME"]
             ?? FileManager.default.homeDirectoryForCurrentUser.path
-        let server = MCPServer(home: home, serverVersion: AppInfo.version)
+        let server = MCPServer(home: home, serverVersion: AppInfo.displayVersion)
         server.serve(channel: StdioMCPChannel())
     }
 }

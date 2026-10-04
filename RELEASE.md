@@ -1,11 +1,11 @@
 # Moost バージョン管理・改修・リリース手順
 
-- **ステータス**: ドラフト
-- **作成日**: 2026-07-09
+- **ステータス**: 運用中（Swift 版 v2.0.0 以降）
+- **作成日**: 2026-07-09（2026-10-04 に Swift 版向けへ改訂）
 - **前提資料**: [requirements.md](./requirements.md) / [design.md](./design.md)
 
-Swift 版の `RELEASE.md` + `scripts/build-dmg.sh`（VERSION もそこで管理）に相当する運用を
-Dart/Flutter 版向けに定義する。実装リポジトリ作成時に本書を `RELEASE.md` として持ち込む。
+Swift 版（`apps/macos`）を正とする。Dart/Flutter 版（`apps/desktop` / `packages/core`）は
+リファレンス実装として残すが、リリース対象からは外れる（ADR-005）。
 
 ## 1. バージョニング
 
@@ -19,14 +19,33 @@ Dart/Flutter 版向けに定義する。実装リポジトリ作成時に本書�
 | MINOR | 機能追加（新画面・新設定・adapter 追加等）。後方互換あり |
 | PATCH | バグ修正・文言修正・依存更新のみ |
 
+### 1.1.2 プラットフォーム記号（3 OS 対応を見据えた規約・2026-10-04 導入）
+
+Moost は macOS / Linux / Windows をいずれ native 対応する（#73）ため、
+リリース単位をプラットフォームごとに分ける。
+
+| 対象 | 表記 | 例 |
+|------|------|-----|
+| git タグ | `v<semver>-<platform>` | `v2.0.0-macos` |
+| アプリ内バージョン（--version / 設定画面 / MCP serverInfo） | `<semver>-<platform>` | `2.0.0-macos` |
+| 配布アセット | `Moost-<semver>-<platform>.<ext>` | `Moost-2.0.0-macos.dmg` |
+| brew cask の version | `<semver>-<platform>` | `2.0.0-macos` |
+| CHANGELOG の見出し | `[<semver>]`（プラットフォーム共通） | `## [2.0.0]` |
+
+- `platform` は `macos` / `linux` / `windows` の固定 3 値（`AppInfo.platformTag`）
+- **`-macos` 等は正式リリース**（GitHub では prerelease にしない）。
+  prerelease は `-rc<数>` / `-beta<数>` / `-alpha<数>` のみ
+- 各プラットフォームは独立した semver を持つ（進み具合が異なれば個別に上がる。
+  互換破壊のような共通の理由では一律に上げる）
+
 ### 1.2 バージョンの単一情報源
 
-**`apps/desktop/pubspec.yaml` の `version`（`x.y.z+ビルド番号`）を唯一の情報源とする。**
+**`apps/macos/Sources/MoostApp/AppInfo.swift` の `version`（semver）を唯一の情報源とする。**
 
-- 設定画面のバージョン表示は package_info_plus 等で pubspec から取得する（手書きの重複を作らない）
-- `packages/core` は当面プロダクトと同一バージョンで扱い、独立した版番号を振らない。
-  pub.dev への単独公開を始める時点で分離する
-- git タグは `v<x.y.z>` 形式（例: `v1.2.0`）
+- 設定画面のバージョン表示・`--version`・MCP serverInfo は `AppInfo.displayVersion`
+  （semver + プラットフォーム記号）を使う（手書きの重複を作らない）
+- `MoostCore` はプロダクトと同一バージョンで扱い、独立した版番号を振らない
+- git タグは `v<x.y.z>-<platform>` 形式（例: `v2.0.0-macos` → 1.1.2）
 
 ### 1.3 アプリのバージョンとデータの schemaVersion は別物
 
@@ -56,41 +75,29 @@ Dart/Flutter 版向けに定義する。実装リポジトリ作成時に本書�
 
 ## 3. リリース手順
 
-### 3.1 フェーズ 1（core のみ・アプリ配布なし）
-
-git タグを打つだけの軽量リリースとする。
+### 3.1 準備（リリースコミット + タグ push）
 
 1. CHANGELOG の `[Unreleased]` を `[x.y.z] - YYYY-MM-DD` に確定
-2. pubspec.yaml の version を上げる
-3. `dart analyze && dart test` が通ることを確認してコミット
-4. `git tag v<x.y.z>` → push
+2. `apps/macos/Sources/MoostApp/AppInfo.swift` の version を上げる
+3. `swift build && swift test` が通ることを確認してコミット（PR → CI 緑 → マージ）
+4. `git tag v<x.y.z>-<platform>` → push
 
-### 3.2 フェーズ 2 以降（macOS アプリ配布 + Linux .deb）
+### 3.2 タグ push による自動リリース（macOS）
 
-リリースは GitHub Actions のタグ起動ワークフローに集約する（Swift 版 `build-dmg.sh` の置き換え）。
-macOS の dmg に加えて、Linux (Ubuntu) 向けの `.deb` も同じ Release に添付される
-（build-linux ジョブが `flutter build linux` → `scripts/linux/package_deb.sh` で生成）。
-
-**手元でやること:**
-
-1. CHANGELOG の `[Unreleased]` を `[x.y.z] - YYYY-MM-DD` に確定
-2. pubspec.yaml の version を `x.y.z+<ビルド番号>` に上げる
-3. リリースコミットを作成し PR → マージ
-4. `git tag v<x.y.z>` → push
+リリースは GitHub Actions のタグ起動ワークフロー（`.github/workflows/release.yml`）に集約する。
 
 **CI（タグ push で自動実行）:**
 
-1. `dart analyze` / `dart test` / osv-scanner
-2. `dart pub get --enforce-lockfile` で依存を固定取得
-3. macOS: `flutter build macos --release` → .app 署名（当面は ad-hoc 署名）→ dmg 化
-4. Linux: `flutter build linux --release` → moost-mcp をバンドルへ同梱 → `scripts/linux/package_deb.sh` で .deb 化
-5. GitHub Release を作成し、dmg + deb と CHANGELOG 該当節を添付
+1. `swift build -c release`（apps/macos）
+2. `.app` バンドル構築（MoostApp + Info.plist + AppIcon.icns）→ ad-hoc 署名 → dmg 化
+3. GitHub Release を作成し、dmg と CHANGELOG 該当節を添付
+4. Homebrew tap の cask を新バージョンへ bump（cask version = `x.y.z-platform`）
 
 **リリース後の確認:**
 
 - dmg をクリーンな環境（または別ユーザー）でインストールし、
   起動 → 一覧表示 → メモ登録 → 復帰の最小動線を確認する
-- 設定画面のバージョン表示が上がっていることを確認する
+- 設定画面のバージョン表示が `x.y.z-platform` になっていることを確認する
 
 ### 3.3 hotfix
 
@@ -99,10 +106,11 @@ macOS の dmg に加えて、Linux (Ubuntu) 向けの `.deb` も同じ Release �
 
 ### 3.4 Homebrew tap への自動反映と deploy key
 
-リリース（`-` を含まないタグ）時、release.yml が
+リリース（`-rc` を含まないタグ）時、release.yml が
 [rami2076/homebrew-tap](https://github.com/rami2076/homebrew-tap) の
 `Casks/moost.rb` を丸ごと再生成して push する（version / sha256 / dmg URL）。
 ユーザーは `brew install --cask rami2076/tap/moost` で導入、`brew upgrade` で更新できる。
+cask の version はタグ規約どおり `x.y.z-platform`（例: `2.0.0-macos`）。
 
 **認証の構成**（Actions の `GITHUB_TOKEN` は自リポジトリにしか効かないため）:
 
@@ -144,11 +152,11 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
 ## 5. チェックリスト（リリース時）
 
 - [ ] CHANGELOG が確定している（Unreleased が空になった）
-- [ ] pubspec.yaml の version がタグと一致している
-- [ ] `dart analyze` / `dart test` / `--enforce-lockfile` が通っている
+- [ ] `AppInfo.version` がタグの semver と一致している
+- [ ] `swift build && swift test`（apps/macos）が通っている
 - [ ] schemaVersion を変えた場合: マイグレーション実装 + テストがあり、MAJOR を上げている
 - [ ] クリーン環境で最小動線（一覧 → メモ登録 → 復帰）を確認した
-- [ ] 設定画面のバージョン表示が新しい版になっている
+- [ ] 設定画面のバージョン表示が `x.y.z-platform` になっている
 
 ## 6. リリースフローのトラブルシューティング（練習リリースで発見）
 

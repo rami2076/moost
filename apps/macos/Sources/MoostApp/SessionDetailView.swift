@@ -45,7 +45,12 @@ struct SessionDetailScreen: View {
                 Button {
                     model.openNewMemo(for: session)
                 } label: {
-                    Label("このセッションをメモ", systemImage: "square.and.pencil")
+                    Label("メモ登録", systemImage: "square.and.pencil")
+                }
+                Button {
+                    model.openSummary(session)
+                } label: {
+                    Label("要約", systemImage: "sparkles")
                 }
                 Spacer()
                 Button {
@@ -104,6 +109,37 @@ struct SummaryScreen: View {
                 }
                 .padding(.horizontal, 12)
             }
+
+            HStack {
+                Button {
+                    model.openNewMemo(for: session)
+                } label: {
+                    Label("メモ登録", systemImage: "square.and.pencil")
+                }
+                Button {
+                    model.openSessionDetail(session)
+                } label: {
+                    Label("詳細", systemImage: "info.circle")
+                }
+                Spacer()
+                Button {
+                    model.copyResumeCommand(agent: session.agentId,
+                                            projectPath: session.projectPath,
+                                            sessionId: session.sessionId)
+                } label: {
+                    Label("復帰コマンドをコピー", systemImage: "doc.on.doc")
+                }
+                Button {
+                    model.openInTerminal(agent: session.agentId,
+                                         projectPath: session.projectPath,
+                                         sessionId: session.sessionId)
+                } label: {
+                    Label("ターミナルで開く", systemImage: "terminal")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
         }
     }
 }

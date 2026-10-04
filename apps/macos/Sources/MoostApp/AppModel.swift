@@ -196,7 +196,7 @@ final class AppModel: ObservableObject {
     }
 
     func openSessionDetail(_ session: RecentSession) {
-        detailReturnTo = screen
+        rememberDetailReturn()
         summaryScopeIsRecent = true
         isSummarizing = false
         summaryText = ""
@@ -205,12 +205,23 @@ final class AppModel: ObservableObject {
     }
 
     func openSummary(_ session: RecentSession) {
-        detailReturnTo = screen
+        rememberDetailReturn()
         summaryScopeIsRecent = true
         isSummarizing = false
         summaryText = ""
         summaryError = nil
         screen = .summary(session)
+    }
+
+    /// 詳細/要約を開く際、戻り先を記録する。詳細/要約からの相互遷移では
+    /// 既に記録済みの戻り先（メモ登録など）を上書きしない。
+    private func rememberDetailReturn() {
+        switch screen {
+        case .summary, .sessionDetail:
+            break
+        default:
+            detailReturnTo = screen
+        }
     }
 
     /// 詳細/要約画面からの戻り。開く前にいた画面（メモ登録など）があればそこへ戻す。

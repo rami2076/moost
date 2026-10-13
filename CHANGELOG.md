@@ -3,6 +3,15 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [Unreleased]
+
+### Added
+
+- **設定画面に更新チェック**: GitHub Releases API（/releases/latest）を参照し、
+  新しいバージョンが公開されていれば「リリースページを開く」/「brew コマンドを
+  コピー」ボタンを表示。最新なら「最新版です」、取得失敗なら理由と再確認ボタン
+  （Flutter 版 Issue #12 の native 移植、移行計画 5.2）
+
 ## [2.0.1] - 2026-10-13
 
 ### Fixed

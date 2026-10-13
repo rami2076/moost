@@ -1,79 +1,93 @@
+import Foundation
 import XCTest
 @testable import MoostApp
 
-/// 更新チェック（UpdateChecker）の純粋関数テスト。
-/// ネットワークは使わず、API 応答の解釈とバージョン比較を検証する
-/// （Flutter 版 Issue #12 の native 移植への回帰ゲート）。
+/// 更新チェック（リダイレクト方式: docs/app-update-check-methods.md 方式 7）のテスト。
+/// ネットワークは使わず、URL パース・SemVer 比較・正規化の純粋関数を検証する。
+/// （ネットワーク障害時の沈黙（nil を返す）は check() の全体契約として保証される。）
 final class UpdateCheckerTests: XCTestCase {
-    // MARK: - decodeRelease（API 応答の解釈）
 
-    func testDecodeReleaseNormalizesTagAndKeepsURL() throws {
-        let json = """
-        {
-          "tag_name": "v2.0.2-macos",
-          "html_url": "https://github.com/rami2076/moost/releases/tag/v2.0.2-macos"
-        }
-        """.data(using: .utf8)!
-        let release = try XCTUnwrap(UpdateChecker.decodeRelease(json))
-        XCTAssertEqual(release.version, "2.0.2-macos")
-        XCTAssertEqual(release.url, "https://github.com/rami2076/moost/releases/tag/v2.0.2-macos")
+    // MARK: - tagFromLocation
+
+    func testTagFromLocationWithPlatformSuffix() {
+        let url = URL(string: "https://github.com/rami2076/moost/releases/tag/v2.1.0-macos")!
+        XCTAssertEqual(UpdateChecker.tagFromLocation(url), "v2.1.0-macos")
     }
 
-    func testDecodeReleaseIgnoresBrokenPayload() {
-        XCTAssertNil(UpdateChecker.decodeRelease(Data("not json".utf8)))
-        XCTAssertNil(UpdateChecker.decodeRelease(Data("{\"foo\":1}".utf8)))
-        XCTAssertNil(UpdateChecker.decodeRelease(Data("{\"tag_name\":\"\"}".utf8)))
+    func testTagFromLocationPlainVersion() {
+        let url = URL(string: "https://github.com/rami2076/moost/releases/tag/v2.0.1")!
+        XCTAssertEqual(UpdateChecker.tagFromLocation(url), "v2.0.1")
     }
 
-    // MARK: - evaluate（比較ロジック）
-
-    func testEvaluateAvailableWhenLatestIsNewer() throws {
-        let latest = UpdateChecker.Release(version: "2.0.2-macos", url: "u")
-        let result = UpdateChecker.evaluate(current: "2.0.1-macos", latest: latest)
-        XCTAssertEqual(result, .available(latest))
+    func testTagFromLocationMissingTagSegment() {
+        let url = URL(string: "https://github.com/rami2076/moost/releases/latest")!
+        XCTAssertNil(UpdateChecker.tagFromLocation(url))
     }
 
-    func testEvaluateUpToDateWhenEqual() throws {
-        let latest = UpdateChecker.Release(version: "2.0.1-macos", url: "u")
-        let result = UpdateChecker.evaluate(current: "2.0.1-macos", latest: latest)
-        XCTAssertEqual(result, .upToDate(latest))
+    func testTagFromLocationTrailingSlash() {
+        // Location に末尾スラッシュが付くケースは tagFromLocation で拾えないが、
+        // 空セグメントを弾くことで誤ったタグを返さないことを保証する。
+        let url = URL(string: "https://github.com/rami2076/moost/releases/tag/")!
+        XCTAssertNil(UpdateChecker.tagFromLocation(url))
     }
 
-    func testEvaluateUpToDateWhenCurrentIsNewer() throws {
-        // 手元がリリースより先（開発ビルド等）でも「最新」表示で落ち着かせる
-        let latest = UpdateChecker.Release(version: "2.0.1-macos", url: "u")
-        let result = UpdateChecker.evaluate(current: "2.0.2-macos", latest: latest)
-        XCTAssertEqual(result, .upToDate(latest))
+    // MARK: - normalize
+
+    func testNormalizeStripsLeadingV() {
+        XCTAssertEqual(UpdateChecker.normalize("v2.1.0-macos"), "2.1.0-macos")
+        XCTAssertEqual(UpdateChecker.normalize("v2.0.1"), "2.0.1")
+        XCTAssertEqual(UpdateChecker.normalize("2.1.0-macos"), "2.1.0-macos")
     }
 
-    func testEvaluateComparesOnlyMajorMinorPatch() throws {
-        // プラットフォーム記号が違っても SemVer 本体で比較する
-        let latest = UpdateChecker.Release(version: "2.1.0-linux", url: "u")
-        let result = UpdateChecker.evaluate(current: "2.0.1-macos", latest: latest)
-        XCTAssertEqual(result, .available(latest))
+    // MARK: - semverCore / compare
+
+    func testSemverCoreIgnoresPlatformSuffix() {
+        XCTAssertEqual(UpdateChecker.semverCore("2.1.0-macos"), [2, 1, 0])
+        XCTAssertEqual(UpdateChecker.semverCore("v2.1.0-macos"), [2, 1, 0])
+        XCTAssertEqual(UpdateChecker.semverCore("2.0.1-linux"), [2, 0, 1])
     }
 
-    func testEvaluateFailedOnUnparseableVersion() {
-        let latest = UpdateChecker.Release(version: "vNext-macos", url: "u")
-        if case .failed = UpdateChecker.evaluate(current: "2.0.1-macos", latest: latest) {
-            // OK
-        } else {
-            XCTFail("解釈不能なバージョンは failed になるべき")
-        }
+    func testSemverCoreHandlesBuildMetadata() {
+        XCTAssertEqual(UpdateChecker.semverCore("2.1.0+build42"), [2, 1, 0])
+        XCTAssertEqual(UpdateChecker.semverCore("2.1.0-macos+build42"), [2, 1, 0])
     }
 
-    // MARK: - normalize / semverTriple
-
-    func testNormalizeStripsV() {
-        XCTAssertEqual(UpdateChecker.normalize("v2.0.2-macos"), "2.0.2-macos")
-        XCTAssertEqual(UpdateChecker.normalize("2.0.1-macos"), "2.0.1-macos")
+    func testSemverCoreRejectsGarbage() {
+        XCTAssertNil(UpdateChecker.semverCore("latest"))
+        XCTAssertNil(UpdateChecker.semverCore(""))
+        XCTAssertNil(UpdateChecker.semverCore("v"))
     }
 
-    func testSemverTriple() {
-        XCTAssertEqual(UpdateChecker.semverTriple("2.0.2-macos")?.0, 2)
-        XCTAssertEqual(UpdateChecker.semverTriple("2.0.2-macos")?.1, 0)
-        XCTAssertEqual(UpdateChecker.semverTriple("2.0.2-macos")?.2, 2)
-        XCTAssertNil(UpdateChecker.semverTriple("2.0"))
-        XCTAssertNil(UpdateChecker.semverTriple("abc"))
+    func testSemverCorePadsMissingComponents() {
+        // タグが `v2.1` のような省略表記でも i686 世代のように比較できる。
+        XCTAssertEqual(UpdateChecker.semverCore("v2.1"), [2, 1])
+    }
+
+    // MARK: - isNewer
+
+    func testIsNewerPlatformSuffixedTag() {
+        XCTAssertTrue(UpdateChecker.isNewer(tag: "v2.1.0-macos", current: "2.0.1-macos"))
+        XCTAssertTrue(UpdateChecker.isNewer(tag: "v2.0.3-macos", current: "2.0.2-macos"))
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "v2.0.1-macos", current: "2.0.2-macos"))
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "v2.0.2-macos", current: "2.0.2-macos"))
+    }
+
+    func testIsNewerIgnoresPlatformSuffixMismatch() {
+        // 2.1.0-linux と 2.0.1-macos: プラットフォームの違いはあっても本体が新しければ true
+        // （SemVer 本体だけを比較する仕様。プラットフォームごとにタグを分ける規約のため）。
+        XCTAssertTrue(UpdateChecker.isNewer(tag: "v2.1.0-linux", current: "2.0.1-macos"))
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "v2.0.1-linux", current: "2.0.2-macos"))
+    }
+
+    func testIsNewerMajorMinorPatch() {
+        XCTAssertTrue(UpdateChecker.isNewer(tag: "v3.0.0-macos", current: "2.99.99-macos"))
+        XCTAssertTrue(UpdateChecker.isNewer(tag: "v2.10.0-macos", current: "2.9.9-macos"))
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "v2.0.0-macos", current: "2.0.0-macos"))
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "v1.9.9-macos", current: "2.0.0-macos"))
+    }
+
+    func testIsNewerWithGarbageTagIsFalse() {
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "not-a-version", current: "2.0.1-macos"))
+        XCTAssertFalse(UpdateChecker.isNewer(tag: "v2.0.2-macos", current: "garbage"))
     }
 }

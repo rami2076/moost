@@ -113,6 +113,8 @@ final class AppModel: ObservableObject {
         reloadAutoLaunchStatus()
         detectClaudePath()
         refresh()
+        checkInstallHealth()
+        checkForUpdateIfStale()
     }
 
     /// ポップオーバーを開いたとき・タブを切り替えたとき・フォームから戻ったときに
@@ -121,6 +123,9 @@ final class AppModel: ObservableObject {
     /// 完了後に published を更新する。
     func refresh() {
         refreshTask?.cancel()
+        // 更新チェックは前面化のたびにネットワークを張らないよう間引きする。
+        checkInstallHealth()
+        checkForUpdateIfStale()
         let home = self.home
         let memoFileURL = memoStore.file
         let projectFileURL = projectStore.file
@@ -149,6 +154,37 @@ final class AppModel: ObservableObject {
             guard !Task.isCancelled else { return }
             self.projects = projects
         }
+    }
+
+    // MARK: - 更新チェック（Flutter 版 Issue #12 の native 移植）
+
+    /// 新しいバージョンがあれば UpdateInfo。更新チェックは沈黙（失敗しても何も出さない）。
+    @Published private(set) var updateInfo: UpdateInfo?
+    /// 中断された brew アップグレードによるインストール破損（Issue #58）。
+    @Published private(set) var installBroken = false
+    /// 起動時 + 前面化時の再チェック間隔（docs/app-update-check-methods.md 3章）。
+    private static let updateCheckInterval: TimeInterval = 5 * 60
+    private var lastUpdateCheck: Date?
+
+    /// 起動時・ポップオーバー表示時のチェック（一定時間空いた場合のみ再実行）。
+    /// ネットワークを伴うため非同期で実行し、結果は published で画面に反映する。
+    func checkForUpdateIfStale() {
+        if let last = lastUpdateCheck,
+           Date().timeIntervalSince(last) < Self.updateCheckInterval {
+            return
+        }
+        lastUpdateCheck = Date()
+        let currentVersion = AppInfo.displayVersion
+        Task { [weak self] in
+            let found = await UpdateChecker.check(currentVersion: currentVersion)
+            guard !Task.isCancelled else { return }
+            self?.updateInfo = found
+        }
+    }
+
+    /// インストール破損の検知（同期・軽量）。
+    func checkInstallHealth() {
+        installBroken = InstallHealthChecker.isBroken()
     }
 
     // MARK: - 読み込み

@@ -1,101 +1,114 @@
 import Foundation
 
-/// 更新チェック（Flutter 版 Issue #12 の native 移植）。
-/// GitHub Releases API（`/releases/latest`、prerelease は返らない）を参照し、
-/// 現在のアプリバージョン（AppInfo.displayVersion）と比較する。
-/// 移行計画 5.2「アプリ内更新通知（v1.10 系）は GitHub Releases API の
-/// 読み取りで継続する」に基づく。
-struct UpdateChecker {
-    struct Release: Equatable {
-        /// 正規化済みタグ（例: "v2.0.2-macos" → "2.0.2-macos"）
-        let version: String
-        let url: String
-    }
+/// 更新チェック（Flutter 版 Issue #12 の native 移植。
+/// docs/app-update-check-methods.md の方式 7 = リダイレクト方式）。
+///
+/// Web の `releases/latest` に HEAD を打ち、302 の `Location`
+/// （…/releases/tag/vX.Y.Z）からタグを読む。API ではないのでレート制限がなく、
+/// JSON / XML のパースも不要。最新安定版のみを指す（prerelease / draft は除外）。
+///
+/// 失敗（オフライン・想定外レスポンス・タイムアウト）は沈黙して nil を返す。
+/// 通知機能の不具合でアプリ本体を壊さない。
+struct UpdateInfo: Equatable {
+    /// 例: "2.1.0-macos"（先頭の v は含まない。プラットフォーム記号付き）
+    let version: String
+    let releaseURL: URL
+}
 
-    enum Result: Equatable {
-        /// 新しいバージョンあり
-        case available(Release)
-        /// 最新版（または手元の方が新しい）
-        case upToDate(Release)
-        /// 取得失敗（オフライン / API エラー / 応答解釈不能）
-        case failed(String)
-    }
+enum UpdateChecker {
+    static let endpoint = URL(string: "https://github.com/rami2076/moost/releases/latest")!
 
-    static let endpoint =
-        URL(string: "https://api.github.com/repos/rami2076/moost/releases/latest")!
+    /// 新しいバージョンがあれば [UpdateInfo]、なければ nil。
+    static func check(currentVersion: String) async -> UpdateInfo? {
+        let delegate = NoRedirectDelegate()
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 5
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
 
-    /// ネットワークを伴うチェック（設定画面のボタン / 表示時から呼ぶ）。
-    func check(currentVersion: String) async -> Result {
-        var request = URLRequest(url: Self.endpoint)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "HEAD"
         request.setValue("Moost/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return .failed("更新サーバーがエラーを返しました")
+            let (_, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (300..<400).contains(http.statusCode),
+                  let location = http.value(forHTTPHeaderField: "Location"),
+                  let releaseURL = URL(string: location, relativeTo: endpoint)?.absoluteURL,
+                  let tag = tagFromLocation(releaseURL) else {
+                return nil
             }
-            guard let release = Self.decodeRelease(data) else {
-                return .failed("更新情報を解釈できませんでした")
-            }
-            return Self.evaluate(current: currentVersion, latest: release)
+            guard isNewer(tag: tag, current: currentVersion) else { return nil }
+            return UpdateInfo(version: normalize(tag), releaseURL: releaseURL)
         } catch {
-            return .failed(error.localizedDescription)
-        }
-    }
-
-    /// API 応答 JSON から Release を組み立てる（テストはここを直接叩く）。
-    static func decodeRelease(_ data: Data) -> Release? {
-        struct Payload: Decodable {
-            let tagName: String
-            let htmlUrl: String
-        }
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let payload = try? decoder.decode(Payload.self, from: data) else {
             return nil
         }
-        let version = normalize(payload.tagName)
-        guard !version.isEmpty, !payload.htmlUrl.isEmpty else { return nil }
-        return Release(version: version, url: payload.htmlUrl)
     }
 
-    /// 現行バージョンと最新リリースを比較して結果を返す（純粋関数・テスト対象）。
-    static func evaluate(current: String, latest: Release) -> Result {
-        guard let currentTriple = semverTriple(current),
-              let latestTriple = semverTriple(latest.version) else {
-            return .failed("バージョン番号を比較できませんでした")
+    /// `…/releases/tag/v2.1.0-macos` の末尾からタグを取り出す。
+    /// パスに tag セグメントが無ければ nil。
+    static func tagFromLocation(_ url: URL) -> String? {
+        let segments = url.pathComponents
+        guard let tagIndex = segments.lastIndex(of: "tag"),
+              tagIndex + 1 < segments.count else {
+            return nil
         }
-        if compareTriples(latestTriple, currentTriple) > 0 {
-            return .available(latest)
-        }
-        return .upToDate(latest)
+        let tag = segments[tagIndex + 1]
+        guard !tag.isEmpty else { return nil }
+        return tag
     }
 
-    /// "v2.0.2-macos" → "2.0.2-macos"。先頭の v を除くだけ。
-    /// （プラットフォーム記号は比較には使わず、表示・URL にのみ残す）
-    static func normalize(_ tagName: String) -> String {
-        var s = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// "v2.1.0-macos" → "2.1.0-macos"（先頭の v を除くだけ）。
+    static func normalize(_ tag: String) -> String {
+        var s = tag.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.hasPrefix("v") { s.removeFirst() }
         return s
     }
 
-    /// "2.0.2-macos" → (2,0,2)。解釈できなければ nil。
-    static func semverTriple(_ version: String) -> (Int, Int, Int)? {
-        let core = version.split(separator: "-").first.map(String.init) ?? version
-        let parts = core.split(separator: ".")
-        guard parts.count >= 3,
-              let major = Int(parts[0]),
-              let minor = Int(parts[1]),
-              let patch = Int(parts[2]) else {
-            return nil
+    /// タグ（またはバージョン文字列）が現行より新しいか。
+    /// プラットフォーム記号（-macos 等）は SemVer 本体の比較に使わない。
+    static func isNewer(tag: String, current: String) -> Bool {
+        guard let tagCore = semverCore(tag),
+              let currentCore = semverCore(current) else {
+            return false
         }
-        return (major, minor, patch)
+        return compare(tagCore, currentCore) > 0
     }
 
-    static func compareTriples(_ a: (Int, Int, Int), _ b: (Int, Int, Int)) -> Int {
-        if a.0 != b.0 { return a.0 > b.0 ? 1 : -1 }
-        if a.1 != b.1 { return a.1 > b.1 ? 1 : -1 }
-        if a.2 != b.2 { return a.2 > b.2 ? 1 : -1 }
+    /// "2.1.0-macos"/"v2.1.0"/"2.1.0+build" から数値列を取り出す。
+    static func semverCore(_ version: String) -> [Int]? {
+        var v = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        if v.hasPrefix("v") { v.removeFirst() }
+        let core = v.split(separator: "-").first.map(String.init) ?? v
+        let parts = core.split(separator: "+").first.map(String.init) ?? core
+        let nums = parts.split(separator: ".").compactMap { Int($0) }
+        guard !nums.isEmpty else { return nil }
+        return nums
+    }
+
+    /// 数値列同士の比較（不足成分は 0 扱い）。
+    static func compare(_ a: [Int], _ b: [Int]) -> Int {
+        let count = max(a.count, b.count)
+        for i in 0..<count {
+            let x = i < a.count ? a[i] : 0
+            let y = i < b.count ? b[i] : 0
+            if x != y { return x > y ? 1 : -1 }
+        }
         return 0
+    }
+}
+
+/// リダイレクトを追わずに 302 のレスポンス（Location ヘッダ）を受け取るための
+/// URLSession デリゲート。URLSession はデフォルトでリダイレクトを追跡してしまう。
+private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
     }
 }

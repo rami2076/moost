@@ -143,6 +143,16 @@ struct ListScreen: View {
             }
             .buttonStyle(.borderless)
             Spacer()
+            // 更新ボタンは「新バージョンあり」または「インストール破損」のときだけ表示
+            // （Flutter 版 root_screen.dart と同じ）。バージョンが変わったら状態を
+            // 作り直すのは ValueKey('${version}-$_installBroken') の移植。
+            if model.updateInfo != nil || model.installBroken {
+                UpdateButtonView(
+                    update: model.updateInfo,
+                    isInstallBroken: model.installBroken
+                )
+                .id("\(model.updateInfo?.version ?? "")-\(model.installBroken)")
+            }
             Button {
                 model.quit()
             } label: {

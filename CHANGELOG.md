@@ -3,6 +3,17 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.0.1] - 2026-10-13
+
+### Fixed
+
+- **macOS native 版でコピー&ペーストが効かない問題**: トレイ常駐のため
+  mainMenu を設定しておらず、Cmd+C / Cmd+V / Cmd+X / Cmd+A などがメニュー
+  キー等価として解決されなかった。アプリメニュー + 編集メニュー
+  （取り消し / やり直し / カット / コピー / ペースト / スタイルを合わせて
+  ペースト / 削除 / すべてを選択）を `MainMenuBuilder` で構築し
+  `NSApp.mainMenu` に設定（ユーザー報告 2026-10-05）
+
 ## [2.0.0] - 2026-10-04
 
 macOS 向け **native（Swift/AppKit）版** の正式リリース（Flutter 版から移行・ADR-005）。

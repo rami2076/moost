@@ -24,6 +24,9 @@ struct MoostMain {
         // LSUIElement=true 相当（Info.plist を持たない SPM 実行ファイルのため）。
         // applicationShouldTerminateAfterLastWindowClosed も false を返す。
         app.setActivationPolicy(.accessory)
+        // 編集メニューが無いと Cmd+C / Cmd+V 等がメニューキー等価で解決されず
+        // ポップオーバー内でコピー&ペーストが効かない（ユーザー報告 2026-10-05）。
+        app.mainMenu = MainMenuBuilder.build()
         app.run()
     }
 }

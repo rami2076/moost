@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 import MoostCore
 
 /// 設定画面（design.md 6.6）。保存は各項目の変更時（Flutter 版と同じ）。
@@ -20,11 +19,6 @@ struct SettingsScreen: View {
     @State private var mcpBusy = false
     @State private var mcpBusyTarget: String?
     @State private var mcpMessage: String?
-
-    // 更新チェック（Flutter 版 Issue #12 の native 移植）
-    @State private var updateChecking = false
-    @State private var updateResult: UpdateChecker.Result?
-    @State private var copyFeedback: String?
 
     private let mcpService = McpSetupService()
 
@@ -138,7 +132,7 @@ struct SettingsScreen: View {
 
                     divider()
 
-                    updateSection()
+                    versionSection()
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -147,7 +141,6 @@ struct SettingsScreen: View {
         .onAppear {
             loadFromModel()
             refreshMcpState()
-            checkForUpdate()
         }
     }
 
@@ -225,93 +218,15 @@ struct SettingsScreen: View {
         Divider().padding(.vertical, 2)
     }
 
-    // MARK: - 更新チェック
-
-    @ViewBuilder
-    private func updateSection() -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            label("バージョンと更新")
+    /// バージョン表示（更新チェックと更新実行はフッターの更新ボタンが担当: Issue #12 移植）。
+    private func versionSection() -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            label("バージョン")
             Text("Moost \(AppInfo.displayVersion)")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-
-            if updateChecking {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("更新を確認中…")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Button("更新を確認") { checkForUpdate() }
-                    .controlSize(.small)
-            }
-
-            switch updateResult {
-            case .available(let release):
-                Text("新しいバージョン \(release.version) が公開されています")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.primary)
-                HStack(spacing: 8) {
-                    Button("リリースページを開く") {
-                        openReleasePage(release)
-                    }
-                    .controlSize(.small)
-                    Button("brew コマンドをコピー") {
-                        copyBrewCommand()
-                    }
-                    .controlSize(.small)
-                }
-                if let copyFeedback {
-                    Text(copyFeedback)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-            case .upToDate(let release):
-                Text("最新版です（\(release.version)）")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            case .failed(let message):
-                Text("更新情報を取得できませんでした: \(message)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Button("再確認") { checkForUpdate() }
-                    .controlSize(.small)
-            case nil:
-                EmptyView()
-            }
         }
         .padding(.bottom, 4)
-    }
-
-    @MainActor
-    private func checkForUpdate() {
-        updateChecking = true
-        updateResult = nil
-        copyFeedback = nil
-        Task {
-            let checker = UpdateChecker()
-            let result = await checker.check(currentVersion: AppInfo.displayVersion)
-            updateChecking = false
-            updateResult = result
-        }
-    }
-
-    private func openReleasePage(_ release: UpdateChecker.Release) {
-        guard let url = URL(string: release.url) else { return }
-        NSWorkspace.shared.open(url)
-    }
-
-    private func copyBrewCommand() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString("brew upgrade --cask moost", forType: .string)
-        copyFeedback = "コピーしました"
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
-            copyFeedback = nil
-        }
     }
 
     private func label(_ text: String) -> some View {

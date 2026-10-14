@@ -11,6 +11,7 @@ struct SettingsScreen: View {
     @State private var claudePath = ""
     @State private var piProvider = ""
     @State private var piModel = ""
+    @State private var copyAnimation = true
 
     // MCP 連携（保存先: 外部ツール側。moost の設定ファイルには持たない）
     @State private var mcpClaudeCodeConnected = false
@@ -87,6 +88,19 @@ struct SettingsScreen: View {
                         .onSubmit {
                             save { $0.piModel = piModel }
                         }
+
+                    divider()
+
+                    label("コピー成功アニメーション")
+                    Toggle("コピー時に円周スイープとチェックマークを表示する", isOn: $copyAnimation)
+                        .toggleStyle(.switch)
+                        .font(.system(size: 12))
+                        .onChange(of: copyAnimation) { _, value in
+                            save { $0.copyAnimation = value }
+                        }
+                    Text("OFF にするとスイープを省略し、チェックマークをやや長めに表示します")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
 
                     divider()
 
@@ -241,6 +255,7 @@ struct SettingsScreen: View {
         claudePath = s.claudePath
         piProvider = s.piProvider
         piModel = s.piModel
+        copyAnimation = s.copyAnimation
     }
 
     /// 現在の編集値を反映した Settings を保存する。

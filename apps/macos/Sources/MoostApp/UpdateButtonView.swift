@@ -12,12 +12,15 @@ import SwiftUI
 /// ため、確認はインラインのピル表示（Flutter と同様の小さい はい/いいえ）で行う。
 struct UpdateButtonView: View {
     @StateObject private var model: UpdateButtonModel
+    private let copyAnimation: Bool
 
     init(
         update: UpdateInfo?,
         isInstallBroken: Bool,
+        copyAnimation: Bool = true,
         isBrewManaged: @escaping () -> Bool = { InstallHealthChecker.isBrewManaged }
     ) {
+        self.copyAnimation = copyAnimation
         _model = StateObject(wrappedValue: UpdateButtonModel(
             update: update,
             isInstallBroken: isInstallBroken,
@@ -130,12 +133,11 @@ struct UpdateButtonView: View {
             }
             .buttonStyle(.borderless)
             .help((model.isInstallBroken ? "修復に失敗しました: " : "更新に失敗しました: ") + message)
-            Button {
-                model.copyErrorMessage()
-            } label: {
-                Image(systemName: "doc.on.doc")
-            }
-            .buttonStyle(.borderless)
+            .help("エラーメッセージをコピー")
+            CopyButton(
+                copyAnimation: copyAnimation,
+                iconSize: 14,
+                action: { model.copyErrorMessage() })
             .help("エラーメッセージをコピー")
         }
     }

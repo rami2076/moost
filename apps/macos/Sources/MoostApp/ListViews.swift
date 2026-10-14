@@ -149,7 +149,8 @@ struct ListScreen: View {
             if model.updateInfo != nil || model.installBroken {
                 UpdateButtonView(
                     update: model.updateInfo,
-                    isInstallBroken: model.installBroken
+                    isInstallBroken: model.installBroken,
+                    copyAnimation: model.settings.copyAnimation
                 )
                 .id("\(model.updateInfo?.version ?? "")-\(model.installBroken)")
             }
@@ -201,14 +202,13 @@ struct SessionRow: View {
                 }
                 .buttonStyle(.borderless)
                 .help("ターミナルで再開")
-                Button {
-                    model.copyResumeCommand(agent: session.agentId,
-                                            projectPath: session.projectPath,
-                                            sessionId: session.sessionId)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                }
-                .buttonStyle(.borderless)
+                CopyButton(
+                    copyAnimation: model.settings.copyAnimation,
+                    action: {
+                        model.copyResumeCommand(agent: session.agentId,
+                                                projectPath: session.projectPath,
+                                                sessionId: session.sessionId)
+                    })
                 .help("復帰コマンドをコピー")
                 Button {
                     model.openSessionDetail(session)
@@ -254,14 +254,13 @@ struct MemoRow: View {
                 }
                 .buttonStyle(.borderless)
                 .help("ターミナルで再開")
-                Button {
-                    model.copyResumeCommand(agent: memo.agent,
-                                            projectPath: memo.projectPath,
-                                            sessionId: memo.sessionId)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                }
-                .buttonStyle(.borderless)
+                CopyButton(
+                    copyAnimation: model.settings.copyAnimation,
+                    action: {
+                        model.copyResumeCommand(agent: memo.agent,
+                                                projectPath: memo.projectPath,
+                                                sessionId: memo.sessionId)
+                    })
                 .help("復帰コマンドをコピー")
                 Button {
                     model.requestDeleteMemo(memo)

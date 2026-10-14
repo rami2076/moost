@@ -24,7 +24,8 @@ struct SessionDetailScreen: View {
                         agentId: session.agentId,
                         projectPath: session.projectPath,
                         sessionId: session.sessionId,
-                        updatedAt: session.updatedAt)
+                        updatedAt: session.updatedAt,
+                        copyAnimation: model.settings.copyAnimation)
 
                     SummarySection(session: session)
 
@@ -53,13 +54,14 @@ struct SessionDetailScreen: View {
                     Label("要約", systemImage: "sparkles")
                 }
                 Spacer()
-                Button {
-                    model.copyResumeCommand(agent: session.agentId,
-                                            projectPath: session.projectPath,
-                                            sessionId: session.sessionId)
-                } label: {
-                    Label("復帰コマンドをコピー", systemImage: "doc.on.doc")
-                }
+                CopyButton(
+                    copyAnimation: model.settings.copyAnimation,
+                    label: "復帰コマンドをコピー",
+                    action: {
+                        model.copyResumeCommand(agent: session.agentId,
+                                                projectPath: session.projectPath,
+                                                sessionId: session.sessionId)
+                    })
                 Button {
                     model.openInTerminal(agent: session.agentId,
                                          projectPath: session.projectPath,
@@ -122,13 +124,14 @@ struct SummaryScreen: View {
                     Label("詳細", systemImage: "info.circle")
                 }
                 Spacer()
-                Button {
-                    model.copyResumeCommand(agent: session.agentId,
-                                            projectPath: session.projectPath,
-                                            sessionId: session.sessionId)
-                } label: {
-                    Label("復帰コマンドをコピー", systemImage: "doc.on.doc")
-                }
+                CopyButton(
+                    copyAnimation: model.settings.copyAnimation,
+                    label: "復帰コマンドをコピー",
+                    action: {
+                        model.copyResumeCommand(agent: session.agentId,
+                                                projectPath: session.projectPath,
+                                                sessionId: session.sessionId)
+                    })
                 Button {
                     model.openInTerminal(agent: session.agentId,
                                          projectPath: session.projectPath,

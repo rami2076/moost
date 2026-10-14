@@ -3,7 +3,7 @@ import Foundation
 /// アプリ全体の公示値（bundle を持たない SPM 実行ファイルのため定数で持つ）。
 public enum AppInfo {
     /// SemVer 本体（プラットフォーム共通。リリースごとに上げる）。
-    public static let version = "2.1.0"
+    public static let version = "2.2.0"
 
     /// プラットフォーム識別子。git タグ・アセット名・brew cask の version に使う
     /// （macos / linux / windows。フェーズ D（#73）で linux / windows が増える）。

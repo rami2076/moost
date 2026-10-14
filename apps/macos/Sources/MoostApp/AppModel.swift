@@ -438,7 +438,8 @@ final class AppModel: ObservableObject {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(command, forType: .string)
-        showToast("復帰コマンドをコピーしました")
+        // 成功フィードバックはボタン側のスイープ + チェック（CopyButton）が担う。
+        // トーストは出さない（Flutter 版もスナックバーなし。root_screen.dart:655）。
     }
 
     func openInTerminal(agent: String, projectPath: String, sessionId: String) {

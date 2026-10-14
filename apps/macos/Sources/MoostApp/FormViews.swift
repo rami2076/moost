@@ -80,7 +80,8 @@ struct EditMemoScreen: View {
                 agentId: memo.agent,
                 projectPath: memo.projectPath,
                 sessionId: memo.sessionId,
-                updatedAt: memo.updatedAt)
+                updatedAt: memo.updatedAt,
+                copyAnimation: model.settings.copyAnimation)
 
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -154,6 +155,8 @@ struct MetaPanel: View {
     let projectPath: String
     let sessionId: String
     let updatedAt: Date
+    /// セッション ID コピーのアニメーション有無（設定 copyAnimation を親が渡す）。
+    var copyAnimation = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -169,6 +172,14 @@ struct MetaPanel: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
+                // セッション ID のコピー（Dart 版は compact な CopyIconButton、design.md 6.1「コピー付き」）
+                CopyButton(
+                    copyAnimation: copyAnimation,
+                    iconSize: 14,
+                    action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(sessionId, forType: .string)
+                    })
                 Text(AppFormat.dateTime(updatedAt))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)

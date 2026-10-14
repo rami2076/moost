@@ -3,7 +3,27 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [Unreleased]
+## [2.2.0] - 2026-10-14
+
+### Added
+
+- **コピー成功アニメーション（Flutter 版 `CopyIconButton` の移植）**: コピーすると
+  アイコンの円周を緑の線が時計回りに一周（250ms）→ 緑のチェックマーク（400ms）→
+  元のアイコンに戻る。スナックバー/トーストは出さない（Flutter と同じ）。
+  OS の「視差効果を減らす」有効時や設定 OFF 時はスイープを省略して即チェック
+  （`CopyFeedbackTiming` の既定値と同一）。セッション一覧 / メモ一覧 / セッション
+  詳細・要約フッター / セッション ID / 更新失敗ピルのエラーコピーに適用
+- **設定に「コピー成功アニメーション」トグル**: ON/OFF（設定キー `copyAnimation`、
+  既定 ON）を設定画面に追加。設定ファイル `~/.moost/v2/settings.json` に保存
+- **セッション詳細メタ情報のセッション ID コピーボタン**: セッション ID の横に
+  コピーボタンを新設（Dart 版は compact な CopyIconButton、design.md 6.1「コピー付き」）
+
+### Changed
+
+- **コピー成功時のトーストを廃止**: `復帰コマンドをコピーしました` トーストを
+  削除し、フィードバックはボタン自体のアニメーションに一本化（Flutter と同じ）
+
+## [2.1.0] - 2026-10-14
 
 ### Added
 
@@ -25,6 +45,12 @@
   （手動導入はリリースページを開く、brew 管理下は brew 更新を案内）
 - **更新チェックの方式を GitHub Releases API → リダイレクト方式に変更**
   （docs/app-update-check-methods.md 方式 7。レート制限の考慮・キャッシュが不要）
+
+## [Unreleased]
+
+### Added
+
+_なし_
 
 ## [2.0.2] - 2026-10-13
 

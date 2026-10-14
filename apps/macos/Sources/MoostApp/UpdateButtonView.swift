@@ -136,7 +136,6 @@ struct UpdateButtonView: View {
             .help("エラーメッセージをコピー")
             CopyButton(
                 copyAnimation: copyAnimation,
-                iconSize: 14,
                 action: { model.copyErrorMessage() })
             .help("エラーメッセージをコピー")
         }

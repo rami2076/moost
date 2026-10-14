@@ -175,7 +175,6 @@ struct MetaPanel: View {
                 // セッション ID のコピー（Dart 版は compact な CopyIconButton、design.md 6.1「コピー付き」）
                 CopyButton(
                     copyAnimation: copyAnimation,
-                    iconSize: 14,
                     action: {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(sessionId, forType: .string)

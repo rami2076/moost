@@ -16,7 +16,6 @@ struct CopyButton: View {
     var copyAnimation = true
     /// nil ならアイコンのみ（一覧行・MetaPanel 等）。
     var label: String? = nil
-    var iconSize: CGFloat = 18
     /// 実際のコピー処理（success/failure はこの View では判定しない）。
     let action: () -> Void
 
@@ -34,15 +33,17 @@ struct CopyButton: View {
     private static let holdDuration: TimeInterval = 0.4
     private static let noAnimationHold: TimeInterval = 1.0
 
-    private var arcSize: CGFloat { iconSize + 8 }
+    /// 円弧の直径。アイコン（既定フォントサイズ ~14pt）の周囲に少し余白を取る。
+    /// **レイアウトには影響しない**（overlay で描画。隣のアイコンとサイズ・間隔を揃えるため）。
+    private static let arcSize: CGFloat = 22
 
     var body: some View {
         Button(action: handleTap) {
             if let label {
-                HStack(spacing: 4) {
-                    icon
+                Label {
                     Text(label)
-                        .font(.system(size: 12))
+                } icon: {
+                    icon
                 }
             } else {
                 icon
@@ -58,19 +59,19 @@ struct CopyButton: View {
     }
 
     private var icon: some View {
-        ZStack {
-            Image(systemName: phase == .checked ? "checkmark" : "doc.on.doc")
-                .font(.system(size: iconSize))
-                .foregroundStyle(phase == .checked ? Color.green : Color.primary)
-            // 円弧は常に描画し opacity で出し入れする（条件挿入だと最初の
-            // 描画に最終値が使われてスイープがアニメしないため）。
-            Circle()
-                .trim(from: 0, to: phase == .sweep ? progress : (phase == .checked ? 1 : 0))
-                .stroke(Color.green, style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .opacity(phase == .idle ? 0 : 1)
-        }
-        .frame(width: arcSize, height: arcSize)
+        Image(systemName: phase == .checked ? "checkmark" : "doc.on.doc")
+            .fontWeight(phase == .checked ? .semibold : .regular)
+            .foregroundStyle(phase == .checked ? Color.green : Color.primary)
+            // 円弧は overlay で描く（レイアウトサイズを変えないため。条件挿入だと
+            // 最初の描画に最終値が使われてスイープがアニメしない）。
+            .overlay {
+                Circle()
+                    .trim(from: 0, to: phase == .sweep ? progress : (phase == .checked ? 1 : 0))
+                    .stroke(Color.green, style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: Self.arcSize, height: Self.arcSize)
+                    .opacity(phase == .idle ? 0 : 1)
+            }
     }
 
     private func handleTap() {

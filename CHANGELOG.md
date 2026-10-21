@@ -3,7 +3,7 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [Unreleased]
+## [2.3.0] - 2026-10-21
 
 ### Added
 

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// 復帰先ターミナル。settings.json の terminalApp に保存される文字列は
@@ -160,14 +161,19 @@ public final class TerminalLauncher {
     /// osascript（iTerm2）と /usr/bin/open（Terminal.app）の両方を受け止める。
     public let runCommand: ([String]) -> (exit: Int32, stdout: String, stderr: String)
     private let kittenPathProvider: () -> String?
+    private let socketCandidatesProvider: () -> [String]
 
     public init(
         runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil,
-        kittenPathProvider: (() -> String?)? = nil
+        kittenPathProvider: (() -> String?)? = nil,
+        socketCandidatesProvider: (() -> [String])? = nil
     ) {
         // デフォルト引数のある execute は関数参照にできないためクロージャで包む。
         self.runCommand = runCommand ?? { TerminalLauncher.execute($0) }
         self.kittenPathProvider = kittenPathProvider ?? { TerminalLauncher.findKittyBinary() }
+        self.socketCandidatesProvider = socketCandidatesProvider ?? {
+            TerminalLauncher.kittySocketCandidates()
+        }
     }
 
     @discardableResult
@@ -203,12 +209,81 @@ public final class TerminalLauncher {
 
     // MARK: Kitty（AppleScript 非対応のためリモコン経由で開く）
 
-    /// Kitty のリモコン用ソケット。kitty.conf の listen_on と一致させる固定パス。
-    /// 可変パスだと Moost 側が接続先を推測できないため、
-    /// 「~/.config/kitty/kitty.conf にこの 2 行」と案内して固定する:
+    /// Kitty のリモコン用ソケットの基底パス。kitty.conf には下記の 2 行を案内する:
     ///   allow_remote_control yes
     ///   listen_on unix:/tmp/moost-kitty.sock
+    /// ただし kitty は設定ファイル由来の listen_on に PID を付与する
+    /// （unix:/tmp/moost-kitty.sock → /tmp/moost-kitty.sock-<pid>。
+    /// CLI の --listen-on では付与されない — kitty main.py expand_listen_on）。
+    /// そのため Moost は固定パスだけでなく、前面ウィンドウのオーナー PID から
+    /// 推測した候補を順に試す（kittySocketCandidates）。
     public static let kittyControlSocket = "unix:/tmp/moost-kitty.sock"
+
+    /// 実際のリモコンソケット候補（試行順: 前面ウィンドウのインスタンス → CLI 固定パス
+    /// → 残りのウィンドウインスタンス → グロブ）。
+    /// windowPids / globbed / socketExists はテストから差し替え可能。
+    /// - windowPids: 画面上の kitty ウィンドウのオーナー PID（手前から）
+    /// - globbed: /tmp の moost-kitty.sock-*（CGWindowList に載らないもの用）
+    /// - socketExists: ソケットファイルの実在判定（既定はファイルシステム）
+    public static func kittySocketCandidates(
+        windowPids: [Int32] = kittyWindowOwnerPids(),
+        globbed: [String] = kittyGlobbedSocketPaths(),
+        socketExists: (String) -> Bool = { socket in TerminalLauncher.kittySocketFileExists(socket) }
+    ) -> [String] {
+        var result: [String] = []
+        var seen = Set<String>()
+        func add(_ socket: String) {
+            guard socketExists(socket), !seen.contains(socket) else { return }
+            seen.insert(socket)
+            result.append(socket)
+        }
+        // 1) 最前面ウィンドウのインスタンス（config の listen_on は -<pid> が付く）
+        if let front = windowPids.first {
+            add(kittyControlSocket + "-" + String(front))
+        }
+        // 2) CLI の --listen-on で固定パスを listen しているインスタンス
+        add(kittyControlSocket)
+        // 3) 残りのウィンドウインスタンス（手前から）
+        for pid in windowPids.dropFirst() {
+            add(kittyControlSocket + "-" + String(pid))
+        }
+        // 4) 最小化などで CGWindowList に出ないインスタンスをグロブで回収
+        for path in globbed { add(path) }
+        return result
+    }
+
+    /// 画面上の kitty ウィンドウのオーナー PID を手前から返す（重複除去）。
+    /// kitty のウィンドウはマスターインスタンス（listen_on の PID 付与元）が所有する
+    /// （2026-10-21 実機検証: ウィンドウオーナー PID == ソケットの -<pid>）。
+    /// kCGWindowName は画面収録権限が要るが、OwnerName / OwnerPID は不要。
+    public static func kittyWindowOwnerPids() -> [Int32] {
+        let opts: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windows = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        var pids: [Int32] = []
+        for window in windows {
+            guard let owner = window[kCGWindowOwnerName as String] as? String, owner == "kitty",
+                  let pid = window[kCGWindowOwnerPID as String] as? Int32 else { continue }
+            if !pids.contains(pid) { pids.append(pid) }
+        }
+        return pids
+    }
+
+    /// /tmp 上の moost-kitty.sock-* を "unix:" 付きで列挙する。
+    public static func kittyGlobbedSocketPaths() -> [String] {
+        let base = String(kittyControlSocket.dropFirst("unix:".count))
+        let dir = (base as NSString).deletingLastPathComponent
+        let prefix = (base as NSString).lastPathComponent + "-"
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir) else { return [] }
+        return names.filter { $0.hasPrefix(prefix) }.sorted().map { "unix:" + dir + "/" + $0 }
+    }
+
+    /// "unix:/path" のプレフィックスを外してソケットファイルの実在を調べる。
+    public static func kittySocketFileExists(_ socket: String) -> Bool {
+        let path = socket.hasPrefix("unix:") ? String(socket.dropFirst("unix:".count)) : socket
+        return FileManager.default.fileExists(atPath: path)
+    }
 
     /// kitten/kitty CLI の探索先（リモコン経路で使用）。
     public static let kittyBinaryCandidates: [String] = [
@@ -238,10 +313,13 @@ public final class TerminalLauncher {
         return nil
     }
 
-    /// Kitty で復帰コマンドを開く。AppleScript 互換ではないため 2 段構え:
-    /// 1) リモコン（kitten @ --to unix:<socket> launch --type=tab）でフォーカス中
-    ///    ウィンドウに新規タブ。kitty.conf の allow_remote_control が yes かつ
-    ///    listen_on が上記ソケットである場合のみ成功する。
+    /// Kitty で復帰コマンドを開く。AppleScript 非対応のため 2 段構え:
+    /// 1) リモコン（kitten @ --to <socket> launch --type=tab）で前面ウィンドウの
+    ///    インスタンスに新規タブ。kitty.conf の allow_remote_control yes と
+    ///    listen_on unix:/tmp/moost-kitty.sock が設定され、かつ Kitty がその設定で
+    ///    起動済みである場合のみ成功する（listen_on はリロード非対応）。
+    ///    ソケットは設定ファイル由来だと PID が付与されるため、ウィンドウの
+    ///    オーナー PID から候補を作り、手前から順に試す（kittySocketCandidates）。
     /// 2) 不可なら /usr/bin/open -n -a kitty --args ... で新規インスタンスの
     ///    ウィンドウとして開く（設定不要・AppleScript 不要・非ブロッキング）。
     /// write text ではなく起動引数でコマンドを渡すため、
@@ -253,10 +331,14 @@ public final class TerminalLauncher {
         // （2026-10-21 実機確認）。オプション解析は先頭が非オプションの時点で終わるため
         // ここでは "--" を挟まない。
         if let kitten = kittenPathProvider() {
-            let result = runCommand([kitten, "@", "--to", TerminalLauncher.kittyControlSocket,
-                                     "launch", "--type=tab"] + shell)
-            if result.exit == 0 {
-                return .tab
+            for socket in socketCandidatesProvider() {
+                // ソケットが生きているか（古いソケットはすぐ失敗して次の候補へ）
+                let alive = runCommand([kitten, "@", "--to", socket, "ls"])
+                guard alive.exit == 0 else { continue }
+                let result = runCommand([kitten, "@", "--to", socket,
+                                         "launch", "--type=tab"] + shell)
+                if result.exit == 0 { return .tab }
+                // 応答はあるが launch が失敗した場合も次の候補を試す
             }
         }
         // 2) 新規ウィンドウ経路（既存インスタンスへは入らなくても起動は成功する）

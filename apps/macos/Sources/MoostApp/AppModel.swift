@@ -489,8 +489,9 @@ final class AppModel: ObservableObject {
                 return "Kitty を新しいウィンドウで開きました"
             }
             UserDefaults.standard.set(true, forKey: kittyRemoteHintKey)
-            return "Kitty を新しいウィンドウで開きました。"
-                + "タブで開くには kitty.conf に allow_remote_control yes の設定が必要です。"
+            return "Kitty を新しいウィンドウで開きました。既存ウィンドウのタブで開くには "
+                + "kitty.conf に allow_remote_control yes と listen_on unix:/tmp/moost-kitty.sock "
+                + "を追加し、Kitty を再起動してください。"
         }
     }
 

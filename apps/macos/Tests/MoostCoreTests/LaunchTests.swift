@@ -230,40 +230,115 @@ final class LaunchTests: XCTestCase {
     // MARK: Kitty（リモコン経由 → 新規ウィンドウへフォールバック）
 
     func test_kitty_opens_tab_when_remote_control_available() throws {
-        // kitty.conf に allow_remote_control yes + listen_on が設定されている場合:
-        // kitten @ --to <socket> launch --type=tab が成功し、フォーカス中ウィンドウにタブを開く。
+        // kitty.conf に allow_remote_control yes + listen_on が設定され、Kitty がその
+        // 設定で起動済みの場合: プローブ（ls）→ launch --type=tab が成功し、
+        // 既存ウィンドウにタブを開く。
+        let socket = TerminalLauncher.kittyControlSocket
         var received: [[String]] = []
         let launcher = TerminalLauncher(
             runCommand: { args in
                 received.append(args)
-                return (0, "2", "")
+                return (0, "", "")
             },
-            kittenPathProvider: { "/fake/kitten" })
+            kittenPathProvider: { "/fake/kitten" },
+            socketCandidatesProvider: { [socket] })
         let outcome = try launcher.launch(terminal: .kitty, command: "cd /tmp && echo hi")
         XCTAssertEqual(outcome, .tab)
-        XCTAssertEqual(received.count, 1)
-        XCTAssertEqual(received[0], [
-            "/fake/kitten", "@", "--to", TerminalLauncher.kittyControlSocket,
+        XCTAssertEqual(received.count, 2)
+        XCTAssertEqual(received[0], ["/fake/kitten", "@", "--to", socket, "ls"])
+        XCTAssertEqual(received[1], [
+            "/fake/kitten", "@", "--to", socket,
             "launch", "--type=tab", "/bin/zsh", "-lc", "cd /tmp && echo hi",
         ])
+    }
+
+    func test_kitty_uses_pid_suffixed_socket_for_config_listen_on() throws {
+        // kitty.conf 由来の listen_on は PID 付与される（/tmp/moost-kitty.sock-<pid>）。
+        // 前面ウィンドウのオーナー PID から構築した候補でタブを開く。
+        let socket = TerminalLauncher.kittyControlSocket + "-4242"
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                return (0, "", "")
+            },
+            kittenPathProvider: { "/fake/kitten" },
+            socketCandidatesProvider: { [socket] })
+        let outcome = try launcher.launch(terminal: .kitty, command: "echo hi")
+        XCTAssertEqual(outcome, .tab)
+        XCTAssertEqual(received[1], ["/fake/kitten", "@", "--to", socket,
+                                     "launch", "--type=tab", "/bin/zsh", "-lc", "echo hi"])
+    }
+
+    func test_kitty_tries_next_candidate_when_front_socket_is_stale() throws {
+        // 前面のソケットが古い（接続不能）場合、次の候補へ進み、開いたインスタンスへ
+        // タブを開く。
+        let dead = TerminalLauncher.kittyControlSocket + "-1111"
+        let live = TerminalLauncher.kittyControlSocket + "-2222"
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                if args.contains(dead) { return (2, "", "connection refused") }
+                return (0, "", "")
+            },
+            kittenPathProvider: { "/fake/kitten" },
+            socketCandidatesProvider: { [dead, live] })
+        let outcome = try launcher.launch(terminal: .kitty, command: "echo hi")
+        XCTAssertEqual(outcome, .tab)
+        XCTAssertEqual(received.count, 3)
+        XCTAssertEqual(received[0], ["/fake/kitten", "@", "--to", dead, "ls"])
+        XCTAssertEqual(received[1], ["/fake/kitten", "@", "--to", live, "ls"])
+        XCTAssertEqual(received[2], ["/fake/kitten", "@", "--to", live,
+                                     "launch", "--type=tab", "/bin/zsh", "-lc", "echo hi"])
+    }
+
+    func test_kitty_socket_candidates_orders_front_window_first_and_dedupes() {
+        // 純粋関数の並び順: 最前面（存在する場合）→ CLI 固定パス → 残り → グロブ。
+        let base = TerminalLauncher.kittyControlSocket
+        let front = base + "-11"
+        let back = base + "-22"
+        let globbed = "unix:/tmp/moost-kitty.sock-33"
+        let alive: Set<String> = [front, base, back, globbed]
+        let candidates = TerminalLauncher.kittySocketCandidates(
+            windowPids: [11, 22],
+            globbed: [globbed],
+            socketExists: { alive.contains($0) })
+        XCTAssertEqual(candidates, [front, base, back, globbed])
+    }
+
+    func test_kitty_socket_candidates_prefers_exact_when_front_has_no_pid_socket() {
+        // 最前面が CLI の --listen-on 起動（固定パス、PID なし）の場合:
+        // 前面 PID ソケットが無ければ固定パスが最初に来る。
+        let base = TerminalLauncher.kittyControlSocket
+        let back = base + "-22"
+        let alive: Set<String> = [base, back]
+        let candidates = TerminalLauncher.kittySocketCandidates(
+            windowPids: [11, 22],
+            globbed: [],
+            socketExists: { alive.contains($0) })
+        XCTAssertEqual(candidates, [base, back])
     }
 
     func test_kitty_falls_back_to_new_window_when_remote_control_unavailable() throws {
         // allow_remote_control 未設定（既定 no）や Kitty 未起動ではタブ経路が失敗するため、
         // 設定不要の /usr/bin/open -n -a kitty --args で新規ウィンドウを開く。
+        let socket = TerminalLauncher.kittyControlSocket
         var received: [[String]] = []
         let launcher = TerminalLauncher(
             runCommand: { args in
                 received.append(args)
-                if received.count == 1 {
-                    return (1, "", "Failed to connect to unix:/tmp/moost-kitty.sock")
+                if args.contains("ls") || args.contains("launch") {
+                    return (2, "", "Failed to connect to unix:/tmp/moost-kitty.sock")
                 }
                 return (0, "", "")
             },
-            kittenPathProvider: { "/fake/kitten" })
+            kittenPathProvider: { "/fake/kitten" },
+            socketCandidatesProvider: { [socket] })
         let outcome = try launcher.launch(terminal: .kitty, command: "echo hi")
         XCTAssertEqual(outcome, .window)
         XCTAssertEqual(received.count, 2)
+        XCTAssertEqual(received[0], ["/fake/kitten", "@", "--to", socket, "ls"])
         XCTAssertEqual(received[1], ["/usr/bin/open", "-n", "-a", "kitty",
                                      "--args", "/bin/zsh", "-lc", "echo hi"])
     }

@@ -1,12 +1,16 @@
 import Foundation
 
 /// 復帰先ターミナル。settings.json の terminalApp に保存される文字列は
-/// Dart 実装と共通なので、値域も同じまま保つ（"Terminal.app" / "iTerm2" / "gnome-terminal"）。
+/// Dart 実装と共通なので、値域も同じまま保つ
+/// （"Terminal.app" / "iTerm2" / "gnome-terminal" / "kitty"）。
+/// "kitty" は Dart 側が未知値として Terminal.app へフォールバックするため、
+/// Flutter 版で選ばれていても壊れない（native のみの拡張値）。
 /// リファレンス実装: packages/core/lib/src/terminal_launcher.dart
 public enum TerminalApp: String {
     case terminal = "Terminal.app"
     case iterm2 = "iTerm2"
     case gnomeTerminal = "gnome-terminal"
+    case kitty = "kitty"
 
     /// 未知の値（手書き編集・旧バージョン等）は OS の既定へフォールバックする。
     /// macOS native 実装での既定は Terminal.app（Linux 既定の分岐は Dart 側が担う）。
@@ -17,9 +21,21 @@ public enum TerminalApp: String {
 
 /// ターミナル起動の失敗。UI 側はこれを捕まえてトーストを出す
 /// （ポップオーバーにダイアログを出さない — design.md 7 章）。
-public struct TerminalLaunchError: Error {
+/// LocalizedError: トーストは error.localizedDescription を使うため、
+/// これを実装しないと汎用文言（The operation couldn't be completed.）になる。
+public struct TerminalLaunchError: Error, LocalizedError {
     public let message: String
     public init(_ message: String) { self.message = message }
+    public var errorDescription: String? { message }
+}
+
+/// ターミナル起動の結果種別。Kitty は「既存ウィンドウにタブ」で開けるかが
+/// kitty.conf の設定に依存するため、UI 側で開き方をトーストへ反映する。
+public enum TerminalLaunchOutcome: Equatable, Sendable {
+    /// 既存ウィンドウのタブとして開いた（Kitty の kitten @ launch --type=tab）。
+    case tab
+    /// 新しいウィンドウ（または新規インスタンス）として開いた。
+    case window
 }
 
 /// claude 由来の環境変数（Issue #52）。Moost 自身のプロセスがこれを持ったまま
@@ -143,13 +159,19 @@ public final class TerminalLauncher {
     /// コマンド実行を差し替え可能にする（テスト用）。
     /// osascript（iTerm2）と /usr/bin/open（Terminal.app）の両方を受け止める。
     public let runCommand: ([String]) -> (exit: Int32, stdout: String, stderr: String)
+    private let kittenPathProvider: () -> String?
 
-    public init(runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil) {
+    public init(
+        runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil,
+        kittenPathProvider: (() -> String?)? = nil
+    ) {
         // デフォルト引数のある execute は関数参照にできないためクロージャで包む。
         self.runCommand = runCommand ?? { TerminalLauncher.execute($0) }
+        self.kittenPathProvider = kittenPathProvider ?? { TerminalLauncher.findKittyBinary() }
     }
 
-    public func launch(terminal: TerminalApp, command: String) throws {
+    @discardableResult
+    public func launch(terminal: TerminalApp, command: String) throws -> TerminalLaunchOutcome {
         // macOS 上で gnome-terminal が選ばれることはないが、万一に備えて
         // Terminal.app 相当にフォールバックする（Dart 実装と同じ判断）。
         let args: [String]
@@ -168,12 +190,83 @@ public final class TerminalLauncher {
             args = ["-e", TerminalLauncher.iterm2Script(command)]
         case .gnomeTerminal:
             args = ["-e", TerminalLauncher.terminalScript(command)]
+        case .kitty:
+            return try kittyLaunch(command: command)
         }
         let result = runCommand(args)
         if result.exit != 0 {
             let reason = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             throw TerminalLaunchError(terminal.rawValue + ": " + reason)
         }
+        return .window
+    }
+
+    // MARK: Kitty（AppleScript 非対応のためリモコン経由で開く）
+
+    /// Kitty のリモコン用ソケット。kitty.conf の listen_on と一致させる固定パス。
+    /// 可変パスだと Moost 側が接続先を推測できないため、
+    /// 「~/.config/kitty/kitty.conf にこの 2 行」と案内して固定する:
+    ///   allow_remote_control yes
+    ///   listen_on unix:/tmp/moost-kitty.sock
+    public static let kittyControlSocket = "unix:/tmp/moost-kitty.sock"
+
+    /// kitten/kitty CLI の探索先（リモコン経路で使用）。
+    public static let kittyBinaryCandidates: [String] = [
+        "/Applications/kitty.app/Contents/MacOS/kitten",
+        "/Applications/kitty.app/Contents/MacOS/kitty",
+        "/opt/homebrew/bin/kitten",
+        "/opt/homebrew/bin/kitty",
+        "/usr/local/bin/kitten",
+        "/usr/local/bin/kitty",
+    ]
+
+    /// 実行可能な kitten（または kitty）を探す。戻り値はリモコン経路の `kitten @` に使う。
+    /// Homebrew とアプリバンドル内を順に確認し、見つからなければ PATH を探索する
+    /// （GUI アプリから起動した場合は PATH が狭いため、通常は上の固定候補で見つかる）。
+    public static func findKittyBinary() -> String? {
+        let fm = FileManager.default
+        for path in kittyBinaryCandidates where fm.isExecutableFile(atPath: path) {
+            return path
+        }
+        let pathVar = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for dir in pathVar.split(separator: ":").map(String.init) where !dir.isEmpty {
+            for name in ["kitten", "kitty"] {
+                let candidate = dir + "/" + name
+                if fm.isExecutableFile(atPath: candidate) { return candidate }
+            }
+        }
+        return nil
+    }
+
+    /// Kitty で復帰コマンドを開く。AppleScript 互換ではないため 2 段構え:
+    /// 1) リモコン（kitten @ --to unix:<socket> launch --type=tab）でフォーカス中
+    ///    ウィンドウに新規タブ。kitty.conf の allow_remote_control が yes かつ
+    ///    listen_on が上記ソケットである場合のみ成功する。
+    /// 2) 不可なら /usr/bin/open -n -a kitty --args ... で新規インスタンスの
+    ///    ウィンドウとして開く（設定不要・AppleScript 不要・非ブロッキング）。
+    /// write text ではなく起動引数でコマンドを渡すため、
+    /// 復帰コマンドは /bin/zsh -lc 経由でそのまま実行される。
+    private func kittyLaunch(command: String) throws -> TerminalLaunchOutcome {
+        let shell = ["/bin/zsh", "-lc", command]
+        // 1) タブ経路。kitten バイナリが見つからない場合は新規ウィンドウへ直行する。
+        // 注意: コマンド引数の区切りに "--" を使うと Go 版 CLI では実行されなかった
+        // （2026-10-21 実機確認）。オプション解析は先頭が非オプションの時点で終わるため
+        // ここでは "--" を挟まない。
+        if let kitten = kittenPathProvider() {
+            let result = runCommand([kitten, "@", "--to", TerminalLauncher.kittyControlSocket,
+                                     "launch", "--type=tab"] + shell)
+            if result.exit == 0 {
+                return .tab
+            }
+        }
+        // 2) 新規ウィンドウ経路（既存インスタンスへは入らなくても起動は成功する）
+        let opened = runCommand(["/usr/bin/open", "-n", "-a", "kitty", "--args"] + shell)
+        if opened.exit == 0 {
+            return .window
+        }
+        let reason = opened.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        let detail = reason.isEmpty ? "" : "（" + reason + "）"
+        throw TerminalLaunchError("Kitty: 起動できませんでした" + detail)
     }
 
     /// .command 実行ファイルを一時ディレクトリに書き出す（Terminal.app 用）。
@@ -191,7 +284,8 @@ public final class TerminalLauncher {
     }
 
     /// settings.json の terminalApp 値（文字列）から起動する。
-    public func launch(settingValue: String, command: String) throws {
+    @discardableResult
+    public func launch(settingValue: String, command: String) throws -> TerminalLaunchOutcome {
         try launch(terminal: TerminalApp.fromSetting(settingValue), command: command)
     }
 

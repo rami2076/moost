@@ -14,7 +14,7 @@
     "terminalApp": {
       "type": "string",
       "default": "Terminal.app",
-      "description": "ENUM にしない（Issue #41 の教訓: 厳しすぎる検証が現実の遅延を裏切る）。既知 iTerm2.app 等の外部値を受付ける"
+      "description": "ENUM にしない（Issue #41 の教訓: 厳しすぎる検証が現実の遅延を裏切る）。既知 iTerm2.app 等の外部値を受付ける。既知値: Terminal.app / iTerm2 / kitty（native のみ。Flutter は未知値として Terminal.app へフォールバック）"
     },
     "recentSessionLimit": {
       "type": "integer",

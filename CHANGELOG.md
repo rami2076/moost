@@ -3,6 +3,18 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [Unreleased]
+
+### Added
+
+- **設定に「Kitty」を追加（タブ対応）**: 復帰先ターミナルに Kitty を追加。
+  Kitty は AppleScript 非対応のためリモコン経路（`kitten @ launch --type=tab`）で
+  フォーカス中のウィンドウに新規タブを開く。タブにするには
+  `~/.config/kitty/kitty.conf` に「`allow_remote_control yes`」と
+  「`listen_on unix:/tmp/moost-kitty.sock`」の 2 行が必要（既定は OFF）。
+  未設定・Kitty 未起動時は `/usr/bin/open -n -a kitty` で新しいウィンドウとして
+  開き、設定案内のトーストを初回のみ表示する
+
 ## [2.2.1] - 2026-10-14
 
 ### Fixed

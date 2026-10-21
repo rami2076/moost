@@ -41,6 +41,7 @@ struct SettingsScreen: View {
                     Picker("", selection: $terminalApp) {
                         Text("Terminal.app").tag("Terminal.app")
                         Text("iTerm2").tag("iTerm2")
+                        Text("Kitty").tag("kitty")
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -281,7 +282,12 @@ struct NotesScreen: View {
                     note("ターミナル操作の権限",
                          "セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます"
                          + "（一度「許可」を選べば以後は出ません）。"
-                         + "ターミナルは別ウィンドウで開きます（Terminal.app / iTerm2）。")
+                         + "Terminal.app / iTerm2 は別ウィンドウで開きます。"
+                         + "Kitty は AppleScript 非対応のためリモコン経由で開き、フォーカス中の"
+                         + "ウィンドウに新規タブを追加します。"
+                         + "タブで開くには ~/.config/kitty/kitty.conf に次の 2 行を追加してください:"
+                         + "「allow_remote_control yes」と「listen_on unix:/tmp/moost-kitty.sock」"
+                         + "（未設定でも新しいウィンドウで開きます。案内は初回のみ表示）。")
                     note("セッションの保持期間",
                          "セッションは Claude Code が cleanupPeriodDays（デフォルト 30 日）に"
                          + "基づいて保持します。メモを登録していても、期限切れのセッションには"

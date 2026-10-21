@@ -200,6 +200,7 @@ final class LaunchTests: XCTestCase {
 
     func test_from_setting_falls_back_for_unknown_value() {
         XCTAssertEqual(TerminalApp.fromSetting("iTerm2"), .iterm2)
+        XCTAssertEqual(TerminalApp.fromSetting("kitty"), .kitty)
         XCTAssertEqual(TerminalApp.fromSetting("Alacritty"), .terminal)
         XCTAssertEqual(TerminalApp.fromSetting(""), .terminal)
     }
@@ -210,6 +211,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertNotNil(error)
         XCTAssertTrue(error?.message.contains("boom") ?? false, error?.message ?? "")
         XCTAssertTrue(error?.message.hasPrefix("iTerm2:") ?? false)
+        // LocalizedError 経由でトースト（error.localizedDescription）にも message が出る
+        XCTAssertTrue(error?.localizedDescription.contains("boom") ?? false,
+                      error?.localizedDescription ?? "")
     }
 
     func test_launch_with_setting_value_string() throws {
@@ -221,6 +225,80 @@ final class LaunchTests: XCTestCase {
         try launcher.launch(settingValue: "iTerm2", command: "echo hi")
         XCTAssertEqual(received.first, "-e")
         XCTAssertTrue(received[1].contains("iTerm"))
+    }
+
+    // MARK: Kitty（リモコン経由 → 新規ウィンドウへフォールバック）
+
+    func test_kitty_opens_tab_when_remote_control_available() throws {
+        // kitty.conf に allow_remote_control yes + listen_on が設定されている場合:
+        // kitten @ --to <socket> launch --type=tab が成功し、フォーカス中ウィンドウにタブを開く。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                return (0, "2", "")
+            },
+            kittenPathProvider: { "/fake/kitten" })
+        let outcome = try launcher.launch(terminal: .kitty, command: "cd /tmp && echo hi")
+        XCTAssertEqual(outcome, .tab)
+        XCTAssertEqual(received.count, 1)
+        XCTAssertEqual(received[0], [
+            "/fake/kitten", "@", "--to", TerminalLauncher.kittyControlSocket,
+            "launch", "--type=tab", "/bin/zsh", "-lc", "cd /tmp && echo hi",
+        ])
+    }
+
+    func test_kitty_falls_back_to_new_window_when_remote_control_unavailable() throws {
+        // allow_remote_control 未設定（既定 no）や Kitty 未起動ではタブ経路が失敗するため、
+        // 設定不要の /usr/bin/open -n -a kitty --args で新規ウィンドウを開く。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                if received.count == 1 {
+                    return (1, "", "Failed to connect to unix:/tmp/moost-kitty.sock")
+                }
+                return (0, "", "")
+            },
+            kittenPathProvider: { "/fake/kitten" })
+        let outcome = try launcher.launch(terminal: .kitty, command: "echo hi")
+        XCTAssertEqual(outcome, .window)
+        XCTAssertEqual(received.count, 2)
+        XCTAssertEqual(received[1], ["/usr/bin/open", "-n", "-a", "kitty",
+                                     "--args", "/bin/zsh", "-lc", "echo hi"])
+    }
+
+    func test_kitty_skips_tab_when_kitten_binary_missing() throws {
+        // バイナリが見つからない場合も、起動自体は open 経路で試みる。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                return (0, "", "")
+            },
+            kittenPathProvider: { nil })
+        let outcome = try launcher.launch(terminal: .kitty, command: "echo hi")
+        XCTAssertEqual(outcome, .window)
+        XCTAssertEqual(received.count, 1)
+        XCTAssertEqual(received[0].first, "/usr/bin/open")
+    }
+
+    func test_kitty_throws_when_open_fails() {
+        // Kitty 未インストール等、タブ経路と open 経路の両方が失敗した場合。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                return (1, "", "Unable to find application named 'kitty'")
+            },
+            kittenPathProvider: { nil })
+        XCTAssertThrowsError(try launcher.launch(terminal: .kitty, command: "echo hi")) { error in
+            XCTAssertTrue((error as? TerminalLaunchError)?.message.contains("Kitty") == true,
+                          "\(error)")
+            XCTAssertTrue((error as? TerminalLaunchError)?.message.contains("Unable to find") == true,
+                          "\(error)")
+        }
+        XCTAssertEqual(received.count, 1)
     }
 
     // MARK: 差し替え経路の契約（実行環境に依存しない検査）

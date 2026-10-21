@@ -460,13 +460,37 @@ final class AppModel: ObservableObject {
         showToast("ターミナルを起動しています…")
         Task { @MainActor in
             do {
-                try await Task.detached(priority: .userInitiated) {
+                let outcome = try await Task.detached(priority: .userInitiated) {
                     try TerminalLauncher().launch(settingValue: terminalApp, command: command)
                 }.value
-                showToast("ターミナルを開きました")
+                showToast(Self.toast(for: outcome, terminalApp: terminalApp))
             } catch {
                 showToast("ターミナルを起動できませんでした: \(error.localizedDescription)")
             }
+        }
+    }
+
+    /// Kitty のタブ不可時に表示する設定案内（初回のみ）。
+    /// 毎回出すと長文になるため UserDefaults で一度きりにし、
+    /// 全文は設定画面の「注意」にも記載する。
+    private static let kittyRemoteHintKey = "moost.kittyRemoteControlHintShown"
+
+    /// 起動結果のトースト文言。Kitty は開き方（タブ/新規ウィンドウ）を明示し、
+    /// タブにできなかった場合は allow_remote_control の案内を初回に添える。
+    private static func toast(for outcome: TerminalLaunchOutcome, terminalApp: String) -> String {
+        guard terminalApp == TerminalApp.kitty.rawValue else {
+            return "ターミナルを開きました"
+        }
+        switch outcome {
+        case .tab:
+            return "Kitty のタブを開きました"
+        case .window:
+            if UserDefaults.standard.bool(forKey: kittyRemoteHintKey) {
+                return "Kitty を新しいウィンドウで開きました"
+            }
+            UserDefaults.standard.set(true, forKey: kittyRemoteHintKey)
+            return "Kitty を新しいウィンドウで開きました。"
+                + "タブで開くには kitty.conf に allow_remote_control yes の設定が必要です。"
         }
     }
 

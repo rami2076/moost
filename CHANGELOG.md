@@ -3,6 +3,20 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.3.1] - 2026-10-21
+
+### Fixed
+
+- **Kitty のタブ復帰が効かなかった問題を修正**: kitty.conf 由来の `listen_on` は
+  実際のソケットに PID が付与される（`unix:/tmp/moost-kitty.sock` →
+  `/tmp/moost-kitty.sock-<pid>`。CLI の `--listen-on` では付与されない）。
+  固定パスだけに接続していたため、kitty.conf に 2 行を設定してもタブが開けなかった。
+  画面の kitty ウィンドウのオーナー PID からソケット候補を構築し、
+  前面のインスタンスから順に試すように変更（CGWindowList + `kitten @ ... ls` で生存確認）。
+  複数インスタンスでも「今開いている」ウィンドウへタブを開く。
+- **Kitty の設定案内文言を更新**: タブで開くには kitty.conf への 2 行に加えて
+  Kitty の再起動が必要（`listen_on` はリロードでは反映されません）ことを明記
+
 ## [2.3.0] - 2026-10-21
 
 ### Added

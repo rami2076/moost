@@ -283,9 +283,10 @@ struct NotesScreen: View {
                          "セッションへの初回復帰時に macOS のオートメーション権限ダイアログが出ます"
                          + "（一度「許可」を選べば以後は出ません）。"
                          + "Terminal.app / iTerm2 は別ウィンドウで開きます。"
-                         + "Kitty は AppleScript 非対応のためリモコン経由で開き、フォーカス中の"
+                         + "Kitty は AppleScript 非対応のためリモコン経由で開き、前面の"
                          + "ウィンドウに新規タブを追加します。"
-                         + "タブで開くには ~/.config/kitty/kitty.conf に次の 2 行を追加してください:"
+                         + "タブで開くには ~/.config/kitty/kitty.conf に次の 2 行を追加し、"
+                         + "Kitty を再起動してください（listen_on はリロードでは反映されません）:"
                          + "「allow_remote_control yes」と「listen_on unix:/tmp/moost-kitty.sock」"
                          + "（未設定でも新しいウィンドウで開きます。案内は初回のみ表示）。")
                     note("セッションの保持期間",

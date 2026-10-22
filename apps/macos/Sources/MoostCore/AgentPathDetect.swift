@@ -1,10 +1,11 @@
 import Foundation
 
-/// claude / codex コマンドの検出（design.md 7 章【1】GUI の PATH 問題）。
+/// claude / codex / hermes コマンドの検出（design.md 7 章【1】GUI の PATH 問題）。
 /// 順序: 設定の手動上書き（`~` 展開）→ 既知パス → 対話シェルの whence。
 /// リファレンス実装:
 /// - packages/core/lib/src/agent/claude_code/claude_path_resolver.dart
 /// - packages/core/lib/src/agent/codex/codex_path_resolver.dart
+/// - hermes（hermes-agent v0.22.3）: `hermes` は ~/.local/bin に入る
 ///
 /// GUI アプリから起動すると PATH が最小限になり bare なコマンドが解決
 /// できないため、3 段構えで解決する。シェルは `-lic`（対話ログインシェル）
@@ -16,6 +17,10 @@ public enum AgentPathDetect {
 
     public static func codex(override: String = "") -> String? {
         detect(override: override, command: "codex", knownPaths: codexKnownPaths())
+    }
+
+    public static func hermes(override: String = "") -> String? {
+        detect(override: override, command: "hermes", knownPaths: hermesKnownPaths())
     }
 
     private static func claudeKnownPaths() -> [String] {
@@ -36,6 +41,17 @@ public enum AgentPathDetect {
             "/usr/local/bin/codex",
             home + "/.local/bin/codex",
             home + "/bin/codex",
+        ]
+    }
+
+    /// hermes は公式インストーラが ~/.local/bin/hermes に置く（v0.22.3 実機確認）。
+    private static func hermesKnownPaths() -> [String] {
+        let home = ProcessInfo.processInfo.environment["HOME"] ?? ""
+        return [
+            "/opt/homebrew/bin/hermes",
+            "/usr/local/bin/hermes",
+            home + "/.local/bin/hermes",
+            home + "/bin/hermes",
         ]
     }
 

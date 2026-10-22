@@ -69,6 +69,7 @@ public enum ResumeCommand {
     public static let claudeAgentId = "claude-code"
     public static let codexAgentId = "codex"
     public static let piAgentId = "pi"
+    public static let hermesAgentId = "hermes"
 
     /// claude 用。claude の直前だけ env -u で環境変数を外す（Issue #52）。
     /// cd はシェルの組み込みコマンドなので env の対象にしない。
@@ -120,6 +121,20 @@ public enum ResumeCommand {
         return "cd " + shellEscape(projectPath) + " && " + command
     }
 
+    /// hermes 用。`hermes chat --resume <id>` は記録済み cwd へ自動復帰する
+    /// （`--no-restore-cwd` で無効化可能。hermes-agent v0.22.3 実機確認）が、
+    /// codex と同様に projectPath があれば cd しておく（無害・表示上も一貫）。
+    /// 新規セッションは `hermes chat` をそのまま起動する。
+    public static func hermesResume(projectPath: String, sessionId: String) -> String {
+        let resume = "hermes chat --resume " + shellEscape(sessionId)
+        if projectPath.isEmpty { return resume }
+        return "cd " + shellEscape(projectPath) + " && " + resume
+    }
+
+    public static func hermesNewSession(projectPath: String) -> String {
+        "cd " + shellEscape(projectPath) + " && hermes chat"
+    }
+
     /// アダプタ識別子（Memo.agent / RecentSession.agentId）から復帰コマンドを組み立てる。
     /// 未知のエージェントは nil を返す（UI 側は「不明な agent」のトーストを出す）。
     public static func resume(agent: String, projectPath: String, sessionId: String,
@@ -132,6 +147,8 @@ public enum ResumeCommand {
         case piAgentId:
             return piResume(projectPath: projectPath, sessionId: sessionId,
                             provider: provider, model: model)
+        case hermesAgentId:
+            return hermesResume(projectPath: projectPath, sessionId: sessionId)
         default:
             return nil
         }
@@ -147,6 +164,8 @@ public enum ResumeCommand {
             return codexNewSession(projectPath: projectPath)
         case piAgentId:
             return piNewSession(projectPath: projectPath, provider: provider, model: model)
+        case hermesAgentId:
+            return hermesNewSession(projectPath: projectPath)
         default:
             return nil
         }

@@ -128,7 +128,7 @@ public final class MCPServer {
         [
             [
                 "name": "list_recent_sessions",
-                "description": "Claude Code / Codex の直近セッションを最新順に一覧する。",
+                "description": "Claude Code / Codex / pi / hermes の直近セッションを最新順に一覧する。",
                 "inputSchema": schema(properties: [
                     "limit": ["type": "integer", "description": "取得件数の上限（デフォルト 20）"],
                 ]),
@@ -148,7 +148,7 @@ public final class MCPServer {
                 "description": "指定したセッションへ復帰するためのシェルコマンドを組み立てる。",
                 "inputSchema": schema(
                     properties: [
-                        "agent": ["type": "string", "description": "エージェント種別（例: \"claude-code\", \"codex\"）"],
+                        "agent": ["type": "string", "description": "エージェント種別（例: \"claude-code\", \"codex\", \"pi\", \"hermes\"）"],
                         "projectPath": ["type": "string", "description": "復帰先ディレクトリの絶対パス"],
                         "sessionId": ["type": "string", "description": "復帰するセッションの ID"],
                     ],

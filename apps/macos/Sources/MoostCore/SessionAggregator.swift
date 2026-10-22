@@ -7,12 +7,13 @@ import Foundation
 /// 1 つの読み取り元の失敗（CLI 未導入・履歴破損等）で一覧全体を空にしないよう、
 /// 失敗した読み取り元は空扱いにする。
 public enum SessionAggregator {
-    /// claude / codex / pi の 3 系統を統合する。fixture は同一（spec/ が唯一の正）。
+    /// claude / codex / pi / hermes の 4 系統を統合する。fixture は同一（spec/ が唯一の正）。
     public static func recentSessions(
         claudeHistoryFile: URL,
         codexHistoryFile: URL,
         codexSessionsDir: URL,
         piSessionsDir: URL,
+        hermesDB: URL,
         limit: Int = 20
     ) -> [RecentSession] {
         let claude = (try? SessionHistoryReader(
@@ -36,7 +37,20 @@ public enum SessionAggregator {
                 }
             } ?? []
 
-        return Array((claude + codex + pi)
+        let hermes = (try? HermesSessionReader(dbURL: hermesDB)
+            .recentSessions(limit: limit))
+            .map { entries in
+                entries.map {
+                    RecentSession(agentId: ResumeCommand.hermesAgentId,
+                                  sessionId: $0.sessionId,
+                                  projectPath: $0.projectPath,
+                                  lastPrompt: $0.lastPrompt,
+                                  updatedAt: $0.updatedAt,
+                                  aiTitle: $0.aiTitle)
+                }
+            } ?? []
+
+        return Array((claude + codex + pi + hermes)
             .sorted { $0.updatedAt > $1.updatedAt }
             .prefix(limit))
     }
@@ -48,6 +62,7 @@ public enum SessionAggregator {
             codexHistoryFile: URL(fileURLWithPath: homeDirectory + "/.codex/history.jsonl"),
             codexSessionsDir: URL(fileURLWithPath: homeDirectory + "/.codex/sessions", isDirectory: true),
             piSessionsDir: URL(fileURLWithPath: homeDirectory + "/.pi/agent/sessions", isDirectory: true),
+            hermesDB: URL(fileURLWithPath: homeDirectory + "/.hermes/state.db"),
             limit: limit)
     }
 

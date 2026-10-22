@@ -8,6 +8,7 @@ import Foundation
 ///   `--fork-session` / `resume --ephemeral` で行う
 /// - pi: ヘッドレス要約コマンドを持たないため、抽出テキストをそのまま返す
 ///   （API 消費ゼロ）
+/// - hermes: 同じくヘッドレス要約なし。`~/.hermes/state.db` から抜粋して返す
 /// - cwd が取れなかったセッションでも要約は動かせるように、codex は
 ///   projectPath が空なら home で実行する
 public final class SessionSummarizer: Sendable {
@@ -31,6 +32,8 @@ public final class SessionSummarizer: Sendable {
             return try await summarizeCodex(session: session, scope: scope, rallies: rallies)
         case ResumeCommand.piAgentId:
             return try summarizePi(session: session, scope: scope, rallies: rallies)
+        case ResumeCommand.hermesAgentId:
+            return try summarizeHermes(session: session, scope: scope, rallies: rallies)
         default:
             throw SummarizeError("unknown agent: \(session.agentId)")
         }
@@ -100,6 +103,25 @@ public final class SessionSummarizer: Sendable {
         let extractor = PiTranscriptExtractor(
             sessionsDir: URL(
                 fileURLWithPath: home + "/.pi/agent/sessions", isDirectory: true))
+        let text = extractor.extract(
+            sessionId: session.sessionId,
+            full: scope == .full,
+            rallies: rallies)
+        if text.isEmpty {
+            throw SummarizeError("no transcript found for the session")
+        }
+        return text
+    }
+
+    /// hermes はヘッドレス要約コマンドを持たないため、state.db から抽出した
+    /// テキストをそのまま要約として返す（pi と同じ方針、API 消費ゼロ）。
+    private func summarizeHermes(
+        session: RecentSession,
+        scope: SummaryScope,
+        rallies: Int
+    ) throws -> String {
+        let extractor = HermesTranscriptExtractor(
+            dbURL: URL(fileURLWithPath: home + "/.hermes/state.db"))
         let text = extractor.extract(
             sessionId: session.sessionId,
             full: scope == .full,

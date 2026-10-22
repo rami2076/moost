@@ -21,7 +21,7 @@
       "required": ["id", "agent", "sessionId", "title", "tags", "body", "projectPath", "createdAt", "updatedAt"],
       "properties": {
         "id": { "type": "string", "description": "UUIDv4" },
-        "agent": { "type": "string", "description": "エージェント識別子（claude-code / codex 等。ADR-004 で起動時確定）" },
+        "agent": { "type": "string", "description": "エージェント識別子（claude-code / codex / pi / hermes 等。ADR-004 で起動時確定）" },
         "sessionId": { "type": "string", "description": "復帰対象セッション。不変" },
         "title": { "type": "string", "description": "可変フィールド" },
         "tags": { "type": "array", "items": { "type": "string" }, "description": "可変。カンマ区切り入力 は trim・空要素除去 済みで保存（parseTags）" },

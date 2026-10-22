@@ -64,7 +64,7 @@ struct ListScreen: View {
                     Divider()
                 }
                 if model.sessions.isEmpty {
-                    EmptyHint(text: "直近セッションがありません。\nclaude / codex / pi で作業すると表示されます。")
+                    EmptyHint(text: "直近セッションがありません。\nclaude / codex / pi / hermes で作業すると表示されます。")
                 }
             }
         }
@@ -304,6 +304,7 @@ struct ProjectRow: View {
         (ResumeCommand.claudeAgentId, "Claude"),
         (ResumeCommand.codexAgentId, "Codex"),
         (ResumeCommand.piAgentId, "pi"),
+        (ResumeCommand.hermesAgentId, "Hermes"),
     ]
 
     var body: some View {

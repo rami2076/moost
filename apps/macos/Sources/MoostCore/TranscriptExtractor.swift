@@ -6,6 +6,9 @@ import Foundation
 /// - packages/core/lib/src/agent/codex/codex_transcript_extractor.dart
 /// - packages/core/lib/src/agent/pi/pi_transcript_extractor.dart
 ///
+/// hermes（SQLite `~/.hermes/state.db`）用は HermesSessionReader.swift の
+/// HermesTranscriptExtractor を参照（DB 読みなのでこのファイルには置かない）。
+///
 /// ラリー = ユーザープロンプト 1 つと、それに続くアシスタント応答のまとまり。
 /// パースできない行・関係ない行はスキップする。呼び出し側の明示操作でしか
 /// 走らないため全行読みでよい（Dart リファレンスと同じ足取り）。

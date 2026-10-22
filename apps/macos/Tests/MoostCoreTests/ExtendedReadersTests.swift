@@ -1,4 +1,5 @@
 import XCTest
+import SQLite3
 @testable import MoostCore
 
 /// pi・codex・統合（SessionAggregator）の読み取りテスト。
@@ -8,6 +9,33 @@ import XCTest
 final class ExtendedReadersTests: XCTestCase {
 
     // MARK: - helpers
+
+    /// 集約テスト用の最小 hermes state.db を作る（1 セッション + ユーザー 1 発言）。
+    private func makeSimpleHermesDB(at url: URL, source: String, startedAt: Double) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        _ = FileManager.default.createFile(atPath: url.path, contents: nil)
+        var handle: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &handle), SQLITE_OK)
+        defer { sqlite3_close(handle) }
+        let schema = """
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY, source TEXT, title TEXT, cwd TEXT,
+                started_at REAL, last_activity_at REAL,
+                message_count INTEGER DEFAULT 0, archived INTEGER DEFAULT 0, hidden INTEGER DEFAULT 0);
+            CREATE TABLE messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, role TEXT,
+                content TEXT, tool_name TEXT, timestamp REAL, active INTEGER DEFAULT 1);
+            """
+        XCTAssertEqual(sqlite3_exec(handle, schema, nil, nil, nil), SQLITE_OK)
+        let insert = """
+            INSERT INTO sessions (id, source, title, cwd, started_at, last_activity_at, message_count)
+            VALUES ('hermes-1', '\(source)', '', '/w/hermes', \(startedAt), \(startedAt) + 10, 1);
+            INSERT INTO messages (session_id, role, content, timestamp)
+            VALUES ('hermes-1', 'user', 'hermes prompt', \(startedAt) + 5);
+            """
+        XCTAssertEqual(sqlite3_exec(handle, insert, nil, nil, nil), SQLITE_OK)
+    }
 
     private func makeTempDir(_ label: String) throws -> URL {
         let dir = FileManager.default.temporaryDirectory
@@ -154,18 +182,23 @@ final class ExtendedReadersTests: XCTestCase {
                 + "{\"type\":\"message\",\"timestamp\":\"2026-09-10T03:05:06.000Z\","
                 + "\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"pi prompt\"}]}}",
             to: root.appendingPathComponent("pi/--Users--/x_pi-1.jsonl"))
+        // hermes: state.db（ts は unix 秒。codex(9000) と claude(3000ms) の間）
+        let hermesDB = root.appendingPathComponent("hermes/state.db")
+        try makeSimpleHermesDB(at: hermesDB, source: "oneshot", startedAt: 10_000)
 
         let merged = SessionAggregator.recentSessions(
             claudeHistoryFile: root.appendingPathComponent("claude.jsonl"),
             codexHistoryFile: root.appendingPathComponent("codex.jsonl"),
             codexSessionsDir: root.appendingPathComponent("sessions"),
             piSessionsDir: root.appendingPathComponent("pi"),
-            limit: 3)
-        XCTAssertEqual(merged.map(\.agentId), ["pi", "codex", "claude-code"])
-        XCTAssertEqual(merged.map(\.sessionId), ["pi-1", codexSid, "claude-1"])
+            hermesDB: hermesDB,
+            limit: 4)
+        XCTAssertEqual(merged.map(\.agentId), ["pi", "hermes", "codex", "claude-code"])
+        XCTAssertEqual(merged.map(\.sessionId), ["pi-1", "hermes-1", codexSid, "claude-1"])
         XCTAssertEqual(merged[0].projectPath, "/w/pi")
-        XCTAssertEqual(merged[1].projectPath, "/work/codex")
-        XCTAssertEqual(merged[2].projectPath, "/p1")
+        XCTAssertEqual(merged[1].projectPath, "/w/hermes")
+        XCTAssertEqual(merged[2].projectPath, "/work/codex")
+        XCTAssertEqual(merged[3].projectPath, "/p1")
     }
 
     func test_aggregator_missing_sources_yields_empty_but_not_fatal() {
@@ -174,6 +207,7 @@ final class ExtendedReadersTests: XCTestCase {
             codexHistoryFile: URL(fileURLWithPath: "/nonexistent/codex.jsonl"),
             codexSessionsDir: URL(fileURLWithPath: "/nonexistent/sessions"),
             piSessionsDir: URL(fileURLWithPath: "/nonexistent/pi"),
+            hermesDB: URL(fileURLWithPath: "/nonexistent/hermes/state.db"),
             limit: 5)
         XCTAssertTrue(merged.isEmpty)
     }

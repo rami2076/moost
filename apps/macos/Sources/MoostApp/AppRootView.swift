@@ -85,6 +85,8 @@ struct AgentBadge: View {
             return Color(red: 0x68 / 255, green: 0x67 / 255, blue: 0xAA / 255) // 0xFF6867AA
         case ResumeCommand.piAgentId:
             return Color(red: 0x2E / 255, green: 0x7D / 255, blue: 0x9E / 255) // 0xFF2E7D9E
+        case ResumeCommand.hermesAgentId:
+            return Color(red: 0x8E / 255, green: 0x44 / 255, blue: 0xAD / 255) // 0xFF8E44AD
         default:
             return Color.secondary
         }
@@ -96,6 +98,7 @@ struct AgentBadge: View {
         case ResumeCommand.claudeAgentId: return "Claude"
         case ResumeCommand.codexAgentId: return "Codex"
         case ResumeCommand.piAgentId: return "pi"
+        case ResumeCommand.hermesAgentId: return "Hermes"
         default: return agentId
         }
     }

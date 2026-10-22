@@ -57,9 +57,27 @@ final class LaunchTests: XCTestCase {
         XCTAssertNotNil(ResumeCommand.resume(agent: "claude-code", projectPath: "/w", sessionId: "s"))
         XCTAssertNotNil(ResumeCommand.resume(agent: "codex", projectPath: "/w", sessionId: "s"))
         XCTAssertNotNil(ResumeCommand.resume(agent: "pi", projectPath: "/w", sessionId: "s"))
+        XCTAssertNotNil(ResumeCommand.resume(agent: "hermes", projectPath: "/w", sessionId: "s"))
         // 対応アダプタを外したメモなど（UI 側はトーストで告知する経路）
         XCTAssertNil(ResumeCommand.resume(agent: "unknown", projectPath: "/w", sessionId: "s"))
         XCTAssertNil(ResumeCommand.newSession(agent: "unknown", projectPath: "/w"))
+    }
+
+    // MARK: hermes（`hermes chat --resume` / `hermes chat`）
+
+    func test_hermes_resume_cds_and_calls_chat_resume() {
+        // cwd は hermes 側が自動復帰するが、codex と同じく cd も付ける（無害・一貫）
+        XCTAssertEqual(
+            ResumeCommand.hermesResume(projectPath: "/w", sessionId: "local-abc"),
+            "cd '/w' && hermes chat --resume 'local-abc'")
+        XCTAssertEqual(
+            ResumeCommand.hermesResume(projectPath: "", sessionId: "local-abc"),
+            "hermes chat --resume 'local-abc'")
+    }
+
+    func test_hermes_new_session_starts_chat_in_directory() {
+        XCTAssertEqual(ResumeCommand.hermesNewSession(projectPath: "/work/moost"),
+                       "cd '/work/moost' && hermes chat")
     }
 
     // MARK: シェルエスケープ（G1: 注入が作動しない）

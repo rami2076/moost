@@ -3,6 +3,24 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [2.4.0] - 2026-10-23
+
+### Added
+
+- **Hermes エージェント対応（Nous Research の自律エージェント・v0.22.3）**:
+  直近セッション一覧・メモ登録・復帰・要約の対象に 4 番目のエージェントとして追加。
+  セッションは `~/.hermes/state.db`（SQLite・WAL）から**読み取り専用**で読み取る
+  （書き込みは一切しない。`~/.hermes/sessions/` は v0.22.3 では未使用で空）。
+  - 一覧は CLI 起点（`source IN ('local','oneshot')`）かつメッセージありのものだけ
+    （gateway / acp 起点は除外。起動スタブも除外）。自動タイトル・作業ディレクトリを表示
+  - 復帰は `hermes chat --resume <id>`、新規は `hermes chat`（復帰時は記録済みの
+    作業ディレクトリへ cd してから起動。`hermes` 側の cwd 自動復帰と二重だが無害）
+  - Hermes はヘッドレス要約コマンドを持たないため、要約は state.db からの
+    会話抜粋をそのまま表示する（pi と同じ方針・API 消費ゼロ）
+- **一覧・バッジの表示**: Hermes セッションには紫色のバッジ（表示名 Hermes）。
+  プロジェクトタブの新規セッションアイコンにも Hermes を追加。
+  空一覧ヒント・MCP ツール説明も 4 エージェントに更新
+
 ## [2.3.1] - 2026-10-21
 
 ### Fixed

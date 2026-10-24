@@ -204,8 +204,13 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
 - **MoostCore（ロジック層）は Windows でビルド・テストできる**。Foundation のみに依存し、
   SQLite3（Hermes）と CoreGraphics（Kitty）は `#if canImport(...)` で分岐済み
 - **MoostApp（トレイ UI）は macOS 専用**（AppKit / SwiftUI）。Windows 用 UI は未実装
-- CI に `windows-core` ジョブ（`windows-latest` + Swift for Windows 6.0）を追加し、
-  PR ごとに Windows ビルド・テストをゲートする
+- CI に `windows-core` ジョブを追加し、PR ごとに Windows ビルド・テストをゲートする。
+  2026-10-24 に全ジョブ green を確認（`swift build` / `swift test` とも通過）
+  - ツールチェーン: `compnerd/gha-setup-swift` で Swift **6.4.1**（`swift-6.4.1-release`）
+  - `ilammy/msvc-dev-cmd` で MSVC / Windows SDK の INCLUDE・LIB を設定
+    （無いと `SwiftOverlayShims` が ucrt を見つけられない）
+  - `.gitattributes` の `* text=auto eol=lf` で LF チェックアウトを強制
+    （CRLF だと JSONL / JSON のパーステストが落ちる）
 - Windows 版の開発引き継ぎは
   [`docs/specs/windows-handoff.md`](./docs/specs/windows-handoff.md) を参照
 
@@ -230,3 +235,6 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
 - Hermes の `state.db` は読まない（SQLite3 モジュールが無いため一覧は空・抜粋は空文字）
 - Kitty のウィンドウ探索は行わない（CoreGraphics が無いため固定パス + グロブのみ）
 - プロセス実行に依存する要約テストは macOS 専用（`#if os(macOS)`）
+- `/usr/bin/true` を実行する前提の MCP セットアップテストは macOS 専用
+  （`AgentPathDetect` は override にも実在チェックをかけるため）
+- Windows の `swift test` は macOS よりテスト数が少ない（macOS 専用テストを除くため）

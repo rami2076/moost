@@ -9,15 +9,15 @@ macOS 側（v2.4.0-macos まで）の実装を前提に、**共通ロジック�
 2. [requirements.md](./requirements.md) — 要求・要件（データ契約）
 3. [design.md](./design.md) — 画面設計・アーキテクチャ判断・ハマりどころ
 4. [native-migration-plan.md](./native-migration-plan.md) — フェーズ D（7.3・詳細版 A）
-5. [../RELEASE.md](../RELEASE.md) — 7 章が Windows のリリース基盤
+5. [RELEASE.md](../../RELEASE.md) — 7 章が Windows のリリース基盤
 6. `spec/conformance.md` と `spec/testdata/` — 実装が満たすべき検証項目
 
-## 2. 現状（2026-10-23）
+## 2. 現状（2026-10-24）
 
 | 項目 | 状態 |
 |---|---|
 | MoostCore（ロジック層） | ✅ **Windows でビルド・テスト可能**（Foundation のみ。SQLite3 / CoreGraphics は条件コンパイル） |
-| CI `windows-core` | ✅ 追加済み（`windows-latest` + Swift for Windows 6.0 で `swift build` / `swift test`） |
+| CI `windows-core` | ✅ **green**（`windows-latest` + Swift 6.4.1 で `swift build` / `swift test`） |
 | MoostApp（トレイ UI） | ❌ macOS 専用（AppKit / SwiftUI）。**Windows 用 UI は未実装** |
 | Windows リリース | ❌ 未着手（タグ規約・成果物は RELEASE.md 7.2 に計画） |
 
@@ -37,6 +37,14 @@ swift test
 
 `Package.swift` は `#if os(Windows)` で MoostCore / MoostCoreTests のみを対象にする
 （MoostApp / MoostAppTests は macOS 専用のため除外）。
+
+### 3.1 CI と同じ条件を手元で再現する場合の注意
+
+- Swift は **6.4.1 以降**を使う（6.0 は新しい MSVC 14.5x のヘッダで
+  `ucrt` のモジュール循環が起きる）
+- Visual Studio の **C++ ワークロード**と Windows SDK を入れる
+- 改行コードは **LF** にしておく（`.gitattributes` で `* text=auto eol=lf`。
+  CRLF だと `spec/testdata` の JSONL / JSON のパーステストが落ちる）
 
 ## 4. 次の増分（優先順）
 
@@ -86,7 +94,10 @@ macOS 版と同じ「一覧 → メモ登録 → 復帰」を通す。
 - Hermes の `state.db` は読まない（SQLite3 モジュールが無いため一覧は空・抜粋は空文字）
 - Kitty のウィンドウ探索は行わない（CoreGraphics が無いため固定パス + グロブのみ）
 - プロセス実行に依存する要約テストは macOS 専用（`#if os(macOS)`）
+- `/usr/bin/true` を実行する前提の MCP セットアップテストも macOS 専用
+  （`AgentPathDetect` は override にも実在チェックをかけるため）
 - 要約（Claude haiku / Codex / pi）のサブプロセス実行は Windows で未検証
+- テスト数は macOS より少ない（macOS 専用テストを除くため）
 
 ## 6. 開発フロー（macOS 側と共通）
 

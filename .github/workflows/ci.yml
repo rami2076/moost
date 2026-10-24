@@ -129,9 +129,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: swift-actions/setup-swift@v2
+      # Windows の公式 Swift ツールチェーンを入れる専用アクション。
+      # setup-swift は Windows で 6.0 のツールチェーンを提供していない。
+      - uses: compnerd/gha-setup-swift@main
         with:
-          swift-version: "6.0"
+          swift-version: swift-6.0-release
+          swift-build: 6.0-RELEASE
       - name: Build
         run: swift build
         working-directory: apps/macos

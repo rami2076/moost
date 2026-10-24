@@ -49,6 +49,9 @@ final class McpSetupServiceTests: XCTestCase {
                        ["mcp", "add", "-s", "user", "moost", "--", "/opt/moost/MoostApp", "mcp"])
     }
 
+    // AgentPathDetect は override にも実在チェックをかけるため、
+    // /usr/bin/true が無い Windows ではランナーが呼ばれない。macOS 限定。
+    #if os(macOS)
     func testClaudeCodeConnectedTrueAndFalse() {
         let connected = RecordingRunner()
         connected.exitCode = 0
@@ -69,6 +72,7 @@ final class McpSetupServiceTests: XCTestCase {
             claudeDesktopConfigPath: desktopConfigPath)
         XCTAssertFalse(serviceDisconnected.isClaudeCodeConnected())
     }
+    #endif
 
     func testUnregisterClaudeCodeArguments() throws {
         let runner = RecordingRunner()

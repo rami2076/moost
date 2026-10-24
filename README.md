@@ -78,7 +78,7 @@ MCP サーバーはアプリに内蔵。CLI から使う場合は:
 
 ## ドキュメント
 
-要求・要件・設計資料は docs リポジトリの `project/moost/` を正とする。
+要求・要件・設計資料は [docs/specs/](./docs/specs/) を正とする。
 リリース手順は [RELEASE.md](./RELEASE.md)。
 
 ## ライセンス

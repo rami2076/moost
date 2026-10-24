@@ -202,6 +202,8 @@ final class McpSetupServiceTests: XCTestCase {
 
     // MARK: - プロセス失敗
 
+    // /usr/bin/true 前提のため macOS 限定。
+    #if os(macOS)
     func testRunFailureThrowsProcessFailed() {
         let runner = RecordingRunner()
         runner.exitCode = 2
@@ -218,4 +220,5 @@ final class McpSetupServiceTests: XCTestCase {
             XCTAssertEqual(detail, "boom")
         }
     }
+    #endif
 }

@@ -129,6 +129,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      # Windows SDK（ucrt 等）の INCLUDE/LIB を設定する。これが無いと
+      # SwiftOverlayShims の C モジュールが ucrt を見つけられずビルドが落ちる。
+      - uses: ilammy/msvc-dev-cmd@v1
       # Windows の公式 Swift ツールチェーンを入れる専用アクション。
       # setup-swift は Windows で 6.0 のツールチェーンを提供していない。
       - uses: compnerd/gha-setup-swift@main

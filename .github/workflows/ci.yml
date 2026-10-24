@@ -139,7 +139,7 @@ jobs:
           # 新しい MSVC（windows-latest の VS 18 / 14.51）では Swift 6.0 の
           # Clang が ucrt のモジュール循環で落ちるため、修正済みの新しい
           # ツールチェーンを使う（Package.swift の tools-version 6.0 は維持）。
-          swift-version: swift-6.4-release
+          swift-version: swift-6.4.1-release
           swift-build: 6.4.1-RELEASE
       - name: Build
         run: swift build

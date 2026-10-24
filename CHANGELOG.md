@@ -3,6 +3,21 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
+## [Unreleased]
+
+### Added
+
+- **Windows 開発基盤（フェーズ D の着手）**: MoostCore を Windows（Swift for Windows）
+  でもビルド・テストできるようにした。`Package.swift` は `#if os(Windows)` で
+  MoostApp（macOS 専用）を除外し、SQLite3（Hermes）と CoreGraphics（Kitty）は
+  条件コンパイルでスタブ化。CI に `windows-core` ジョブを追加。
+  Windows 用 UI とリリースワークフローは未着手（`docs/specs/windows-handoff.md`）
+
+### Changed
+
+- 仕様書の正を docs リポジトリから本リポジトリの `docs/specs/` へ移設
+  （Windows など別環境のセッションから参照するため）
+
 ## [2.4.0] - 2026-10-23
 
 ### Added

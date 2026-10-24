@@ -1,3 +1,4 @@
+#if canImport(SQLite3)
 import XCTest
 import SQLite3
 @testable import MoostCore
@@ -248,3 +249,4 @@ final class HermesSessionReaderTests: XCTestCase {
         }
     }
 }
+#endif

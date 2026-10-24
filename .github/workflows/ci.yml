@@ -119,6 +119,26 @@ jobs:
           grep -q 'key=' /tmp/moost-smoke.log
         working-directory: apps/macos
 
+  # Phase D (#73): Windows native core gate.
+  # MoostCore（ロジック層）は Foundation のみに依存するため、Swift for Windows の
+  # ツールチェーンでビルド・テストできる。MoostApp（AppKit / SwiftUI）は macOS
+  # 専用なので Package.swift が Windows では除外する（#if os(Windows)）。
+  # プロセス実行・SQLite3 に依存するテストは各ファイルで条件コンパイル済み。
+  windows-core:
+    name: windows-core (swift build + test)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      - name: Build
+        run: swift build
+        working-directory: apps/macos
+      - name: Test (spec conformance)
+        run: swift test
+        working-directory: apps/macos
+
   osv-scan:
     name: osv-scanner (lockfiles)
     runs-on: ubuntu-latest

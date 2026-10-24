@@ -18,8 +18,9 @@ Moost の要求・要件・設計・移行計画の**正**はこのディレク�
 ## プラットフォーム別の実装状況
 
 - **macOS native**: 実装済み（`apps/macos/`、v2.0.0〜）
-- **Windows**: フェーズ D（未実装）。計画は
-  [native-migration-plan.md](./native-migration-plan.md) の 7.3・詳細版 A を参照
+- **Windows**: フェーズ D。MoostCore の Windows ビルド・テストは CI ゲート済み
+  （`windows-core`）。UI とリリースワークフローは未着手
+  → 引き継ぎは [windows-handoff.md](./windows-handoff.md)
 - **Linux**: 保留（フェーズ D の後）
 
 ## 更新ルール

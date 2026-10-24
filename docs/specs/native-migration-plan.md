@@ -221,6 +221,7 @@ Dart 特有の対策（design.md 8 章）はスタックごとに洗い直し、
 | 2026-10-21 | C. macOS | ✅ | `#87`（Kitty を復帰先ターミナルに追加。リモコン経由のタブ復帰 + 新規ウィンドウフォールバック）→ v2.3.0-macos リリース |
 | 2026-10-21 | C. macOS | ✅ | `#89`（Kitty タブ復帰を実機仕様に修正: kitty.conf 由来 `listen_on` の PID 付与に対応し前面インスタンスを特定）→ v2.3.1-macos リリース |
 | 2026-10-23 | C. macOS | ✅ | `#91`（Hermes エージェント対応: state.db 読み取り専用で一覧・復帰・要約。詳細版 A の Hermes 行参照）→ v2.4.0-macos リリース |
+| 2026-10-23 | D. Windows | 🚧 | MoostCore の Windows ビルド基盤（Package.swift の `#if os(Windows)`、SQLite3 / CoreGraphics の条件コンパイル、CI `windows-core` ジョブ）。UI・リリースワークフローは未着手（Windows セッションで継続。`windows-handoff.md` 参照） |
 | - | D. Windows | ❔ | `#73` |
 
 > **フェーズ B の到達点**: ロードマップの完了条件は「一覧 → メモ登録 → 復帰」の最小動線の実走だが、`#77` はそのうち データ契約とコアロジック（conformance 19 件）に絞った。UI 動線は `B′`（`#78`）として残す。フェーズ B は「コア合格・UI 未完」の中間状態であり、cask 本線の切り替え（フェーズ C）はまだ行わない。
@@ -347,6 +348,9 @@ Terminal.app / iTerm2 は **osascript（AppleScript）方式**、Kitty は **リ
   Automation の受け入れが必要。初回のみ権限ダイアログ）。Kitty は AppleScript 非対応のため
   リモコン方式（ソケット経由。権限ダイアログなし）
 - Windows では端末の作りが別（conhost / Windows Terminal の CLI）なので、フェーズ D でこの行を新設する
+- Windows のビルド基盤（2026-10-23）: MoostCore は Foundation のみに依存するため
+  Swift for Windows でビルド・テストできる（CI `windows-core`）。MoostApp（AppKit）は
+  macOS 専用のため Windows では対象外。UI 方式とリリースワークフローは Windows セッションで継続
 
 ### 7.4 依存性の保守（スタック別）
 

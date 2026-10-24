@@ -3,32 +3,6 @@
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョニングは [Semantic Versioning](https://semver.org/lang/ja/) に従う。
 
-## [Unreleased]
-
-### Added
-
-- **Windows 開発基盤（フェーズ D の着手）**: MoostCore を Windows（Swift for Windows）
-  でもビルド・テストできるようにした。`Package.swift` は `#if os(Windows)` で
-  MoostApp（macOS 専用）を除外し、SQLite3（Hermes）と CoreGraphics（Kitty）は
-  条件コンパイルでスタブ化。CI に `windows-core` ジョブを追加し、全ジョブ green を確認。
-  Windows 用 UI とリリースワークフローは未着手（`docs/specs/windows-handoff.md`）
-
-### Changed
-
-- 仕様書の正を docs リポジトリから本リポジトリの `docs/specs/` へ移設
-  （Windows など別環境のセッションから参照するため）
-- Windows CI のセットアップを実機に合わせて修正: Swift **6.4.1**
-  （`compnerd/gha-setup-swift`）+ MSVC 開発環境（`ilammy/msvc-dev-cmd`）+
-  `.gitattributes` の LF 固定（CRLF による JSON パース失敗を回避）
-- `AiTitleReader` のディレクトリ列挙を `contentsOfDirectory(atPath:)` に変更
-  （Windows の Foundation で `includingPropertiesForKeys: []` が例外になり得るため）
-
-### Fixed
-
-- Windows で失敗していたテストをプラットフォーム別に整理
-  （SQLite3 依存の Hermes テスト、`/usr/bin/true` 依存の MCP テスト、
-  SQLite3 の無い環境向け集約テストの期待値）
-
 ## [2.4.0] - 2026-10-23
 
 ### Added

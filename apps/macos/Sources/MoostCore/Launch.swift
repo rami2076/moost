@@ -1,7 +1,5 @@
-import Foundation
-#if canImport(CoreGraphics)
 import CoreGraphics
-#endif
+import Foundation
 
 /// 復帰先ターミナル。settings.json の terminalApp に保存される文字列は
 /// Dart 実装と共通なので、値域も同じまま保つ
@@ -277,7 +275,6 @@ public final class TerminalLauncher {
     /// kitty のウィンドウはマスターインスタンス（listen_on の PID 付与元）が所有する
     /// （2026-10-21 実機検証: ウィンドウオーナー PID == ソケットの -<pid>）。
     /// kCGWindowName は画面収録権限が要るが、OwnerName / OwnerPID は不要。
-    #if canImport(CoreGraphics)
     public static func kittyWindowOwnerPids() -> [Int32] {
         let opts: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let windows = CGWindowListCopyWindowInfo(opts, kCGNullWindowID) as? [[String: Any]] else {
@@ -291,11 +288,6 @@ public final class TerminalLauncher {
         }
         return pids
     }
-    #else
-    /// CoreGraphics の無いプラットフォーム（Windows 等）ではウィンドウ探索を行わない。
-    /// Kitty 自体が macOS 専用のため、ソケット候補は固定パス + グロブのみになる。
-    public static func kittyWindowOwnerPids() -> [Int32] { [] }
-    #endif
 
     /// /tmp 上の moost-kitty.sock-* を "unix:" 付きで列挙する。
     public static func kittyGlobbedSocketPaths() -> [String] {

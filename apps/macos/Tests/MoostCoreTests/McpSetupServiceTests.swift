@@ -35,9 +35,6 @@ final class McpSetupServiceTests: XCTestCase {
 
     // MARK: - Claude Code
 
-    // 以下は AgentPathDetect の実在チェックを通過する /usr/bin/true を前提に
-    // している。Windows には無いため macOS 限定。
-    #if os(macOS)
     func testRegisterClaudeCodeArguments() throws {
         let runner = RecordingRunner()
         let service = McpSetupService(
@@ -52,9 +49,6 @@ final class McpSetupServiceTests: XCTestCase {
                        ["mcp", "add", "-s", "user", "moost", "--", "/opt/moost/MoostApp", "mcp"])
     }
 
-    // AgentPathDetect は override にも実在チェックをかけるため、
-    // /usr/bin/true が無い Windows ではランナーが呼ばれない。macOS 限定。
-    #if os(macOS)
     func testClaudeCodeConnectedTrueAndFalse() {
         let connected = RecordingRunner()
         connected.exitCode = 0
@@ -75,7 +69,6 @@ final class McpSetupServiceTests: XCTestCase {
             claudeDesktopConfigPath: desktopConfigPath)
         XCTAssertFalse(serviceDisconnected.isClaudeCodeConnected())
     }
-    #endif
 
     func testUnregisterClaudeCodeArguments() throws {
         let runner = RecordingRunner()
@@ -113,7 +106,6 @@ final class McpSetupServiceTests: XCTestCase {
         try service.unregisterCodex()
         XCTAssertEqual(runner.calls[0].arguments, ["mcp", "remove", "moost"])
     }
-    #endif
 
     // MARK: - Claude Desktop
 
@@ -202,8 +194,6 @@ final class McpSetupServiceTests: XCTestCase {
 
     // MARK: - プロセス失敗
 
-    // /usr/bin/true 前提のため macOS 限定。
-    #if os(macOS)
     func testRunFailureThrowsProcessFailed() {
         let runner = RecordingRunner()
         runner.exitCode = 2
@@ -220,5 +210,4 @@ final class McpSetupServiceTests: XCTestCase {
             XCTAssertEqual(detail, "boom")
         }
     }
-    #endif
 }

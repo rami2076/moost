@@ -35,6 +35,9 @@ final class McpSetupServiceTests: XCTestCase {
 
     // MARK: - Claude Code
 
+    // 以下は AgentPathDetect の実在チェックを通過する /usr/bin/true を前提に
+    // している。Windows には無いため macOS 限定。
+    #if os(macOS)
     func testRegisterClaudeCodeArguments() throws {
         let runner = RecordingRunner()
         let service = McpSetupService(
@@ -110,6 +113,7 @@ final class McpSetupServiceTests: XCTestCase {
         try service.unregisterCodex()
         XCTAssertEqual(runner.calls[0].arguments, ["mcp", "remove", "moost"])
     }
+    #endif
 
     // MARK: - Claude Desktop
 

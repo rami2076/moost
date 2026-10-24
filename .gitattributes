@@ -1,0 +1,11 @@
+# 改行コードは LF に固定する。
+# Windows ランナー（core.autocrlf=true）でも LF でチェックアウトさせ、
+# spec/testdata の JSONL や JSON を LF 前提で読むテスト・実装を壊さない。
+* text=auto eol=lf
+
+# バイナリは変換しない
+*.png binary
+*.gif binary
+*.dmg binary
+*.zip binary
+*.ico binary

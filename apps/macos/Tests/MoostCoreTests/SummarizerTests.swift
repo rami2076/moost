@@ -1,4 +1,3 @@
-#if os(macOS)
 import XCTest
 @testable import MoostCore
 
@@ -214,4 +213,3 @@ final class SummarizerTests: XCTestCase {
         }
     }
 }
-#endif

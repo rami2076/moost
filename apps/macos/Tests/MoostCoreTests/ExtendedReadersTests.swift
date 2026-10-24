@@ -1,7 +1,5 @@
 import XCTest
-#if canImport(SQLite3)
 import SQLite3
-#endif
 @testable import MoostCore
 
 /// pi・codex・統合（SessionAggregator）の読み取りテスト。
@@ -13,7 +11,6 @@ final class ExtendedReadersTests: XCTestCase {
     // MARK: - helpers
 
     /// 集約テスト用の最小 hermes state.db を作る（1 セッション + ユーザー 1 発言）。
-    #if canImport(SQLite3)
     private func makeSimpleHermesDB(at url: URL, source: String, startedAt: Double) throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -39,7 +36,6 @@ final class ExtendedReadersTests: XCTestCase {
             """
         XCTAssertEqual(sqlite3_exec(handle, insert, nil, nil, nil), SQLITE_OK)
     }
-    #endif
 
     private func makeTempDir(_ label: String) throws -> URL {
         let dir = FileManager.default.temporaryDirectory
@@ -160,7 +156,6 @@ final class ExtendedReadersTests: XCTestCase {
 
     // MARK: - aggregator
 
-    #if canImport(SQLite3)
     func test_aggregator_merges_agents_newest_first_and_takes_limit() throws {
         let root = try makeTempDir("aggregator")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -205,46 +200,6 @@ final class ExtendedReadersTests: XCTestCase {
         XCTAssertEqual(merged[2].projectPath, "/work/codex")
         XCTAssertEqual(merged[3].projectPath, "/p1")
     }
-    #else
-    /// SQLite3 の無いプラットフォーム（Windows 等）では Hermes を除いた
-    /// 3 エージェントで同じ並び・上限の検証をする。
-    func test_aggregator_merges_agents_newest_first_and_takes_limit() throws {
-        let root = try makeTempDir("aggregator")
-        defer { try? FileManager.default.removeItem(at: root) }
-
-        try write(
-            "{\"display\":\"normal one\",\"timestamp\":3000,\"project\":\"/p1\",\"sessionId\":\"claude-1\"}\n"
-                + "{\"display\":\"[Moost\u{8981}\u{7d04}] fork\",\"timestamp\":5000,\"project\":\"/p1\",\"sessionId\":\"claude-fork\"}\n",
-            to: root.appendingPathComponent("claude.jsonl"))
-        let codexSid = "01234567-89ab-cdef-0123-456789abcdef"
-        try write(
-            "{\"session_id\":\"\(codexSid)\",\"ts\":9000,\"text\":\"codex prompt\"}\n"
-                + "{\"session_id\":\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\",\"ts\":8000,\"text\":\"no rollout\"}\n",
-            to: root.appendingPathComponent("codex.jsonl"))
-        try write(
-            "{\"timestamp\":\"2026-09-08T09:00:00.000Z\",\"type\":\"session_meta\","
-                + "\"payload\":{\"cwd\":\"/work/codex\"}}",
-            to: root.appendingPathComponent("sessions/x/rollout-1-\(codexSid).jsonl"))
-        try write(
-            "{\"type\":\"session\",\"version\":3,\"id\":\"pi-1\",\"timestamp\":\"2026-09-10T03:04:05.000Z\",\"cwd\":\"/w/pi\"}\n"
-                + "{\"type\":\"message\",\"timestamp\":\"2026-09-10T03:05:06.000Z\","
-                + "\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"pi prompt\"}]}}",
-            to: root.appendingPathComponent("pi/--Users--/x_pi-1.jsonl"))
-
-        let merged = SessionAggregator.recentSessions(
-            claudeHistoryFile: root.appendingPathComponent("claude.jsonl"),
-            codexHistoryFile: root.appendingPathComponent("codex.jsonl"),
-            codexSessionsDir: root.appendingPathComponent("sessions"),
-            piSessionsDir: root.appendingPathComponent("pi"),
-            hermesDB: root.appendingPathComponent("hermes/state.db"),
-            limit: 4)
-        XCTAssertEqual(merged.map(\.agentId), ["pi", "codex", "claude-code"])
-        XCTAssertEqual(merged.map(\.sessionId), ["pi-1", codexSid, "claude-1"])
-        XCTAssertEqual(merged[0].projectPath, "/w/pi")
-        XCTAssertEqual(merged[1].projectPath, "/work/codex")
-        XCTAssertEqual(merged[2].projectPath, "/p1")
-    }
-    #endif
 
     func test_aggregator_missing_sources_yields_empty_but_not_fatal() {
         let merged = SessionAggregator.recentSessions(

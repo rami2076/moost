@@ -1,9 +1,11 @@
 import Foundation
+#if canImport(SQLite3)
 import SQLite3
 
 /// sqlite3_bind_text のデストラクタ指定（SQLITE_TRANSIENT）。C のマクロは
 /// Swift から見えないため unsafeBitCast で作り直す。
 private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+#endif
 
 /// Hermes（Nous Research の自律エージェント、`hermes` CLI）のセッション読み取り。
 ///
@@ -46,6 +48,7 @@ public enum HermesStateError: Error, Equatable, Sendable {
 /// Hermes セッション一覧の読み取り。
 /// リファレンス実装: hermes-agent v0.22.3 の `SessionDB.search_sessions`
 /// （`gateway_session_store.py`）。
+#if canImport(SQLite3)
 public final class HermesSessionReader: Sendable {
     public let dbURL: URL
 
@@ -116,10 +119,25 @@ public final class HermesSessionReader: Sendable {
         let activity: Double
     }
 }
+#else
+/// SQLite3 モジュールが無いプラットフォーム（Windows 等）では Hermes の
+/// `~/.hermes/state.db` を読めないため、一覧は空を返す。
+/// 呼び出し側（SessionAggregator）では「Hermes 未使用」と同じ扱いになる。
+public final class HermesSessionReader: Sendable {
+    public let dbURL: URL
+
+    public init(dbURL: URL? = nil) {
+        self.dbURL = dbURL ?? URL(fileURLWithPath: "")
+    }
+
+    public func recentSessions(limit: Int = 20) throws -> [HermesSessionEntry] { [] }
+}
+#endif
 
 /// Hermes セッションの会話抜粋（要約用テキスト）を作る。
 /// Hermes はヘッドレス要約コマンドを持たないため、抽出結果をそのまま
 /// 要約として返す（pi と同じ方針、API 消費ゼロ）。
+#if canImport(SQLite3)
 public final class HermesTranscriptExtractor: Sendable {
     public let dbURL: URL
 
@@ -233,7 +251,21 @@ public final class HermesTranscriptExtractor: Sendable {
         let toolName: String
     }
 }
+#else
+/// SQLite3 モジュールが無いプラットフォーム（Windows 等）では抜粋を作れない。
+/// 空文字列を返し、要約側は `SummarizeError`（対象なし）として扱う。
+public final class HermesTranscriptExtractor: Sendable {
+    public let dbURL: URL
 
+    public init(dbURL: URL? = nil) {
+        self.dbURL = dbURL ?? URL(fileURLWithPath: "")
+    }
+
+    public func extract(sessionId: String, full: Bool = false, rallies: Int = 1) -> String { "" }
+}
+#endif
+
+#if canImport(SQLite3)
 /// state.db への読み取り専用 SQLite 接続（Moost 内部用）。
 private final class HermesStateDB {
     private var handle: OpaquePointer?
@@ -285,3 +317,4 @@ private final class HermesStateDB {
         sqlite3_column_double(stmt, index)
     }
 }
+#endif

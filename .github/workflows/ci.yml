@@ -119,6 +119,35 @@ jobs:
           grep -q 'key=' /tmp/moost-smoke.log
         working-directory: apps/macos
 
+  # Phase D (#73): Windows native core gate.
+  # MoostCore（ロジック層）は Foundation のみに依存するため、Swift for Windows の
+  # ツールチェーンでビルド・テストできる。MoostApp（AppKit / SwiftUI）は macOS
+  # 専用なので Package.swift が Windows では除外する（#if os(Windows)）。
+  # プロセス実行・SQLite3 に依存するテストは各ファイルで条件コンパイル済み。
+  windows-core:
+    name: windows-core (swift build + test)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Windows SDK（ucrt 等）の INCLUDE/LIB を設定する。これが無いと
+      # SwiftOverlayShims の C モジュールが ucrt を見つけられずビルドが落ちる。
+      - uses: ilammy/msvc-dev-cmd@v1
+      # Windows の公式 Swift ツールチェーンを入れる専用アクション。
+      # setup-swift は Windows で 6.0 のツールチェーンを提供していない。
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          # 新しい MSVC（windows-latest の VS 18 / 14.51）では Swift 6.0 の
+          # Clang が ucrt のモジュール循環で落ちるため、修正済みの新しい
+          # ツールチェーンを使う（Package.swift の tools-version 6.0 は維持）。
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - name: Build
+        run: swift build
+        working-directory: apps/macos
+      - name: Test (spec conformance)
+        run: swift test
+        working-directory: apps/macos
+
   osv-scan:
     name: osv-scanner (lockfiles)
     runs-on: ubuntu-latest

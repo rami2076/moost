@@ -52,11 +52,13 @@ public final class AiTitleReader {
     /// 一意性だけを使う（design.md 3.2）
     private func findSessionFile(_ sessionId: String) -> URL? {
         let fileManager = FileManager.default
-        guard let entries = try? fileManager.contentsOfDirectory(at: projectsDirectory, includingPropertiesForKeys: []) else {
+        // `contentsOfDirectory(at:includingPropertiesForKeys: [])` は
+        // Windows の Foundation で例外になることがあるため atPath: を使う。
+        guard let names = try? fileManager.contentsOfDirectory(atPath: projectsDirectory.path) else {
             return nil
         }
-        for entry in entries {
-            let directory = projectsDirectory.appendingPathComponent(entry.lastPathComponent)
+        for name in names {
+            let directory = projectsDirectory.appendingPathComponent(name)
             let target = directory.appendingPathComponent(sessionId + ".jsonl")
             if fileManager.fileExists(atPath: target.path) {
                 return target

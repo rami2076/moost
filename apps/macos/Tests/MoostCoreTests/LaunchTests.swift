@@ -422,6 +422,7 @@ final class LaunchTests: XCTestCase {
 
     // MARK: 既定実装（execute）のタイムアウト
 
+    #if os(macOS)
     func test_execute_times_out_and_reports_reason() {
         // osascript の delay 5 を 1 秒で打ち切り、exit 124 + タイムアウト文言を返す。
         let (exit, stdout, stderr) = TerminalLauncher.execute(["-e", "delay 5"], timeout: 1)
@@ -434,4 +435,5 @@ final class LaunchTests: XCTestCase {
         let (exit, _, stderr) = TerminalLauncher.execute(["-e", "return 0"], timeout: 5)
         XCTAssertEqual(exit, 0, stderr)
     }
+    #endif
 }

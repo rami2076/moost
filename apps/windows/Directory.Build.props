@@ -20,7 +20,11 @@
 
     <!-- 供給網: NuGet は中央管理（Directory.Packages.props）+ lock ファイルをコミットして固定する -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    <!--
+      RestoreLockedMode はここで有効化しない。CI=true で常時有効にすると、
+      リリース時の RID 付き復元（win-x64）が lock を RID 依存に変えてしまい、
+      RID 無しの復元と両立しない。lock の強制は CI が明示オプションで行う。
+    -->
   </PropertyGroup>
 
 </Project>

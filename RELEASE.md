@@ -84,7 +84,7 @@ Moost は macOS / Linux / Windows をいずれ native 対応する（#73）た�
 
 ### 3.2 タグ push による自動リリース（macOS）
 
-リリースは GitHub Actions のタグ起動ワークフロー（`.github/workflows/release.yml`）に集約する。
+リリースは GitHub Actions のタグ起動ワークフロー（`.github/workflows/release-macos.yml`）に集約する。
 
 **CI（タグ push で自動実行）:**
 
@@ -106,7 +106,7 @@ Moost は macOS / Linux / Windows をいずれ native 対応する（#73）た�
 
 ### 3.4 Homebrew tap への自動反映と deploy key
 
-リリース（`-rc` を含まないタグ）時、release.yml が
+リリース（`-rc` を含まないタグ）時、release-macos.yml が
 [rami2076/homebrew-tap](https://github.com/rami2076/homebrew-tap) の
 `Casks/moost.rb` を丸ごと再生成して push する（version / sha256 / dmg URL）。
 ユーザーは `brew install --cask rami2076/tap/moost` で導入、`brew upgrade` で更新できる。
@@ -129,7 +129,7 @@ gh api -X DELETE repos/rami2076/homebrew-tap/keys/<id>
 # 2. 新しい鍵ペアを作成し、公開鍵を tap へ・秘密鍵を secret へ登録して手元を削除
 ssh-keygen -t ed25519 -N '' -C "moost-release-tap-bump" -f /tmp/tap_key -q
 gh api -X POST repos/rami2076/homebrew-tap/keys \
-  -f title="moost release.yml (tap bump)" \
+  -f title="moost release-macos.yml (tap bump)" \
   -f key="$(cat /tmp/tap_key.pub)" -F read_only=false
 gh secret set TAP_DEPLOY_KEY --repo rami2076/moost < /tmp/tap_key
 rm -f /tmp/tap_key /tmp/tap_key.pub

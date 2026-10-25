@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Moost.Core/Moost.Core.csproj" />
+    <Project Path="src/Moost.WindowsApp/Moost.WindowsApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Moost.Core.Tests/Moost.Core.Tests.csproj" />
+  </Folder>
+</Solution>

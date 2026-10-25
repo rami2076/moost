@@ -86,12 +86,31 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 - フレームワーク依存（`--self-contained` なし）にすると数 MB になるが、
   **.NET デスクトップランタイムの導入が前提**になるため採用しない
 
-## 現在の状態（#97 時点）
+## 現在の状態（#98 時点）
+
+| conformance | 項目 | 状態 |
+|---|---|---|
+| A | JSON 永続基盤（アトミック書き込み・破損退避・エラー伝播） | ✅ |
+| B | memos.json（エンベロープ・寛容読み・可変/不変・parseTags・日付） | ✅ |
+| C | settings.json（項目別フォールバック・ENUM 化しない・自動起動を保存しない） | ✅ |
+| D | projects.json（エンベロープ・displayName の導出） | ✅ |
+| E | 直近セッション一覧・表題 | ☐ #99 |
+| F | 表題フォールバック / ai-title | ☐ #99 |
+| G | 復帰コマンドとシェル escape | ☐ #100 |
 
 - [x] ソリューション（`.slnx`）・3 プロジェクト・CI ゲート（`windows-ci.yml`）
 - [x] spec への配線（conformance の項目数と Fixture の到達性をテスト）
+- [x] **Moost.Core の永続層とモデル（A〜D）**
 - [x] 単一 exe での publish 経路を実機で検証（上記）
-- [ ] Moost.Core の実装（#98 以降）
+- [ ] 一覧・表題（#99）、escape（#100）、readers・要約（#101）
 - [ ] トレイ常駐・画面（#102 / #103）
+
+テストは `dotnet test` で **55 件**（骨組み 5 + 永続層 50）。
+
+### Windows 固有の解釈
+
+- `Project.DisplayName` は区切りを `/` と `\` の両方で扱う（リファレンス実装は POSIX 前提で `/` のみ）。
+  データ契約の期待値は「最後のディレクトリ名」であり、区切りの種類に依存しない
+- 保存先は `%USERPROFILE%\.moost\v2\`。Windows には旧世代（v1）のデータが無いため、v1 → v2 の移行は行わない
 
 プレースホルダの `MainWindow` は #102 / #103 で置き換える。

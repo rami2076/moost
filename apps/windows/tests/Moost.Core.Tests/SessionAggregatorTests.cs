@@ -3,14 +3,14 @@ using Moost.Core;
 namespace Moost.Core.Tests;
 
 /// <summary>
-/// conformance E5（複数エージェントの統合）と Codex の rollout 依存。
+/// conformance E5（複数エージェントの統合）。claude / codex / pi / hermes の 4 系統を扱う。
 /// </summary>
 public class SessionAggregatorTests
 {
     private const string CodexSessionId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     private const string CodexWithoutRollout = "11111111-2222-3333-4444-555555555555";
 
-    private static (string ClaudeHistory, string CodexHistory, string CodexSessions) Prepare(TempDir dir)
+    private static SessionSources Prepare(TempDir dir)
     {
         var claudeHistory = dir.File("claude-history.jsonl");
         File.WriteAllLines(claudeHistory,
@@ -25,7 +25,7 @@ public class SessionAggregatorTests
             $$"""{"session_id":"{{CodexWithoutRollout}}","ts":3,"text":"rollout が無いセッション"}""",
         ]);
 
-        var rolloutDirectory = Path.Combine(dir.Path, "sessions", "2026", "09", "20");
+        var rolloutDirectory = Path.Combine(dir.Path, "codex-sessions", "2026", "09", "20");
         Directory.CreateDirectory(rolloutDirectory);
         File.WriteAllLines(
             Path.Combine(rolloutDirectory, $"rollout-2026-09-20T10-00-00-{CodexSessionId}.jsonl"),
@@ -34,19 +34,46 @@ public class SessionAggregatorTests
                 """{"type":"user","message":"codex prompt"}""",
             ]);
 
-        return (claudeHistory, codexHistory, Path.Combine(dir.Path, "sessions"));
+        // pi: 4 秒（codex の 2 秒より新しい）
+        var piDirectory = Path.Combine(dir.Path, "pi-sessions", "cwd");
+        Directory.CreateDirectory(piDirectory);
+        File.WriteAllLines(Path.Combine(piDirectory, "p.jsonl"),
+        [
+            """{"type":"session","id":"P-1","cwd":"/work/pi","timestamp":"1970-01-01T00:00:04.000Z"}""",
+            """{"type":"message","timestamp":"1970-01-01T00:00:04.000Z","message":{"role":"user","content":[{"type":"text","text":"pi prompt"}]}}""",
+        ]);
+
+        // hermes: 5 秒（最新）
+        var hermesDb = HermesDbFixture.Create(dir.File("state.db"));
+        HermesDbFixture.AddSession(hermesDb, "H-1", "", "/work/hermes", 5);
+        HermesDbFixture.AddMessage(hermesDb, "H-1", "user", "hermes prompt", 5);
+
+        return new SessionSources
+        {
+            ClaudeHistoryFile = claudeHistory,
+            CodexHistoryFile = codexHistory,
+            CodexSessionsDirectory = Path.Combine(dir.Path, "codex-sessions"),
+            PiSessionsDirectory = Path.Combine(dir.Path, "pi-sessions"),
+            HermesDatabase = hermesDb,
+        };
     }
 
     [Fact]
-    public void MergesAgents_NewestFirst()
+    public void MergesAllFourAgents_NewestFirst()
     {
         using var dir = new TempDir();
-        var (claudeHistory, codexHistory, codexSessions) = Prepare(dir);
+        var sources = Prepare(dir);
 
-        var sessions = SessionAggregator.RecentSessions(claudeHistory, codexHistory, codexSessions);
+        var sessions = SessionAggregator.RecentSessions(sources);
 
-        // codex 2 秒 > claude 1 秒
-        Assert.Equal([ResumeCommand.CodexAgentId, ResumeCommand.ClaudeAgentId],
+        // hermes 5 秒 > pi 4 秒 > codex 2 秒 > claude 1 秒
+        Assert.Equal(
+            [
+                ResumeCommand.HermesAgentId,
+                ResumeCommand.PiAgentId,
+                ResumeCommand.CodexAgentId,
+                ResumeCommand.ClaudeAgentId,
+            ],
             sessions.Select(session => session.AgentId));
     }
 
@@ -54,9 +81,7 @@ public class SessionAggregatorTests
     public void CodexWithoutRollout_IsExcluded()
     {
         using var dir = new TempDir();
-        var (claudeHistory, codexHistory, codexSessions) = Prepare(dir);
-
-        var sessions = SessionAggregator.RecentSessions(claudeHistory, codexHistory, codexSessions);
+        var sessions = SessionAggregator.RecentSessions(Prepare(dir));
 
         Assert.DoesNotContain(sessions, session => session.SessionId == CodexWithoutRollout);
     }
@@ -65,9 +90,7 @@ public class SessionAggregatorTests
     public void CodexProjectPath_ComesFromRolloutSessionMeta()
     {
         using var dir = new TempDir();
-        var (claudeHistory, codexHistory, codexSessions) = Prepare(dir);
-
-        var sessions = SessionAggregator.RecentSessions(claudeHistory, codexHistory, codexSessions);
+        var sessions = SessionAggregator.RecentSessions(Prepare(dir));
         var codex = Assert.Single(sessions, session => session.AgentId == ResumeCommand.CodexAgentId);
 
         Assert.Equal("C:\\work\\x", codex.ProjectPath);
@@ -75,15 +98,36 @@ public class SessionAggregatorTests
     }
 
     [Fact]
+    public void HermesCarriesAiTitle()
+    {
+        using var dir = new TempDir();
+        var db = HermesDbFixture.Create(dir.File("state.db"));
+        HermesDbFixture.AddSession(db, "H-2", "自動タイトル", "/w", 10);
+        HermesDbFixture.AddMessage(db, "H-2", "user", "本文プロンプト", 10);
+
+        var sessions = SessionAggregator.RecentSessions(new SessionSources
+        {
+            ClaudeHistoryFile = dir.File("none-1"),
+            CodexHistoryFile = dir.File("none-2"),
+            CodexSessionsDirectory = dir.File("none-3"),
+            PiSessionsDirectory = dir.File("none-4"),
+            HermesDatabase = db,
+        });
+
+        var hermes = Assert.Single(sessions);
+        Assert.Equal("自動タイトル", hermes.DisplayTitle);
+        Assert.Equal("本文プロンプト", hermes.LastPrompt);
+    }
+
+    [Fact]
     public void Limit_IsAppliedAfterMerging()
     {
         using var dir = new TempDir();
-        var (claudeHistory, codexHistory, codexSessions) = Prepare(dir);
+        var sessions = SessionAggregator.RecentSessions(Prepare(dir), limit: 2);
 
-        var sessions = SessionAggregator.RecentSessions(claudeHistory, codexHistory, codexSessions, limit: 1);
-
-        var session = Assert.Single(sessions);
-        Assert.Equal(ResumeCommand.CodexAgentId, session.AgentId);
+        Assert.Equal(
+            [ResumeCommand.HermesAgentId, ResumeCommand.PiAgentId],
+            sessions.Select(session => session.AgentId));
     }
 
     [Fact]
@@ -91,11 +135,27 @@ public class SessionAggregatorTests
     {
         using var dir = new TempDir();
 
-        var sessions = SessionAggregator.RecentSessions(
-            dir.File("no-claude.jsonl"),
-            dir.File("no-codex.jsonl"),
-            dir.File("no-sessions"));
+        var sessions = SessionAggregator.RecentSessions(new SessionSources
+        {
+            ClaudeHistoryFile = dir.File("no-claude.jsonl"),
+            CodexHistoryFile = dir.File("no-codex.jsonl"),
+            CodexSessionsDirectory = dir.File("no-sessions"),
+            PiSessionsDirectory = dir.File("no-pi"),
+            HermesDatabase = dir.File("no-state.db"),
+        });
 
         Assert.Empty(sessions);
+    }
+
+    [Fact]
+    public void FromHome_BuildsExpectedPaths()
+    {
+        var profile = Path.Combine("C:", "Users", "someone");
+        var sources = SessionSources.FromHome(profile);
+
+        Assert.Equal(SessionLocations.ClaudeHistoryFile(profile), sources.ClaudeHistoryFile);
+        Assert.Equal(SessionLocations.CodexSessionsDirectory(profile), sources.CodexSessionsDirectory);
+        Assert.Equal(SessionLocations.PiSessionsDirectory(profile), sources.PiSessionsDirectory);
+        Assert.Equal(SessionLocations.HermesStateDb(profile), sources.HermesDatabase);
     }
 }

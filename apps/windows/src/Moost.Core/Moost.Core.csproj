@@ -11,4 +11,9 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Hermes の state.db（SQLite）を読み取り専用で読む（#101）。バージョンは中央管理 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
 </Project>

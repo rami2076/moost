@@ -38,6 +38,8 @@
       WinForms の暗黙 using を外し、必要な箇所では using System.Windows.Forms; を明示する。
     -->
     <Using Remove="System.Windows.Forms" />
+    <!-- System.Drawing も暗黙 using から外す（Brush / Brushes が WPF と衝突するため） -->
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
 </Project>

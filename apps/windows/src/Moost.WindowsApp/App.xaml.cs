@@ -42,7 +42,17 @@ public partial class App : Application
             openUrl: url => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }),
             appVersion: AppInfo.Version);
 
-        var window = new PopoverWindow(viewModel);
+        var window = new PopoverWindow(viewModel, quit: () =>
+        {
+            if (_tray is not null)
+            {
+                _tray.Quit();
+            }
+            else
+            {
+                Shutdown();
+            }
+        });
         // ウィンドウを一度も表示しないため、GC されないよう参照を保持する
         MainWindow = window;
 

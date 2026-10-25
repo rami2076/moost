@@ -7,6 +7,9 @@ public sealed record SessionSources
 {
     public required string ClaudeHistoryFile { get; init; }
 
+    /// <summary>claude のセッション JSONL 群（会話抜粋・ai-title の読み取り元）。</summary>
+    public required string ClaudeProjectsDirectory { get; init; }
+
     public required string CodexHistoryFile { get; init; }
 
     public required string CodexSessionsDirectory { get; init; }
@@ -19,6 +22,7 @@ public sealed record SessionSources
     public static SessionSources FromHome(string? userProfile = null) => new()
     {
         ClaudeHistoryFile = SessionLocations.ClaudeHistoryFile(userProfile),
+        ClaudeProjectsDirectory = SessionLocations.ClaudeProjectsDirectory(userProfile),
         CodexHistoryFile = SessionLocations.CodexHistoryFile(userProfile),
         CodexSessionsDirectory = SessionLocations.CodexSessionsDirectory(userProfile),
         PiSessionsDirectory = SessionLocations.PiSessionsDirectory(userProfile),

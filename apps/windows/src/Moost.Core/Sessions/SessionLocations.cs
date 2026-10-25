@@ -1,12 +1,10 @@
-using System.Text.Json.Nodes;
-
 namespace Moost.Core;
 
 /// <summary>
 /// エージェントの履歴・セッションの既定の置き場所（Windows）。
 ///
 /// macOS の <c>~/.claude</c> 等に対応する。Windows ではネイティブ版 CLI の置く場所
-/// （<c>%USERPROFILE%\.claude</c>）を使う。WSL 側に CLI がある場合の扱いは #101 で詰める。
+/// （<c>%USERPROFILE%\.claude</c> 等）を使う。WSL 側に CLI がある場合の扱いは未対応。
 /// </summary>
 public static class SessionLocations
 {
@@ -22,6 +20,12 @@ public static class SessionLocations
     public static string CodexSessionsDirectory(string? userProfile = null) =>
         Path.Combine(Home(userProfile), ".codex", "sessions");
 
+    public static string PiSessionsDirectory(string? userProfile = null) =>
+        Path.Combine(Home(userProfile), ".pi", "agent", "sessions");
+
+    public static string HermesStateDb(string? userProfile = null) =>
+        Path.Combine(Home(userProfile), ".hermes", "state.db");
+
     private static string Home(string? userProfile) =>
         userProfile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 }
@@ -33,7 +37,7 @@ public static class SessionLocations
 internal static class JsonlLine
 {
     /// <summary>行を JSON オブジェクトとして読む。壊れていれば false。</summary>
-    public static bool TryParseObject(string? line, out JsonObject json)
+    public static bool TryParseObject(string? line, out System.Text.Json.Nodes.JsonObject json)
     {
         json = null!;
         if (string.IsNullOrWhiteSpace(line))
@@ -43,7 +47,7 @@ internal static class JsonlLine
 
         try
         {
-            if (JsonNode.Parse(line) is JsonObject parsed)
+            if (System.Text.Json.Nodes.JsonNode.Parse(line) is System.Text.Json.Nodes.JsonObject parsed)
             {
                 json = parsed;
                 return true;

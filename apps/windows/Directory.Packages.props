@@ -16,6 +16,13 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+
+    <!--
+      Hermes の state.db（SQLite）を読み取り専用で読むため（#101）。
+      バージョンは .NET 10 系の安定版に固定する（プレビュー・RC は使わない）。
+      SQLitePCLRaw 経由で e_sqlite3 を同梱するため、追加のネイティブ配布は不要。
+    -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
   </ItemGroup>
 
 </Project>

@@ -86,7 +86,7 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 - フレームワーク依存（`--self-contained` なし）にすると数 MB になるが、
   **.NET デスクトップランタイムの導入が前提**になるため採用しない
 
-## 現在の状態（#99 時点）
+## 現在の状態（#101 前半まで）
 
 | conformance | 項目 | 状態 |
 |---|---|---|
@@ -104,11 +104,21 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 - [x] **Moost.Core の永続層とモデル（A〜D）**
 - [x] **復帰コマンドと PowerShell escape（G）**
 - [x] **一覧・表題（E・F）**：claude / codex の history 集約、rollout からの cwd、ai-title の末尾走査
+- [x] **4 エージェントの一覧**：pi（JSONL）と Hermes（SQLite 読み取り専用）を追加し、統合を 4 系統に拡張
+- [x] **CLI パス検出**：設定上書き → 既知パス → `where.exe` の 3 段構え
 - [x] 単一 exe での publish 経路を実機で検証（上記）
-- [ ] pi / hermes の readers・パス検出・要約（#101）
+- [ ] 会話抜粋と要約（claude -p / codex exec・#101 後半）
 - [ ] トレイ常駐・画面（#102 / #103）
 
-テストは `dotnet test` で **129 件**。
+テストは `dotnet test` で **153 件**。
+
+## 依存（NuGet）
+
+| パッケージ | 用途 | 備考 |
+|---|---|---|
+| `Microsoft.Data.Sqlite` 10.0.13 | Hermes の `state.db` を**読み取り専用**で読む | `SQLitePCLRaw` 経由で `e_sqlite3` を同梱するため、追加のネイティブ配布は不要 |
+
+依存は `Directory.Packages.props` の 1 か所で管理し、`packages.lock.json` をコミットする（CI は `--locked-mode`）。
 
 ### Windows 固有の解釈
 
@@ -119,5 +129,10 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
   `cd` は `[` `]` `*` をワイルドカードとして解釈するため `-LiteralPath`）
 - Claude Code の内部環境変数除去は `env -u` の代わりに
   `Get-ChildItem Env:CLAUDE_*, ... | Remove-Item` を使う
+- CLI の既知パスは **`%USERPROFILE%\.local\bin\<cmd>.exe`**（ネイティブインストーラ）と
+  **`%APPDATA%\npm\<cmd>.cmd`**（npm グローバル）。`.cmd` は実行に `cmd.exe` を挟む必要がある
+  （`AgentPathDetect.RequiresCommandShell`）
+- Hermes の `state.db` は `Mode=ReadOnly` + `PRAGMA query_only=ON` で開き、接続プールは使わない
+  （ハンドルを残すと Hermes 側の書き込みを邪魔する可能性があるため）
 
 プレースホルダの `MainWindow` は #102 / #103 で置き換える。

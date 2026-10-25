@@ -51,6 +51,7 @@ public class SessionAggregatorTests
         return new SessionSources
         {
             ClaudeHistoryFile = claudeHistory,
+            ClaudeProjectsDirectory = Path.Combine(dir.Path, "claude-projects"),
             CodexHistoryFile = codexHistory,
             CodexSessionsDirectory = Path.Combine(dir.Path, "codex-sessions"),
             PiSessionsDirectory = Path.Combine(dir.Path, "pi-sessions"),
@@ -108,6 +109,7 @@ public class SessionAggregatorTests
         var sessions = SessionAggregator.RecentSessions(new SessionSources
         {
             ClaudeHistoryFile = dir.File("none-1"),
+            ClaudeProjectsDirectory = dir.File("none-projects"),
             CodexHistoryFile = dir.File("none-2"),
             CodexSessionsDirectory = dir.File("none-3"),
             PiSessionsDirectory = dir.File("none-4"),
@@ -138,6 +140,7 @@ public class SessionAggregatorTests
         var sessions = SessionAggregator.RecentSessions(new SessionSources
         {
             ClaudeHistoryFile = dir.File("no-claude.jsonl"),
+            ClaudeProjectsDirectory = dir.File("no-projects"),
             CodexHistoryFile = dir.File("no-codex.jsonl"),
             CodexSessionsDirectory = dir.File("no-sessions"),
             PiSessionsDirectory = dir.File("no-pi"),

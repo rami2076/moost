@@ -86,7 +86,7 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 - フレームワーク依存（`--self-contained` なし）にすると数 MB になるが、
   **.NET デスクトップランタイムの導入が前提**になるため採用しない
 
-## 現在の状態（#101 前半まで）
+## 現在の状態（#101 完了・Core 完成）
 
 | conformance | 項目 | 状態 |
 |---|---|---|
@@ -106,11 +106,22 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 - [x] **一覧・表題（E・F）**：claude / codex の history 集約、rollout からの cwd、ai-title の末尾走査
 - [x] **4 エージェントの一覧**：pi（JSONL）と Hermes（SQLite 読み取り専用）を追加し、統合を 4 系統に拡張
 - [x] **CLI パス検出**：設定上書き → 既知パス → `where.exe` の 3 段構え
+- [x] **会話抜粋と要約（#101 後半）**
+  - 抜粋: claude / codex / pi / hermes のセッションから直近 N ラリーをテキスト化
+  - 要約: `claude -p`（haiku 固定）と `codex exec --ephemeral`。pi / hermes はローカル抽出をそのまま返す（API 消費ゼロ）
+  - 要約結果は**永続化しない**メモリキャッシュのみ（ADR-002）
 - [x] 単一 exe での publish 経路を実機で検証（上記）
-- [ ] 会話抜粋と要約（claude -p / codex exec・#101 後半）
 - [ ] トレイ常駐・画面（#102 / #103）
 
-テストは `dotnet test` で **153 件**。
+テストは `dotnet test` で **183 件**。
+
+### サブプロセス実行の注意（Windows）
+
+- stdout / stderr は**同時に**非同期で読み切る（片方だけ読むとパイプが詰まってハングする）
+- タイムアウトで**プロセスツリーごと** kill する（CLI が固まっても UI を止めない）
+- `StandardOutputEncoding = UTF-8` にしているのは、claude / codex が **Node 製で UTF-8 を書く**ため。
+  Windows PowerShell 5.1 は OEM コードページで書くので、`.ps1` を直接叩く経路では日本語が化ける（本番の経路では起きない）
+- `.cmd` / `.bat`（npm シミング）は `cmd.exe /c` を挟んで起動する
 
 ## 依存（NuGet）
 

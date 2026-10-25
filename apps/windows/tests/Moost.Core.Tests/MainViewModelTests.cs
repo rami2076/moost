@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Moost.Core;
 
 namespace Moost.Core.Tests;
@@ -308,5 +309,97 @@ public class MainViewModelTests
         Assert.Contains("cleanupPeriodDays", MainViewModel.NoticeText, StringComparison.Ordinal);
         Assert.Contains("読み取り専用", MainViewModel.NoticeText, StringComparison.Ordinal);
         Assert.Contains("保存されません", MainViewModel.NoticeText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_ShowsAvailableVersion_AndCopiesWingetCommand()
+    {
+        using var dir = new TempDir();
+        var handler = new StubUpdateHandler("v9.9.9-windows");
+        var checker = new UpdateChecker("1.0.0", new HttpClient(handler));
+        var clipboard = new List<string>();
+        var viewModel = BuildViewModel(dir, checker, clipboard, opened: null, processPath: @"C:\Users\me\AppData\Local\Microsoft\WinGet\Packages\rami2076.Moost_1.0.0_x64__abc\Moost.exe");
+
+        await viewModel.CheckForUpdatesAsync();
+
+        Assert.Contains("9.9.9", viewModel.UpdateText, StringComparison.Ordinal);
+        Assert.NotNull(viewModel.AvailableUpdateCommand);
+
+        Assert.True(viewModel.ApplyUpdateGuidance());
+        Assert.Contains("winget upgrade", Assert.Single(clipboard), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_OpensReleasePage_ForManualInstall()
+    {
+        using var dir = new TempDir();
+        var handler = new StubUpdateHandler("v9.9.9-windows");
+        var checker = new UpdateChecker("1.0.0", new HttpClient(handler));
+        var opened = new List<string>();
+        var viewModel = BuildViewModel(dir, checker, clipboard: null, opened: opened, processPath: @"C:\Users\me\AppData\Local\Programs\Moost\Moost.exe");
+
+        await viewModel.CheckForUpdatesAsync();
+        Assert.True(viewModel.ApplyUpdateGuidance());
+
+        Assert.Single(opened);
+        Assert.Contains("/releases/tag/v9.9.9-windows", opened[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_IsSilent_WhenNothingNew()
+    {
+        using var dir = new TempDir();
+        var checker = new UpdateChecker("1.0.0", new HttpClient(new StubUpdateHandler("v1.0.0-windows")));
+        var viewModel = BuildViewModel(dir, checker, clipboard: null, opened: null);
+
+        await viewModel.CheckForUpdatesAsync();
+
+        Assert.Equal(string.Empty, viewModel.UpdateText);
+        Assert.False(viewModel.ApplyUpdateGuidance());
+    }
+
+    private sealed class StubUpdateHandler : HttpMessageHandler
+    {
+        private readonly string _tag;
+
+        public StubUpdateHandler(string tag) => _tag = tag;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Found)
+            {
+                Headers = { Location = new Uri($"https://github.com/rami2076/moost/releases/tag/{_tag}") },
+            });
+    }
+
+    private static MainViewModel BuildViewModel(
+        TempDir dir,
+        UpdateChecker checker,
+        List<string>? clipboard,
+        List<string>? opened,
+        string? processPath = null)
+    {
+        var sources = new SessionSources
+        {
+            ClaudeHistoryFile = dir.File("claude-history.jsonl"),
+            ClaudeProjectsDirectory = Path.Combine(dir.Path, "p"),
+            CodexHistoryFile = dir.File("c"),
+            CodexSessionsDirectory = Path.Combine(dir.Path, "cs"),
+            PiSessionsDirectory = Path.Combine(dir.Path, "ps"),
+            HermesDatabase = dir.File("state.db"),
+        };
+
+        // プロセスパスは環境依存のため、winget 判定は UpdateGuidance 側で検証済み。
+        // ここでは「手動導入ならリリースページ」の経路だけを見たいので、
+        // 実プロセスパスが winget 管理下でない環境（開発実行）を前提にする。
+        return new MainViewModel(
+            sources,
+            new MemoStore(dir.File("memos.json")),
+            new ProjectStore(dir.File("projects.json")),
+            new SettingsStore(dir.File("settings.json")),
+            new TerminalLauncher(executableExists: _ => false, start: _ => true),
+            copyToClipboard: clipboard is null ? null : clipboard.Add,
+            updateChecker: checker,
+            processPath: processPath,
+            openUrl: opened is null ? null : opened.Add);
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using Moost.Core;
 
@@ -28,6 +29,8 @@ public partial class App : Application
             new TerminalLauncher(),
             copyToClipboard: text => Clipboard.SetText(text),
             autoStart: new AutoStartService(),
+            updateChecker: new UpdateChecker(AppInfo.Version),
+            openUrl: url => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }),
             appVersion: AppInfo.Version);
 
         var window = new PopoverWindow(viewModel);
@@ -36,7 +39,11 @@ public partial class App : Application
 
         _tray = new TrayService(window, openLabel: "開く", quitLabel: "終了");
         // 表示のたびに一覧を読み直す（design.md 6.1 の更新タイミング）
-        _tray.Shown += (_, _) => window.RefreshAll();
+        _tray.Shown += (_, _) =>
+        {
+            window.RefreshAll();
+            _ = window.CheckForUpdatesAsync();
+        };
     }
 
     protected override void OnExit(ExitEventArgs e)

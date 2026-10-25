@@ -44,6 +44,9 @@ public partial class PopoverWindow : Window
         AutoStartBox.IsChecked = _viewModel.AutoStartEnabled;
 
         StatusText.Text = _viewModel.StatusMessage;
+
+        UpdateText.Text = _viewModel.UpdateText;
+        UpdateButton.Visibility = _viewModel.UpdateText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // MARK: セッション
@@ -197,6 +200,20 @@ public partial class PopoverWindow : Window
         }
 
         return Math.Clamp(value, min, max);
+    }
+
+    private async void OnApplyUpdate(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ApplyUpdateGuidance();
+        StatusText.Text = _viewModel.StatusMessage;
+    }
+
+    /// <summary>更新チェック（方式 7）。失敗しても沈黙する。</summary>
+    public async Task CheckForUpdatesAsync()
+    {
+        await _viewModel.CheckForUpdatesAsync();
+        UpdateText.Text = _viewModel.UpdateText;
+        UpdateButton.Visibility = _viewModel.UpdateText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnTabChanged(object sender, SelectionChangedEventArgs e)

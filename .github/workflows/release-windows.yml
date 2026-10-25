@@ -53,8 +53,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore (locked)
-        run: dotnet restore --locked-mode
+      # lock ファイルは **RID 非依存**でコミットしている（windows-ci.yml が --locked-mode で検証）。
+      # ここで --locked-mode を使うと、publish の RID 付き復元（-r win-x64）で lock が
+      # RID 依存に書き換わり、RID 無しの復元と両立しなくなるため、通常の復元にする。
+      - name: Restore
+        run: dotnet restore
         working-directory: apps/windows
 
       - name: Publish (self-contained single file)

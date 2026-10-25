@@ -83,6 +83,28 @@ flutter test
 実装に入る前に Issue を立てて相談してもらえると助かります。既存の設計判断と
 矛盾しないか、事前にすり合わせできます。
 
+## プラットフォーム分離（macOS / Windows）
+
+macOS は `apps/macos/`（Swift + AppKit）、Windows は `apps/windows/`（C#/.NET + WPF）に
+**完全に分かれている**（[ADR-006](./docs/specs/adr/006-windows-fully-separated-wpf.md)）。
+実装の言語もビルドも独立していて、片方の変更が他方を壊さないことが狙いです。
+
+**共有してよいのはリポジトリ直下の `spec/` だけ**です。
+
+| してよい | してはいけない |
+|---|---|
+| `spec/`（schemas / testdata / conformance）を両実装のテストで使う | 共通ライブラリ・共通ソースを新設する |
+| コメントに他方の実装パスを書く（移植の手がかり） | ビルド定義から他方のツリーを取り込む |
+| テストで `OperatingSystem.IsWindows()` のような環境ガードを使う | 本番コードに `#if os(Windows)` / `OSPlatform.OSX` を書く |
+
+このルールは CI の **`separation` ジョブ**（`scripts/check_platform_separation.sh`）が
+機械検査します。違反するとマージできません。
+
+```bash
+# 手元で確かめる
+bash scripts/check_platform_separation.sh
+```
+
 ## ライセンス
 
 このプロジェクトへの貢献は [MIT License](./LICENSE) の下で公開されることに

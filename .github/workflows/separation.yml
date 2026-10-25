@@ -1,0 +1,31 @@
+# プラットフォーム分離の検査（#105 / ADR-006）
+#
+# 「macOS 側と Windows 側のコードが独立していること」を PR ごとに機械検査する。
+# 検査の中身は scripts/check_platform_separation.sh（テキスト検査のみ・数秒で終わる）。
+#
+# 検査する混入:
+#   - 言語の混在（apps/macos に C#、apps/windows に Swift）
+#   - ビルド定義の相互参照（apps/windows の csproj が ../macos を参照 等）
+#   - 条件コンパイル（apps/macos/Sources の #if os(Windows)、apps/windows/src の OSPlatform.OSX）
+#   - spec/ 以外の共有ディレクトリの新設
+#   - CI ワークフローのトリガの交差（macos-ci が apps/windows を拾う 等）
+#
+# どの変更でも走らせる（安いので paths フィルタをしない）。
+name: Separation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  separation:
+    name: separation (platform independence)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check platform separation
+        run: bash scripts/check_platform_separation.sh

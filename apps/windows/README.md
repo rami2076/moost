@@ -86,7 +86,7 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 - フレームワーク依存（`--self-contained` なし）にすると数 MB になるが、
   **.NET デスクトップランタイムの導入が前提**になるため採用しない
 
-## 現在の状態（#100 時点）
+## 現在の状態（#99 時点）
 
 | conformance | 項目 | 状態 |
 |---|---|---|
@@ -94,19 +94,21 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 | B | memos.json（エンベロープ・寛容読み・可変/不変・parseTags・日付） | ✅ |
 | C | settings.json（項目別フォールバック・ENUM 化しない・自動起動を保存しない） | ✅ |
 | D | projects.json（エンベロープ・displayName の導出） | ✅ |
-| E | 直近セッション一覧・表題 | ☐ #99 |
-| F | 表題フォールバック / ai-title | ☐ #99 |
+| E | 直近セッション一覧（history 集約・フォーク除外・limit） | ✅ |
+| F | 表題フォールバック（runes 50）/ ai-title 末尾 64KB | ✅ |
 | G | 復帰コマンドとシェル escape | ✅ |
+| H | プラットフォーム受け入れ（既知のハマりどころの踏襲） | ☐ #103 |
 
 - [x] ソリューション（`.slnx`）・3 プロジェクト・CI ゲート（`windows-ci.yml`）
 - [x] spec への配線（conformance の項目数と Fixture の到達性をテスト）
 - [x] **Moost.Core の永続層とモデル（A〜D）**
 - [x] **復帰コマンドと PowerShell escape（G）**
+- [x] **一覧・表題（E・F）**：claude / codex の history 集約、rollout からの cwd、ai-title の末尾走査
 - [x] 単一 exe での publish 経路を実機で検証（上記）
-- [ ] 一覧・表題（#99）、readers・要約（#101）
+- [ ] pi / hermes の readers・パス検出・要約（#101）
 - [ ] トレイ常駐・画面（#102 / #103）
 
-テストは `dotnet test` で **92 件**。
+テストは `dotnet test` で **129 件**。
 
 ### Windows 固有の解釈
 

@@ -5,5 +5,12 @@
         起動時はウィンドウを出さない（トレイ常駐のみ・design.md 6 章）。
         StartupUri を置かず、App.OnStartup でトレイを初期化する。
     -->
-    <Application.Resources />
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- デザイン定数（色・3 つのフォントサイズ）は 1 か所に集約する -->
+                <ResourceDictionary Source="Themes/AppTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
 </Application>

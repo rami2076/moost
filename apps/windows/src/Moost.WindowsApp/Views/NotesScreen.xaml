@@ -1,0 +1,36 @@
+<UserControl x:Class="Moost.WindowsApp.Views.NotesScreen"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 注意画面（design.md 6.1 の notes） -->
+    <Grid Background="{StaticResource ChromeBrush}" Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel>
+            <Button Content="← 戻る" Style="{StaticResource AppFooterButton}" DockPanel.Dock="Left" Click="OnBack" />
+            <TextBlock Text="注意" Style="{StaticResource AppTitleText}" HorizontalAlignment="Center" />
+        </DockPanel>
+
+        <ScrollViewer Grid.Row="1" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="ターミナル操作" Style="{StaticResource AppBodyText}" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource AppCaptionText}" TextWrapping="Wrap" Margin="0,2,0,10"
+                           Text="「ターミナルで開く」は Windows Terminal（無ければ PowerShell）を新しいウィンドウで起動し、復帰コマンドを実行します。" />
+
+                <TextBlock Text="セッションの保持期間" Style="{StaticResource AppBodyText}" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource AppCaptionText}" TextWrapping="Wrap" Margin="0,2,0,10"
+                           Text="セッションは各エージェントの設定（Claude Code は cleanupPeriodDays・既定 30 日）で自動削除されます。メモを登録していても、期限切れのセッションには復帰できない場合があります。" />
+
+                <TextBlock Text="要約について" Style="{StaticResource AppBodyText}" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource AppCaptionText}" TextWrapping="Wrap" Margin="0,2,0,10"
+                           Text="claude / codex の要約は利用枠（API）を消費します（モデルは haiku 固定）。pi / hermes はローカル抽出のため消費しません。要約は保存されないので、残したい要点はメモに書き移してください。" />
+
+                <TextBlock Text="一覧の更新タイミング" Style="{StaticResource AppBodyText}" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource AppCaptionText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                           Text="ポップオーバーを開いたとき・タブを切り替えたときに自動で再読込します（手動リロードは不要）。開きっぱなしの間は更新されません。" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

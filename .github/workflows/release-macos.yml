@@ -1,21 +1,21 @@
-# タグ push で起動するリリース自動化（RELEASE.md 3.2 / プラットフォーム規約）。
-# Swift 版（apps/macos）のみをビルドする。Flutter 版は ADR-005 で廃止済み、
-# Linux / Windows はフェーズ D（#73）でプラットフォームジョブを追加する。
+# macOS のリリース自動化（RELEASE.md 3.2 / プラットフォーム規約・#106）。
+# **macOS のタグ（v<semver>-macos）だけで起動する**。Windows のリリースは
+# release-windows.yml が別に担う（トリガが交差しない）。
 #
 # タグ規約: v<semver>-<platform>（例: v2.0.0-macos）。
-#   - `-macos` / `-linux` / `-windows` は正式リリース（prerelease にしない）
+#   - プラットフォーム記号付きタグは正式リリース（prerelease にしない）
 #   - `-rc*` 等の prerelease タグは GitHub 上 prerelease として扱う
 #
 # 使い方:
 #   1. CHANGELOG の [Unreleased] を [x.y.z] - YYYY-MM-DD に確定
 #   2. apps/macos/Sources/MoostApp/AppInfo.swift の version を上げてコミット
 #      （PR → マージ）
-#   3. git tag v<x.y.z>-<platform> && git push origin v<x.y.z>-<platform>
-name: Release
+#   3. git tag v<x.y.z>-macos && git push origin v<x.y.z>-macos
+name: Release macOS
 
 on:
   push:
-    tags: ['v*']
+    tags: ['v*-macos']
 
 permissions:
   contents: write
@@ -27,6 +27,16 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      # 二重のガード: トリガのタグ接頭辞が間違っていても、ここで止まる
+      - name: Guard platform
+        shell: bash
+        run: |
+          PLATFORM="${GITHUB_REF_NAME##*-}"
+          if [ "$PLATFORM" != "macos" ]; then
+            echo "このワークフローは macOS 専用です（tag=$GITHUB_REF_NAME）" >&2
+            exit 1
+          fi
 
       - name: Extract version parts from tag
         run: |

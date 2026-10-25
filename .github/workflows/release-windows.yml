@@ -1,0 +1,213 @@
+# Windows のリリース自動化（#106 / RELEASE.md 7 章）。
+# **Windows のタグ（v<semver>-windows）だけで起動する**。macOS のリリースは
+# release-macos.yml が別に担う（トリガが交差しない）。
+#
+# 成果物: Moost-<semver>-windows.zip（自己完結の単一 exe + README + LICENSE）
+# 配布: GitHub Releases → winget（便利さ）／zip（即時性）
+#
+# 使い方:
+#   1. CHANGELOG に Windows の節を用意する（#107 でプラットフォーム別ヘッダへ移行）
+#   2. git tag v<x.y.z>-windows && git push origin v<x.y.z>-windows
+#
+# 初回の winget 提出だけは手動（wingetcreate new で manifest を作る）。
+# 2 回目以降はこのワークフローが wingetcreate update で PR を自動作成する。
+name: Release Windows
+
+on:
+  push:
+    tags: ['v*-windows']
+
+permissions:
+  contents: write
+
+jobs:
+  # === Windows: 自己完結の単一 exe をビルドして zip にする ===
+  build-windows:
+    name: Build Windows (zip)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 二重のガード: トリガのタグ接頭辞が間違っていても、ここで止まる
+      - name: Guard platform
+        shell: bash
+        run: |
+          PLATFORM="${GITHUB_REF_NAME##*-}"
+          if [ "$PLATFORM" != "windows" ]; then
+            echo "このワークフローは Windows 専用です（tag=$GITHUB_REF_NAME）" >&2
+            exit 1
+          fi
+
+      - name: Extract version parts from tag
+        shell: bash
+        run: |
+          # タグ: v1.0.3-windows → VERSION=1.0.3-windows / SEMVER=1.0.3
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          SEMVER="${VERSION%-*}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SEMVER=$SEMVER" >> "$GITHUB_ENV"
+          echo "tag=$TAG version=$VERSION semver=$SEMVER"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+        working-directory: apps/windows
+
+      - name: Publish (self-contained single file)
+        shell: pwsh
+        working-directory: apps/windows
+        run: |
+          # IncludeNativeLibrariesForSelfExtract が無いと WPF のネイティブ DLL
+          # （wpfgfx_cor3.dll 等 5 本）が exe の隣に残り、単一 exe にならない。
+          # DebugType=none で pdb を配布物から外す。
+          dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
+            -c Release -r win-x64 --self-contained `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=none `
+            -p:Version=$env:SEMVER `
+            -o dist
+
+      - name: Package zip
+        shell: pwsh
+        working-directory: apps/windows
+        run: |
+          Copy-Item README.md dist/README.md
+          Copy-Item ../../LICENSE dist/LICENSE
+          Compress-Archive -Path dist/* -DestinationPath "Moost-$env:SEMVER-windows.zip" -Force
+          $hash = (Get-FileHash "Moost-$env:SEMVER-windows.zip" -Algorithm SHA256).Hash.ToLower()
+          "ZIP_PATH=Moost-$env:SEMVER-windows.zip" >> $env:GITHUB_ENV
+          "ZIP_SHA=$hash" >> $env:GITHUB_ENV
+          Get-ChildItem dist
+          Write-Output "sha256=$hash"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moost-windows
+          path: apps/windows/Moost-*-windows.zip
+          if-no-files-found: error
+
+  # === リリース作成（zip を添付）===
+  release:
+    name: Create GitHub Release (Windows)
+    needs: [build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: moost-windows
+          path: dist/windows
+
+      - name: Collect artifacts and hashes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SEMVER="${VERSION%-*}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "SEMVER=$SEMVER" >> "$GITHUB_ENV"
+          ZIP=$(ls dist/windows/Moost-*-windows.zip)
+          echo "ZIP_PATH=$ZIP" >> "$GITHUB_ENV"
+          echo "ZIP_SHA=$(sha256sum "$ZIP" | awk '{print $1}')" >> "$GITHUB_ENV"
+          ls -l dist/windows
+
+      # CHANGELOG から該当節を抜き出す（macOS 側と同じ方式・バージョンは SEMVER）
+      - name: Extract changelog section
+        run: |
+          awk -v ver="$SEMVER" '
+            index($0, "## [" ver "]") == 1 {flag=1; next}
+            index($0, "## [") == 1 {flag=0}
+            flag' CHANGELOG.md > RELEASE_NOTES.md
+          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
+            echo "(CHANGELOG に $SEMVER の節がありません)" > RELEASE_NOTES.md
+          fi
+
+      - name: Append install commands
+        run: |
+          cat >> RELEASE_NOTES.md << EOF
+
+          ## インストール（Windows）
+
+          winget を使う場合（推奨・SmartScreen の警告なし）:
+
+          \`\`\`powershell
+          winget install --id rami2076.Moost -e
+          \`\`\`
+
+          更新:
+
+          \`\`\`powershell
+          winget upgrade --id rami2076.Moost -e
+          \`\`\`
+
+          zip から入れる場合（gh / curl 経由は Mark-of-the-Web が付かないため警告なし）:
+
+          \`\`\`powershell
+          gh release download $GITHUB_REF_NAME -R ${{ github.repository }} -p '*.zip' -O \$env:TEMP\Moost.zip
+          Expand-Archive \$env:TEMP\Moost.zip -DestinationPath "\$env:LOCALAPPDATA\Programs\Moost" -Force
+          \`\`\`
+
+          ブラウザでダウンロードした場合は SmartScreen の警告が出ます。
+          「詳細情報」→「実行」で起動できます。
+
+          インストール後に MCP サーバーを登録する場合:
+
+          \`\`\`powershell
+          moost mcp
+          \`\`\`
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # プラットフォーム記号付きタグは正式リリース。prerelease は -rc 系のみ
+          PRERELEASE_FLAG=""
+          case "$GITHUB_REF_NAME" in
+            *-rc*|*-beta*|*-alpha*) PRERELEASE_FLAG="--prerelease" ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" \
+            "$ZIP_PATH" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            $PRERELEASE_FLAG
+
+  # === winget の manifest を更新する（初回提出後・トークンがあるときだけ）===
+  # winget-pkgs への PR は検証に数時間〜数日かかるため、リリース自体は待たせない
+  # （continue-on-error で失敗しても Release は残る）。zip が即時性を担保する。
+  winget:
+    name: Update winget manifest (optional)
+    needs: [release]
+    if: ${{ secrets.WINGET_TOKEN != '' }}
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Extract semver
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "SEMVER=${VERSION%-*}" >> "$GITHUB_ENV"
+
+      - name: Download wingetcreate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo microsoft/winget-create --pattern 'wingetcreate.exe' --dir tools
+          Get-ChildItem tools
+
+      - name: Update manifest and open PR
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Moost-$env:SEMVER-windows.zip"
+          .\tools\wingetcreate.exe update rami2076.Moost `
+            --version $env:SEMVER `
+            --urls $url `
+            --submit `
+            --token $env:WINGET_TOKEN

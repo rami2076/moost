@@ -69,7 +69,13 @@ Fixture `history.jsonl` に対する期待（excludeMarker = `#MOOST-FORK#`）:
 | ID | 項目 | 期待 |
 |----|------|------|
 | G1 | シェル escape | title・projectPath に バックス / `$` / `;` / `\|` / `&&` / リダイレクトを含んでも、復帰コマンドで注入が作動しない（正: `shell_escape.dart` の既存テスト） |
-| G2 | パターン | `cd <project> && <agent> --resume <sessionId>`（agent は claude / codex） |
+| G2 | パターン | 「復帰先ディレクトリへ移動 → `<agent> --resume <sessionId>` を実行」の形。表記は各プラットフォームのシェルに従う（POSIX: `cd '<project>' && <agent> --resume '<id>'` / Windows PowerShell: `Set-Location -LiteralPath '<project>'; <agent> --resume '<id>'`）。agent は claude / codex（pi / hermes は各実装の拡張） |
+
+補足:
+
+- Windows は `&&` が PowerShell 7 以降にしか無いため、既定の Windows PowerShell 5.1 でも動く `;` を使う
+- Windows は `cd`（= `Set-Location -Path`）が `[` `]` `*` をワイルドカードとして解釈するため、`-LiteralPath` を使う
+- `;` は前段の失敗で止めないため、cd に失敗しても端末でコマンド自体は走る（端末が開くことを優先する）
 
 ## H. プラットフォーム受け入れ（Fixture 対象外・native 側で検査）
 

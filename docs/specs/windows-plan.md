@@ -169,15 +169,22 @@ sequenceDiagram
   U->>VM: 「ターミナルで再開」
   VM->>LG: buildResume(agent, projectPath, sessionId)
   LG->>LG: PowerShell 方式でエスケープ<br/>（'...' の内側の ' は '' に）
-  LG-->>VM: cd '<project>' && claude --resume '<id>'
+  LG-->>VM: Set-Location -LiteralPath '<project>'; claude --resume '<id>'
   VM->>CB: コピー（コピー操作時）
   VM->>WT: wt.exe で新規ウィンドウを開きコマンドを実行
-  WT->>WT: PowerShell を起動して cd → --resume
+  WT->>WT: PowerShell を起動して Set-Location → --resume
   Note over LG,WT: Windows Terminal が無ければ PowerShell 単体へフォールバック
 ```
 
 危険文字（`$` `;` `|` `&&` `>` バッククォート `'` `\` 空白）を含むパスでも
 コマンドが壊れず、注入も成立しないことをテストで担保する（conformance G1）。
+
+Windows 固有の判断:
+
+- `&&` は PowerShell 7 以降にしか無いため、既定の Windows PowerShell 5.1 でも動く **`;`** を使う
+- `cd`（= `Set-Location -Path`）は `[` `]` `*` をワイルドカードとして解釈するため、**`-LiteralPath`** を使う
+- 生成するコマンド文字列には**二重引用符を使わない**（`wt.exe` へ引数として渡すときの二重エスケープを避ける）
+- Claude Code の内部環境変数除去は `env -u ...` の代わりに `Get-ChildItem Env:CLAUDE_*, ... | Remove-Item`
 
 ---
 

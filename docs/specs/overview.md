@@ -2,13 +2,13 @@
 
 - **リポジトリ**: [rami2076/moost](https://github.com/rami2076/moost)（Public / MIT License）
 - **最新バージョン**: v1.10.0（2026-08-15）
-- **対応 OS**: macOS（Windows/Linux は未対応、design.md 参照）
+- **対応 OS**: macOS（v2.x・実装済み）／Windows（v1.x・フェーズ D で開発中）／Linux（保留）
 
 ## 一言でいうと
 
 Memo + Roost（鳥の巣）＝ Moost。Claude Code / Codex CLI のセッションに
 メモを付けて記録し、ワンクリックでそのセッションへ復帰できる、
-システムトレイ常駐の macOS デスクトップアプリ。
+システムトレイ常駐のデスクトップアプリ（macOS / Windows）。
 
 ## 解決したい課題
 

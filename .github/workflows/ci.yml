@@ -68,6 +68,15 @@ jobs:
         run: flutter test
         working-directory: apps/desktop
 
+  docs:
+    name: docs (release checklist consistency)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # リリースのたびに更新する資料が実装とズレていないか（#107）
+      - name: Check release docs
+        run: bash scripts/check_release_docs.sh
+
   osv-scan:
     name: osv-scanner (lockfiles)
     runs-on: ubuntu-latest

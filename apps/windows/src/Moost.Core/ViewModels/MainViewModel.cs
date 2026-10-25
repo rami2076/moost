@@ -26,7 +26,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SettingsStore settingsStore,
         TerminalLauncher launcher,
         Action<string>? copyToClipboard = null,
-        Func<DateTime>? now = null)
+        Func<DateTime>? now = null,
+        AutoStartService? autoStart = null,
+        string appVersion = "")
     {
         _sources = sources;
         _memos = memos;
@@ -35,8 +37,43 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _launcher = launcher;
         _copyToClipboard = copyToClipboard ?? (_ => { });
         _now = now ?? (() => DateTime.UtcNow);
+        _autoStart = autoStart;
+        AppVersion = appVersion;
         Settings = settingsStore.Load();
+        RefreshAutoStart();
     }
+
+    private readonly AutoStartService? _autoStart;
+
+    /// <summary>設定画面に表示するアプリのバージョン（ビルド時にタグから注入される）。</summary>
+    public string AppVersion { get; }
+
+    /// <summary>要約の結果（永続化しない・ADR-002）。</summary>
+    public string SummaryText { get; private set; } = string.Empty;
+
+    /// <summary>選択中のセッション（メモフォームの初期値に使う）。</summary>
+    public RecentSession? SelectedSession { get; set; }
+
+    /// <summary>メモフォームの入力値。</summary>
+    public string MemoTitle { get; set; } = string.Empty;
+
+    public string MemoTags { get; set; } = string.Empty;
+
+    public string MemoBody { get; set; } = string.Empty;
+
+    /// <summary>登録プロジェクトの入力値。</summary>
+    public string NewProjectPath { get; set; } = string.Empty;
+
+    /// <summary>ログイン時自動起動の実状態（OS のレジストリを正とする・C4）。</summary>
+    public bool AutoStartEnabled { get; private set; }
+
+    /// <summary>注意画面の文言（requirements 3.5・3.6）。</summary>
+    public const string NoticeText =
+        "・要約は AI の利用枠（API）を消費します。モデルは haiku 固定です。\n" +
+        "・要約は保存されません（アプリを終了すると消えます）。残したい要点はメモに書き移してください。\n" +
+        "・セッションは Claude Code の cleanupPeriodDays（既定 30 日）で自動削除されます。" +
+        "期限切れのセッションには復帰できません。\n" +
+        "・エージェント側のデータには書き込みません（読み取り専用）。";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -236,6 +273,112 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         StatusMessage = message;
         Notify(nameof(StatusMessage));
+    }
+
+    /// <summary>セッションを選んでメモフォームの初期値を埋める（ADR-003 の自己完結捕捉）。</summary>
+    public void SelectSessionForMemo(RecentSession session)
+    {
+        SelectedSession = session;
+        MemoTitle = session.DisplayTitle;
+        MemoTags = string.Empty;
+        MemoBody = string.Empty;
+        Notify(nameof(SelectedSession));
+        Notify(nameof(MemoTitle));
+        Notify(nameof(MemoTags));
+        Notify(nameof(MemoBody));
+    }
+
+    /// <summary>フォームの内容でメモを登録する（セッション未選択なら null）。</summary>
+    public Memo? SaveMemoFromForm()
+    {
+        if (SelectedSession is not { } session)
+        {
+            SetStatus("先にセッションを選んでください。");
+            return null;
+        }
+
+        return CreateMemoFromSession(session, MemoTitle, MemoTags, MemoBody);
+    }
+
+    /// <summary>入力されたパスを登録プロジェクトに追加する（空ならエラー表示）。</summary>
+    public bool AddProjectFromInput()
+    {
+        if (string.IsNullOrWhiteSpace(NewProjectPath))
+        {
+            SetStatus("パスを入力してください。");
+            return false;
+        }
+
+        AddProject(NewProjectPath.Trim());
+        NewProjectPath = string.Empty;
+        Notify(nameof(NewProjectPath));
+        return true;
+    }
+
+    /// <summary>自動起動の実状態を読み直す（画面表示のたび）。</summary>
+    public void RefreshAutoStart()
+    {
+        // レジストリは Windows 専用（他 OS では常に false）
+        AutoStartEnabled = OperatingSystem.IsWindows() && (_autoStart?.IsEnabled() ?? false);
+        Notify(nameof(AutoStartEnabled));
+    }
+
+    /// <summary>自動起動を切り替える（OS の実状態を書き換える・C4）。</summary>
+    public bool SetAutoStart(bool enabled, string executablePath)
+    {
+        if (_autoStart is null || !OperatingSystem.IsWindows())
+        {
+            SetStatus("自動起動はこの環境では利用できません。");
+            return false;
+        }
+
+        try
+        {
+            if (enabled)
+            {
+                _autoStart.Enable(executablePath);
+            }
+            else
+            {
+                _autoStart.Disable();
+            }
+
+            RefreshAutoStart();
+            SetStatus(enabled ? "自動起動を有効にしました。" : "自動起動を解除しました。");
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or UnauthorizedAccessException)
+        {
+            SetStatus($"自動起動を変更できませんでした: {exception.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>選択中セッションの要約を実行して保持する（永続化しない・ADR-002）。</summary>
+    public async Task<bool> SummarizeSelectedAsync(
+        SummaryScope scope,
+        int rallies = 1,
+        SessionSummarizer? summarizer = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (SelectedSession is not { } session)
+        {
+            SetStatus("先にセッションを選んでください。");
+            return false;
+        }
+
+        try
+        {
+            SummaryText = await SummarizeAsync(session, scope, rallies, summarizer, cancellationToken)
+                .ConfigureAwait(false);
+            Notify(nameof(SummaryText));
+            return true;
+        }
+        catch (SummarizeException)
+        {
+            // ステータスに理由を出しているのでここでは握りつぶす（UI を止めない）
+            return false;
+        }
     }
 
     private void Notify([CallerMemberName] string? propertyName = null) =>

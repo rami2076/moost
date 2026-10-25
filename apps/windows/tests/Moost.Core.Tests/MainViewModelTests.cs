@@ -223,4 +223,90 @@ public class MainViewModelTests
         };
         return viewModel.ResumeCommandFor(sessionLike);
     }
+
+    [Fact]
+    public void SelectSessionForMemo_FillsTitleFromDisplayTitle()
+    {
+        using var dir = new TempDir();
+        var (viewModel, _, _) = Create(dir);
+        var session = viewModel.Sessions[0];
+
+        viewModel.SelectSessionForMemo(session);
+
+        Assert.Same(session, viewModel.SelectedSession);
+        Assert.Equal(session.DisplayTitle, viewModel.MemoTitle);
+        Assert.Equal(string.Empty, viewModel.MemoTags);
+        Assert.Equal(string.Empty, viewModel.MemoBody);
+    }
+
+    [Fact]
+    public void SaveMemoFromForm_RequiresASelectedSession()
+    {
+        using var dir = new TempDir();
+        var (viewModel, _, _) = Create(dir);
+
+        Assert.Null(viewModel.SaveMemoFromForm());
+        Assert.Contains("セッションを選んで", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveMemoFromForm_UsesTheFormValues()
+    {
+        using var dir = new TempDir();
+        var (viewModel, _, _) = Create(dir);
+        viewModel.SelectSessionForMemo(viewModel.Sessions[0]);
+        viewModel.MemoTitle = "フォームの表題";
+        viewModel.MemoTags = "a, b";
+        viewModel.MemoBody = "フォームの本文";
+
+        var memo = viewModel.SaveMemoFromForm();
+
+        Assert.NotNull(memo);
+        Assert.Equal("フォームの表題", memo!.Title);
+        Assert.Equal(["a", "b"], memo.Tags);
+        Assert.Equal("フォームの本文", memo.Body);
+        Assert.Equal("S1", memo.SessionId);
+    }
+
+    [Fact]
+    public void AddProjectFromInput_TrimsAndClearsTheInput()
+    {
+        using var dir = new TempDir();
+        var (viewModel, _, _) = Create(dir);
+        viewModel.NewProjectPath = @"  C:\work\trimmed  ";
+
+        Assert.True(viewModel.AddProjectFromInput());
+        Assert.Equal(string.Empty, viewModel.NewProjectPath);
+        Assert.Equal("trimmed", viewModel.Projects[0].DisplayName);
+    }
+
+    [Fact]
+    public void AddProjectFromInput_RejectsEmptyInput()
+    {
+        using var dir = new TempDir();
+        var (viewModel, _, _) = Create(dir);
+        viewModel.NewProjectPath = "   ";
+
+        Assert.False(viewModel.AddProjectFromInput());
+        Assert.Empty(viewModel.Projects);
+    }
+
+    [Fact]
+    public void AutoStart_IsUnavailableWithoutTheService()
+    {
+        using var dir = new TempDir();
+        var (viewModel, _, _) = Create(dir);
+
+        Assert.False(viewModel.AutoStartEnabled);
+        Assert.False(viewModel.SetAutoStart(true, @"C:\Moost\Moost.exe"));
+        Assert.Contains("利用できません", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoticeText_CoversExpiryAndReadOnly()
+    {
+        Assert.Contains("cleanupPeriodDays", MainViewModel.NoticeText, StringComparison.Ordinal);
+        Assert.Contains("読み取り専用", MainViewModel.NoticeText, StringComparison.Ordinal);
+        Assert.Contains("保存されません", MainViewModel.NoticeText, StringComparison.Ordinal);
+    }
 }

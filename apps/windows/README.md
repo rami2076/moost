@@ -112,7 +112,11 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
   - 要約結果は**永続化しない**メモリキャッシュのみ（ADR-002）
 - [x] 単一 exe での publish 経路を実機で検証（上記）
 - [x] **トレイ常駐とポップオーバー（#102）**：NotifyIcon + 枠なしウィンドウ（タスクバー非表示・Topmost・フォーカス喪失で隠す）
-- [ ] 画面一式と復帰起動（#103）
+- [x] **復帰起動・自動起動の土台（#103 前半）**
+  - `TerminalLauncher`（`wt.exe` → `powershell.exe` フォールバック・`-NoExit`）
+  - `AutoStartService`（`HKCU\...\Run` の実状態を正とする・引用符で囲んで登録）
+  - `MainViewModel`（UI 非依存。一覧・メモ・プロジェクト・設定・復帰・要約の操作）
+- [ ] **画面の XAML（#103 後半）**：一覧 / メモフォーム / 詳細 / 設定 / 注意の View を ViewModel に接続
 
 テストは `dotnet test` で **183 件**。
 

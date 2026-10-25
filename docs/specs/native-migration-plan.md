@@ -298,7 +298,7 @@ Dart 特有の対策（design.md 8 章）はスタックごとに洗い直し、
 | **データ・プラットフォーム** | | | | |
 | データ契約（memos / settings / projects、schemaVersion 1） | ✅ | ✅ 継承 | ✅ | ― |
 | 保存先 `~/.moost/v2/`（初回起動時に v1 からマイグレーション） | ❔ | 🚧 | ✅（移行不要） | ― |
-| MCP サーバー（読取り専用・4 ツール） | ✅ apps/mcp_server | ✅ 内蔵 `moost mcp` | 🚧 | ― |
+| MCP サーバー（読取り専用・4 ツール） | ✅ apps/mcp_server | ✅ 内蔵 `moost mcp` | ✅ 内蔵 `moost mcp` | ― |
 | 更新通知（リダイレクト方式・方式 7） | ✅ v1.10（GitHub Releases API） | ✅ v2.1.0（リダイレクト方式） | 🚧 | ― |
 | アプリ内更新ボタン（フッター・brew 更新/修復・design.md 6.8） | ✅ v1.10 | ✅ v2.1.0 | 🚧 | ― |
 | インストール破損検知と修復（`*.upgrading` / 実行ファイル欠落） | ✅ v1.6.0〜 | ✅ v2.1.0（brew 管理下のみ） | 🚧 | ― |

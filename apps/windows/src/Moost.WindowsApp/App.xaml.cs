@@ -19,6 +19,15 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // サブコマンド: moost mcp（stdio JSON-RPC・アプリ内蔵 MCP サーバー・#104）
+        if (e.Args.Any(argument => string.Equals(argument, "mcp", StringComparison.OrdinalIgnoreCase)))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            new McpServer(serverVersion: AppInfo.Version).Run(new StdioMcpChannel());
+            Shutdown(0);
+            return;
+        }
+
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var viewModel = new MainViewModel(

@@ -117,8 +117,10 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
   - `AutoStartService`（`HKCU\...\Run` の実状態を正とする・引用符で囲んで登録）
   - `MainViewModel`（UI 非依存。一覧・メモ・プロジェクト・設定・復帰・要約の操作）
 - [x] **画面一式（#103 後半）**：セッション一覧 / メモ（登録・編集・削除）/ プロジェクト / 詳細（要約）/ 設定 / 注意 の 6 画面を ViewModel に接続
+- [x] **`moost mcp`（#104）**：stdio JSON-RPC 2.0 の読取り専用 4 ツール（一覧 / メモ / 登録プロジェクト / 復帰コマンド）。アプリ内蔵で Node 前提なし
+- [x] **更新チェック（#108）**：方式 7（リダイレクト）・Windows タグのみ・5 分間引き・失敗は沈黙。winget 管理下なら更新コマンドをコピー、手動ならリリースページを開く
 
-テストは `dotnet test` で **245 件**。
+テストは `dotnet test` で **257 件**。
 
 ### サブプロセス実行の注意（Windows）
 

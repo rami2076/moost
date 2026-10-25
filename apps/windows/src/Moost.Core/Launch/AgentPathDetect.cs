@@ -40,11 +40,17 @@ public static class AgentPathDetect
         var appData = userProfile is null
             ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
             : Path.Combine(home, "AppData", "Roaming");
+        var localAppData = userProfile is null
+            ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            : Path.Combine(home, "AppData", "Local");
 
         return
         [
             Path.Combine(home, ".local", "bin", command + ".exe"),
             Path.Combine(appData, "npm", command + ".cmd"),
+            // Volta 経由の導入（実機で pi がここに入ることを確認）
+            Path.Combine(localAppData, "Volta", "bin", command + ".exe"),
+            Path.Combine(localAppData, "Volta", "bin", command + ".cmd"),
             Path.Combine(home, ".local", "bin", command),
         ];
     }

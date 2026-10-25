@@ -36,6 +36,17 @@ public class AgentPathDetectTests
     }
 
     [Fact]
+    public void FindsVoltaInstalledCommand()
+    {
+        // Volta 経由の導入（実機で pi が %LOCALAPPDATA%\Volta\bin に入る）
+        using var dir = new TempDir();
+        var expected = CreateFile(Path.Combine(dir.Path, "AppData", "Local", "Volta", "bin", "pi.exe"));
+
+        Assert.Equal(expected, AgentPathDetect.Pi(userProfile: dir.Path));
+        Assert.False(AgentPathDetect.RequiresCommandShell(expected));
+    }
+
+    [Fact]
     public void NativeExe_DoesNotNeedCommandShell()
     {
         Assert.False(AgentPathDetect.RequiresCommandShell(@"C:\Users\u\.local\bin\claude.exe"));

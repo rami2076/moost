@@ -12,14 +12,16 @@ Moost の要求・要件・設計・移行計画の**正**はこのディレク�
 | [requirements.md](./requirements.md) | 要求・要件（機能一覧・データ契約） |
 | [design.md](./design.md) | 画面設計・アーキテクチャ判断・既知のハマりどころ |
 | [native-migration-plan.md](./native-migration-plan.md) | Flutter → native 移行計画・フェーズ別ロードマップ・**Windows 版（フェーズ D）の計画** |
-| [adr/](./adr/) | Architecture Decision Records（ADR-001〜005） |
+| [windows-plan.md](./windows-plan.md) | **Windows 版の全体構成図・データフロー・リリースフロー（フェーズ D の束ね資料）** |
+| [adr/](./adr/) | Architecture Decision Records（ADR-001〜006） |
 | [RELEASE.md](../../RELEASE.md) | バージョニング・リリース手順（CI・タグ規約・cask） |
 
 ## プラットフォーム別の実装状況
 
 - **macOS native**: 実装済み（`apps/macos/`、v2.0.0〜）
-- **Windows**: フェーズ D（未実装）。計画は
-  [native-migration-plan.md](./native-migration-plan.md) の 7.3・詳細版 A を参照
+- **Windows**: フェーズ D **進行中**（2026-10-25 着手・C#/.NET 10 + WPF・コード共有なし）。
+  決定は [ADR-006](./adr/006-windows-fully-separated-wpf.md)、全体構成は
+  [windows-plan.md](./windows-plan.md)、タスクは EPIC #110 を参照
 - **Linux**: 保留（フェーズ D の後）
 
 ## 更新ルール

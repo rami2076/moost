@@ -13,11 +13,23 @@
     <!-- 成果物名は Moost.exe（winget の PortableCommandAlias: moost と揃える） -->
     <AssemblyName>Moost</AssemblyName>
     <RootNamespace>Moost.WindowsApp</RootNamespace>
+
+    <!-- exe のアイコン（トレイと同じ素材） -->
+    <ApplicationIcon>Assets\moost.ico</ApplicationIcon>
+
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Moost.Core\Moost.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      トレイアイコンは埋め込みリソースにする。単一 exe 配布でも欠けないようにするため
+      （Content にして exe の隣に置くと、publish の単一ファイル化で欠ける）。
+    -->
+    <Resource Include="Assets\moost.ico" />
   </ItemGroup>
 
   <ItemGroup>

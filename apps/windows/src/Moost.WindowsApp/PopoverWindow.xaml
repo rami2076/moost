@@ -1,0 +1,25 @@
+<Window x:Class="Moost.WindowsApp.PopoverWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Moost"
+        Width="570" Height="660"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        Background="White">
+    <!--
+        ポップオーバー相当のウィンドウ（macOS の NSPopover の写像・#102）。
+        枠なし・移動/リサイズ不可・タスクバーに出さない・最前面。
+        表示位置は TrayService がトレイの上側（右下寄せ）に決める。
+
+        画面の中身（一覧 / メモ / 詳細 / 設定 / 注意）は #103 で実装する。
+    -->
+    <Grid>
+        <TextBlock Text="Moost"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="#FF444444" />
+    </Grid>
+</Window>

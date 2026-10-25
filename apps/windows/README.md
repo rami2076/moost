@@ -111,7 +111,8 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
   - 要約: `claude -p`（haiku 固定）と `codex exec --ephemeral`。pi / hermes はローカル抽出をそのまま返す（API 消費ゼロ）
   - 要約結果は**永続化しない**メモリキャッシュのみ（ADR-002）
 - [x] 単一 exe での publish 経路を実機で検証（上記）
-- [ ] トレイ常駐・画面（#102 / #103）
+- [x] **トレイ常駐とポップオーバー（#102）**：NotifyIcon + 枠なしウィンドウ（タスクバー非表示・Topmost・フォーカス喪失で隠す）
+- [ ] 画面一式と復帰起動（#103）
 
 テストは `dotnet test` で **183 件**。
 
@@ -132,6 +133,15 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
 依存は `Directory.Packages.props` の 1 か所で管理し、`packages.lock.json` をコミットする（CI は `--locked-mode`）。
 
 ### Windows 固有の解釈
+
+- **ポップオーバーの位置は macOS と上下が逆**。macOS はメニューバーが上端なので「アイコンの直下」だが、
+  Windows はタスクトレイが**下端（右下）**なので「作業領域の右下に寄せてトレイの上側」に出す
+  （`Moost.Core.Layout.PopoverLayout`。純粋関数なのでテストできる）
+- トレイアイコンは **埋め込みリソース**（`Assets\moost.ico`・16/24/32/48 の 4 サイズ）。
+  Content にすると単一 exe 配布で欠けるため
+- 座標変換: WinForms の作業領域・カーソルは**物理ピクセル**、WPF の `Left/Top` は **DIP**。
+  `VisualTreeHelper.GetDpi` のスケールで割ってから計算する（マルチ DPI 環境の完全対応は #103 で詰める）
+- 起動時はウィンドウを出さずトレイのみ（`ShutdownMode.OnExplicitShutdown`・トレイメニューの「終了」で終わる）
 
 - `Project.DisplayName` は区切りを `/` と `\` の両方で扱う（リファレンス実装は POSIX 前提で `/` のみ）。
   データ契約の期待値は「最後のディレクトリ名」であり、区切りの種類に依存しない

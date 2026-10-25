@@ -64,13 +64,21 @@ public class AgentPathDetectTests
     }
 
     [Fact]
-    public void OverrideExpandsTilde()
+    public void OverrideExpandsEnvironmentVariables()
     {
         using var dir = new TempDir();
-        var expected = CreateFile(Path.Combine(dir.Path, ".local", "bin", "pi.exe"));
+        var expected = CreateFile(Path.Combine(dir.Path, "pi.exe"));
 
-        // ~ は実ユーザーのホームに展開されるため、ここでは実在するパスを直接渡す
-        Assert.Equal(expected, AgentPathDetect.Pi(expected, dir.Path));
+        var variable = "MOOST_TEST_BIN_" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable(variable, dir.Path);
+        try
+        {
+            Assert.Equal(expected, AgentPathDetect.Pi($"%{variable}%\\pi.exe", dir.Path));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, null);
+        }
     }
 
     [Fact]
@@ -81,17 +89,29 @@ public class AgentPathDetectTests
             return;
         }
 
-        // どのプロファイルにも無い状態でも、PATH 上にあるコマンドは where.exe で見つかる
-        using var dir = new TempDir();
-        var detected = AgentPathDetect.Claude(userProfile: dir.Path);
+        // エージェント CLI の有無に依存しないよう、必ず存在するコマンドで PATH 解決を検証する
+        // （CI ランナナーには claude が無いため、claude で検証すると環境依存になる）
+        var detected = AgentPathDetect.FromPath("powershell");
 
         Assert.NotNull(detected);
         Assert.True(File.Exists(detected));
     }
 
     [Fact]
-    public void ReturnsNull_ForUnknownCommand()
+    public void FromPath_ReturnsNull_ForUnknownCommand()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Assert.Null(AgentPathDetect.FromPath("moost-definitely-not-a-command"));
+    }
+
+    [Fact]
+    public void AgentDetection_ReturnsNull_WhenNothingIsFound()
+    {
+        // どのプロファイルにも無く、PATH 上にも無いエージェントは null（未インストール扱い）
         using var dir = new TempDir();
         Assert.Null(AgentPathDetect.Hermes(userProfile: dir.Path));
     }

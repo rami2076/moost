@@ -49,6 +49,12 @@ public static class AgentPathDetect
         ];
     }
 
+    /// <summary>
+    /// PATH からの解決（<c>where.exe</c>）。エージェント名に依らず使えるため、
+    /// テストと #101 後半（要約用のコマンド解決）から直接使う。
+    /// </summary>
+    public static string? FromPath(string command) => WhereViaWhereExe(command);
+
     private static string? Detect(string overridePath, string command, IEnumerable<string> knownPaths)
     {
         if (!string.IsNullOrEmpty(overridePath))

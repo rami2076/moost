@@ -1,0 +1,10 @@
+<Application x:Class="Moost.WindowsApp.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <!--
+        スキャフォールド時点ではプレースホルダのウィンドウを出す。
+        トレイ常駐（起動時はウィンドウを出さない・NotifyIcon・ポップオーバー）は #102 で実装する。
+    -->
+    <Application.Resources />
+</Application>

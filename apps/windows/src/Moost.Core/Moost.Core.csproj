@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ロジック層（UI 非依存）。macOS の apps/macos/Sources/MoostCore に対応する。
+    WPF / WinForms を参照しない（依存方向は UI → Core → OS の一方通行）。
+    バージョン指定は Directory.Packages.props（中央管理）に集約する。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Moost.Core</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

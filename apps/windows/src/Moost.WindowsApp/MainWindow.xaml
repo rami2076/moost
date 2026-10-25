@@ -1,0 +1,15 @@
+<Window x:Class="Moost.WindowsApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Moost" Height="660" Width="570"
+        WindowStartupLocation="CenterScreen">
+    <!--
+        プレースホルダ。実際の画面（一覧 / メモ / 詳細 / 設定 / 注意）と
+        ポップオーバー相当のウィンドウ設定は #102・#103 で実装する。
+    -->
+    <Grid>
+        <TextBlock Text="Moost (scaffold)"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+    </Grid>
+</Window>

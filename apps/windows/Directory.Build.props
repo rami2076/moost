@@ -1,0 +1,26 @@
+<Project>
+
+  <!--
+    apps/windows 配下の全プロジェクトに共通の設定。
+    macOS 側（apps/macos/Package.swift）とは独立しており、共有する設定はない。
+    共有するのはリポジトリ直下の spec/（データ契約・Fixture・conformance）のみ。
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- バージョンはタグから CI が注入する（-p:Version=x.y.z）。ここには書かない＝二重管理しない -->
+    <VersionPrefix>0.0.0</VersionPrefix>
+
+    <!-- 供給網: NuGet は中央管理（Directory.Packages.props）+ lock ファイルをコミットして固定する -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+  </PropertyGroup>
+
+</Project>

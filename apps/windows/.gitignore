@@ -1,0 +1,11 @@
+# .NET / Visual Studio
+bin/
+obj/
+.vs/
+TestResults/
+*.binlog
+*.user
+*.suo
+
+# NuGet の lock ファイル（packages.lock.json）は**コミットする**ので無視しない。
+# 依存を固定して供給網を守るため（Directory.Build.props の RestorePackagesWithLockFile）。

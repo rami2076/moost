@@ -49,17 +49,43 @@ Gatekeeper 警告なしで起動できる）。
 > **初回起動時の注意**: 当面 ad-hoc 署名のため Gatekeeper の警告が出る。
 > Finder で `Moost.app` を右クリック →「開く」を選ぶと以後は起動できる。
 
-### Linux / Windows
+### Windows
 
-フェーズ D（#73）で native 対応予定（Linux は `v2.0.0-linux`、Windows は
-`v2.0.0-windows` として配布予定）。それまでは macOS のみ。
+Windows は **native 実装（C#/.NET 10 + WPF）** をフェーズ D で開発中です（EPIC #110）。
+リリース後は次の手順で導入できます。
+
+```powershell
+# winget（推奨・SmartScreen の警告なし）
+winget install --id rami2076.Moost -e
+
+# 更新
+winget upgrade --id rami2076.Moost -e
+```
+
+```powershell
+# zip から入れる場合（gh / curl 経由は Mark-of-the-Web が付かないため警告なし）
+gh release download <tag> -R rami2076/moost -p '*.zip' -O $env:TEMP\Moost.zip
+Expand-Archive $env:TEMP\Moost.zip -DestinationPath "$env:LOCALAPPDATA\Programs\Moost" -Force
+```
+
+> ブラウザでダウンロードした場合は SmartScreen の警告が出ます（「詳細情報」→「実行」）。
+> データは `%USERPROFILE%\.moost\v2\` に保存され、アンインストールしてもメモは残ります。
+
+### Linux
+
+保留（実装予定なし）。
 
 ## 構成
 
 ```
 apps/macos/      Swift/AppKit native アプリ（MoostCore + MoostApp・MCP 内蔵）
+apps/windows/    C#/.NET 10 + WPF native アプリ（フェーズ D・開発中）
 packages/core/   リファレンス実装（pure Dart・UI 非依存）
+spec/            製品契約の正本（JSON Schema・共通 Fixture・conformance）
 ```
+
+macOS と Windows は**コードを共有しない**（[ADR-006](docs/specs/adr/006-windows-fully-separated-wpf.md)）。
+共有するのは `spec/` だけです。
 
 ## 開発
 

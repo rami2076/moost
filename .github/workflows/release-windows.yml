@@ -118,16 +118,31 @@ jobs:
           echo "ZIP_SHA=$(sha256sum "$ZIP" | awk '{print $1}')" >> "$GITHUB_ENV"
           ls -l dist/windows
 
-      # CHANGELOG から該当節を抜き出す（macOS 側と同じ方式・バージョンは SEMVER）
+      # CHANGELOG から該当節を抜き出す（プラットフォーム別ヘッダ・#107）
       - name: Extract changelog section
         run: |
           awk -v ver="$SEMVER" '
-            index($0, "## [" ver "]") == 1 {flag=1; next}
-            index($0, "## [") == 1 {flag=0}
+            index($0, "## Windows " ver) == 1 {flag=1; next}
+            index($0, "## ") == 1 {flag=0}
             flag' CHANGELOG.md > RELEASE_NOTES.md
           if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
-            echo "(CHANGELOG に $SEMVER の節がありません)" > RELEASE_NOTES.md
+            echo "CHANGELOG に「## Windows $SEMVER」の節がありません。リリースを中止します（#107）。" >&2
+            exit 1
           fi
+
+      # 機能対応状況表（native-migration-plan.md 7.3）をリリースノートに転記する
+      - name: Append feature support matrix
+        run: |
+          {
+            echo ""
+            echo "## 機能対応状況"
+            echo ""
+            awk '
+              /^### 7\.3 / { flag = 1; next }
+              flag && /^### / { exit }
+              flag && /^\|/ { print }
+            ' docs/specs/native-migration-plan.md
+          } >> RELEASE_NOTES.md
 
       - name: Append install commands
         run: |

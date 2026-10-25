@@ -149,14 +149,31 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
 - OSS として広く配るなら Developer ID 署名 + notarization（Apple Developer Program、有料）が必要。
   これは public 化のタイミングで判断する（フェーズ 3 課題）
 
-## 5. チェックリスト（リリース時）
+## 5. リリース前チェックリスト（プラットフォーム別）
 
-- [ ] CHANGELOG が確定している（Unreleased が空になった）
-- [ ] `AppInfo.version` がタグの semver と一致している
-- [ ] `swift build && swift test`（apps/macos）が通っている
+リリースするプラットフォームの行だけを確認する（他方のプラットフォームは触らない）。
+
+### 共通
+
+- [ ] CHANGELOG の対象プラットフォームの節を `Unreleased` → `<semver> - YYYY-MM-DD` に確定した
+- [ ] 版番号をコードに二重管理していない（タグから CI が注入する）
+- [ ] `bash scripts/check_release_docs.sh` が通る
 - [ ] schemaVersion を変えた場合: マイグレーション実装 + テストがあり、MAJOR を上げている
 - [ ] クリーン環境で最小動線（一覧 → メモ登録 → 復帰）を確認した
-- [ ] 設定画面のバージョン表示が `x.y.z-platform` になっている
+
+### macOS
+
+- [ ] `AppInfo.version` がタグの semver と一致している
+- [ ] `swift build && swift test`（apps/macos）が通っている
+- [ ] 設定画面のバージョン表示が `x.y.z-macos` になっている
+
+### Windows
+
+- [ ] `dotnet restore --locked-mode && dotnet build -c Release && dotnet test -c Release`（apps/windows）が通っている
+- [ ] `v<x.y.z>-windows` タグで **Windows のワークフローだけ**が走る（macOS は起動しない）
+- [ ] Release に `Moost-<semver>-windows.zip` が添付されている
+- [ ] 設定画面のバージョン表示が `x.y.z`（接尾辞なし）になっている
+- [ ] winget に初回提出済み（2 回目以降は自動 PR）
 
 ## 6. リリースフローのトラブルシューティング（練習リリースで発見）
 
@@ -185,7 +202,6 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
   CI のヘッダ（bin/cache/artifacts/engine/linux-*/flutter_linux/）で存在確認する
 
 ### 失敗 3: rc2 の「Extract changelog section」が失敗（awk: unterminated regexp）
-
 - 原因 A: スラッシュ形式の正規表現リテラル `/^## \\[/` が、シェルクォートを経由した
   `\\` により `\\[` と解釈され「文字クラスが閉じていない」エラーになった
 - 原因 B: `VERSION=1.11.0-rc2` のまま `## [1.11.0-rc2]` を検索しており、CHANGELOG の
@@ -196,3 +212,70 @@ gh api repos/rami2076/homebrew-tap/keys       # read_only: false の鍵がある
   awk のバックスラッシュはクォート×実装（mawk は文字列 RE 中の `\\` を
   2 文字として扱い invalid regexp になる）の合わせ技で壊れやすいため、
   **照合は `index()` で行う方が確実**
+
+## 7. Windows のリリース手順（フェーズ D）
+
+Windows は**独立したバージョン系列**（自系列 `v1.0.0` 起点）を持ち、リリースも独立している。
+macOS の手順（3 章）とは混ぜない。
+
+### 7.1 タグと成果物
+
+| 項目 | 値 |
+|---|---|
+| タグ | `v<x.y.z>-windows`（例: `v1.0.3-windows`） |
+| ワークフロー | `.github/workflows/release-windows.yml`（**このタグだけで起動**） |
+| 成果物 | `Moost-<semver>-windows.zip`（自己完結の単一 `Moost.exe` + README + LICENSE） |
+| 版番号の注入 | `dotnet publish -p:Version=<semver>`（コードに `<Version>` を書かない） |
+| winget の PackageVersion | `-windows` を落とした `<semver>`（winget は接尾辞を受け付けない） |
+
+### 7.2 手順
+
+1. `CHANGELOG.md` の `## Windows Unreleased` を `## Windows <x.y.z> - YYYY-MM-DD` に確定する
+2. PR を作成してマージする（`bash scripts/check_release_docs.sh` が通ること）
+3. タグを打つ
+
+```bash
+git tag v<x.y.z>-windows
+git push origin v<x.y.z>-windows
+```
+
+4. `release-windows` ワークフローが自動で実行される
+   - `dotnet publish` → 単一 exe → zip → GitHub Release 作成（winget / zip の手順を自動追記）
+   - 機能対応状況表（`native-migration-plan.md` 7.3）がリリースノートに自動転記される
+5. 完了後、`release-windows.yml` の `winget` ジョブが manifest の更新 PR を作る
+   （`WINGET_TOKEN` があるときのみ・失敗しても Release は残る）
+
+> **初回だけ手動**: winget-pkgs にパッケージが無い状態では `wingetcreate update` は動かない。
+> 初回は `wingetcreate new` で manifest を作って PR を出す（2 回目以降が自動化の対象）。
+
+### 7.3 winget の manifest（初回提出の内容）
+
+```yaml
+PackageIdentifier: rami2076.Moost
+PackageVersion: <semver>            # -windows を付けない
+InstallerType: zip
+NestedInstallerType: portable        # winget 1.6 以降
+NestedInstallerFiles:
+  - RelativeFilePath: Moost.exe
+    PortableCommandAlias: moost      # moost mcp を PATH から使えるようにする
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/rami2076/moost/releases/download/v<semver>-windows/Moost-<semver>-windows.zip
+    InstallerSha256: <zip の sha256>
+```
+
+### 7.4 ロールバック
+
+| 事象 | 対応 |
+|---|---|
+| ビルドが壊れている | GitHub Release を削除し、修正後に **同じ系列の PATCH** を上げ直す（macOS の版番号は動かさない） |
+| winget の manifest が誤っている | winget-pkgs の当該 PR を取り下げる／revert PR を出す。Release の zip はそのまま使える |
+| 配布 zip だけ差し替えたい | Release のアセットを削除して再アップロードし、**sha256 を winget manifest と一致**させる |
+| データ契約を壊した | schemaVersion を上げたかを確認し、各プラットフォームの MAJOR を上げる |
+
+### 7.5 必要なシークレット
+
+| 名前 | 用途 | 必須か |
+|---|---|---|
+| `WINGET_TOKEN` | winget-pkgs への PR 作成（fine-grained PAT） | 任意（無い場合は winget ジョブをスキップ） |
+| `TAP_DEPLOY_KEY` | macOS の Homebrew tap bump（既存） | macOS のみ |

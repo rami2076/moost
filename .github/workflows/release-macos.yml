@@ -111,14 +111,29 @@ jobs:
       - name: Extract changelog section
         run: |
           V="$(echo "$VERSION" | cut -d- -f1)"
-          echo "VERSION=$VERSION (changelog 検索用: $V)"
+          echo "VERSION=$VERSION (changelog 検索用: macOS $V)"
           awk -v ver="$V" '
-            index($0, "## [" ver "]") == 1 {flag=1; next}
-            index($0, "## [") == 1 {flag=0}
+            index($0, "## macOS " ver) == 1 {flag=1; next}
+            index($0, "## ") == 1 {flag=0}
             flag' CHANGELOG.md > RELEASE_NOTES.md
           if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
-            echo "(CHANGELOG に $V の節がありません)" > RELEASE_NOTES.md
+            echo "CHANGELOG に「## macOS $V」の節がありません。リリースを中止します（#107）。" >&2
+            exit 1
           fi
+
+      # 機能対応状況表（native-migration-plan.md 7.3）をリリースノートに転記する
+      - name: Append feature support matrix
+        run: |
+          {
+            echo ""
+            echo "## 機能対応状況"
+            echo ""
+            awk '
+              /^### 7\.3 / { flag = 1; next }
+              flag && /^### / { exit }
+              flag && /^\|/ { print }
+            ' docs/specs/native-migration-plan.md
+          } >> RELEASE_NOTES.md
 
       - name: Append install commands
         run: |

@@ -10,16 +10,131 @@
         WindowStartupLocation="Manual"
         Background="White">
     <!--
-        ポップオーバー相当のウィンドウ（macOS の NSPopover の写像・#102）。
+        ポップオーバー相当のウィンドウ（macOS の NSPopover の写像・#102 / #103）。
         枠なし・移動/リサイズ不可・タスクバーに出さない・最前面。
         表示位置は TrayService がトレイの上側（右下寄せ）に決める。
-
-        画面の中身（一覧 / メモ / 詳細 / 設定 / 注意）は #103 で実装する。
     -->
-    <Grid>
-        <TextBlock Text="Moost"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Foreground="#FF444444" />
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0">
+            <TextBlock Text="Moost" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Left" />
+            <TextBlock x:Name="VersionText" FontSize="11" Foreground="#FF777777"
+                       HorizontalAlignment="Right" DockPanel.Dock="Right" />
+        </DockPanel>
+
+        <TabControl Grid.Row="1" Margin="0,10,0,0" SelectionChanged="OnTabChanged">
+
+            <!-- 直近セッション一覧 -->
+            <TabItem Header="セッション">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ListBox x:Name="SessionList" DisplayMemberPath="DisplayTitle"
+                             SelectionChanged="OnSessionSelected" />
+                    <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                        <Button Content="コピー" Padding="10,4" Margin="0,0,6,0" Click="OnCopyResume" />
+                        <Button Content="ターミナルで開く" Padding="10,4" Margin="0,0,6,0" Click="OnLaunchResume" />
+                        <Button Content="メモを作る" Padding="10,4" Click="OnMemoFromSession" />
+                    </WrapPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- メモ一覧 + 登録・編集 -->
+            <TabItem Header="メモ">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ListBox x:Name="MemoList" DisplayMemberPath="Title" SelectionChanged="OnMemoSelected" />
+
+                    <StackPanel Grid.Row="1" Margin="0,8,0,0">
+                        <TextBox x:Name="MemoTitleBox" Margin="0,0,0,4" />
+                        <TextBox x:Name="MemoTagsBox" Margin="0,0,0,4" />
+                        <TextBox x:Name="MemoBodyBox" Height="70" AcceptsReturn="True"
+                                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                    </StackPanel>
+
+                    <WrapPanel Grid.Row="2" Margin="0,8,0,0">
+                        <Button Content="登録 / 更新" Padding="10,4" Margin="0,0,6,0" Click="OnSaveMemo" />
+                        <Button Content="削除" Padding="10,4" Click="OnDeleteMemo" />
+                    </WrapPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- 登録プロジェクト -->
+            <TabItem Header="プロジェクト">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ListBox x:Name="ProjectList" DisplayMemberPath="DisplayName" />
+                    <DockPanel Grid.Row="1" Margin="0,8,0,0">
+                        <Button Content="登録" Padding="10,4" DockPanel.Dock="Right" Click="OnAddProject" />
+                        <TextBox x:Name="ProjectPathBox" Margin="0,0,6,0" />
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- セッション詳細（要約） -->
+            <TabItem Header="詳細">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="DetailTitle" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                        <Button Content="直近を要約" Padding="10,4" Margin="0,0,6,0" Click="OnSummarizeRecent" />
+                        <Button Content="全体を要約" Padding="10,4" Click="OnSummarizeFull" />
+                    </WrapPanel>
+                    <TextBox x:Name="SummaryBox" Grid.Row="2" Margin="0,8,0,0" IsReadOnly="True"
+                             AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                </Grid>
+            </TabItem>
+
+            <!-- 設定 -->
+            <TabItem Header="設定">
+                <StackPanel>
+                    <TextBlock Text="復帰先ターミナル（例: wt.exe / powershell.exe）" />
+                    <TextBox x:Name="TerminalAppBox" Margin="0,2,0,8" />
+
+                    <TextBlock Text="直近セッションの表示件数（5〜100）" />
+                    <TextBox x:Name="LimitBox" Margin="0,2,0,8" />
+
+                    <TextBlock Text="claude コマンドのパス（空なら自動検出・要約専用）" />
+                    <TextBox x:Name="ClaudePathBox" Margin="0,2,0,8" />
+
+                    <TextBlock Text="要約のラリー数（1〜20）" />
+                    <TextBox x:Name="RallyBox" Margin="0,2,0,8" />
+
+                    <CheckBox x:Name="CopyAnimationBox" Content="コピー成功のアニメーション" Margin="0,0,0,8" />
+                    <CheckBox x:Name="AutoStartBox" Content="ログイン時に自動起動" Margin="0,0,0,8" />
+
+                    <Button Content="保存" Padding="10,4" HorizontalAlignment="Left" Click="OnSaveSettings" />
+                </StackPanel>
+            </TabItem>
+
+            <!-- 注意 -->
+            <TabItem Header="注意">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock x:Name="NoticeBlock" TextWrapping="Wrap" LineHeight="20" />
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock x:Name="StatusText" Grid.Row="2" Margin="0,10,0,0"
+                   Foreground="#FF555555" TextWrapping="Wrap" />
     </Grid>
 </Window>

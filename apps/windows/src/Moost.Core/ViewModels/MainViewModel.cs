@@ -28,7 +28,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Action<string>? copyToClipboard = null,
         Func<DateTime>? now = null,
         AutoStartService? autoStart = null,
-        string appVersion = "")
+        string appVersion = "",
+        UpdateChecker? updateChecker = null,
+        string? processPath = null,
+        Action<string>? openUrl = null)
     {
         _sources = sources;
         _memos = memos;
@@ -38,12 +41,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _copyToClipboard = copyToClipboard ?? (_ => { });
         _now = now ?? (() => DateTime.UtcNow);
         _autoStart = autoStart;
+        _updateChecker = updateChecker;
+        _openUrl = openUrl ?? (_ => { });
+        _processPath = processPath ?? Environment.ProcessPath;
         AppVersion = appVersion;
         Settings = settingsStore.Load();
         RefreshAutoStart();
     }
 
     private readonly AutoStartService? _autoStart;
+    private readonly UpdateChecker? _updateChecker;
+    private readonly Action<string> _openUrl;
+    private readonly string? _processPath;
+    private string? _availableUpdateUrl;
+
+    /// <summary>フッターの更新通知（空なら表示しない・方式 7）。</summary>
+    public string UpdateText { get; private set; } = string.Empty;
+
+    /// <summary>更新導線のコマンド（winget 管理下のときのみ。null ならリリースページを開く）。</summary>
+    public string? AvailableUpdateCommand { get; private set; }
 
     /// <summary>設定画面に表示するアプリのバージョン（ビルド時にタグから注入される）。</summary>
     public string AppVersion { get; }
@@ -273,6 +289,56 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         StatusMessage = message;
         Notify(nameof(StatusMessage));
+    }
+
+    /// <summary>
+    /// 更新を確認する（方式 7・失敗は沈默・5 分の間引き）。起動時とポップオーバー表示時に呼ぶ。
+    /// </summary>
+    public async Task CheckForUpdatesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_updateChecker is null)
+        {
+            return;
+        }
+
+        var update = await _updateChecker.CheckAsync(cancellationToken).ConfigureAwait(false);
+        if (update is null)
+        {
+            UpdateText = string.Empty;
+            AvailableUpdateCommand = null;
+            _availableUpdateUrl = null;
+        }
+        else
+        {
+            UpdateText = $"v{update.Semver} が利用可能です";
+            AvailableUpdateCommand = UpdateGuidance.CommandFor(_processPath);
+            _availableUpdateUrl = update.Url;
+        }
+
+        Notify(nameof(UpdateText));
+        Notify(nameof(AvailableUpdateCommand));
+    }
+
+    /// <summary>
+    /// 更新導線を実行する: winget 管理下ならコマンドをコピー、そうでなければリリースページを開く。
+    /// </summary>
+    public bool ApplyUpdateGuidance()
+    {
+        if (AvailableUpdateCommand is { } command)
+        {
+            _copyToClipboard(command);
+            SetStatus("更新コマンドをコピーしました。");
+            return true;
+        }
+
+        if (_availableUpdateUrl is { } url)
+        {
+            _openUrl(url);
+            SetStatus("リリースページを開きました。");
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>セッションを選んでメモフォームの初期値を埋める（ADR-003 の自己完結捕捉）。</summary>

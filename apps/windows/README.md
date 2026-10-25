@@ -118,7 +118,7 @@ dotnet publish src/Moost.WindowsApp/Moost.WindowsApp.csproj `
   - `MainViewModel`（UI 非依存。一覧・メモ・プロジェクト・設定・復帰・要約の操作）
 - [x] **画面一式（#103 後半）**：セッション一覧 / メモ（登録・編集・削除）/ プロジェクト / 詳細（要約）/ 設定 / 注意 の 6 画面を ViewModel に接続
 
-テストは `dotnet test` で **224 件**。
+テストは `dotnet test` で **245 件**。
 
 ### サブプロセス実行の注意（Windows）
 

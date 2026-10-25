@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    NuGet の中央パッケージ管理（CPM）。
+    バージョンはこのファイルだけに書き、各 csproj には Version を書かない。
+    依存追加時は「公開から 7 日を超えた安定版」を選ぶ（リポジトリの供給網ルール）。
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- テスト基盤（dotnet new xunit が生成したバージョンを固定） -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+  </ItemGroup>
+
+</Project>

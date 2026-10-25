@@ -1,0 +1,53 @@
+# Windows CI（フェーズ D）
+#
+# Windows ネイティブ実装の品質ゲート。macOS 側の CI（ci.yml / macos-ci.yml）とは独立しており、
+# 互いのツリーをトリガーに含めない。例外は spec/** で、これは製品契約の変更なので
+# 両実装に影響する（意図的な交差）。
+#
+# 分離の考え方（ADR-006・#105 で機械検査を追加する）:
+#   - 言語を混ぜない / 相互の相対参照をしない / 条件コンパイルを使わない
+#   - 共有するのはリポジトリ直下の spec/ のみ
+#
+# 依存は packages.lock.json で固定する（RestorePackagesWithLockFile / --locked-mode）。
+name: Windows CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/windows/**'
+      - 'spec/**'
+      - '.github/workflows/windows-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/windows/**'
+      - 'spec/**'
+      - '.github/workflows/windows-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: windows (build + test)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # .NET SDK はランナーにプリインストールされているが、global.json の
+      # 要求（10.0 系）を満たすことを明示するために setup-dotnet を使う。
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+        working-directory: apps/windows
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+        working-directory: apps/windows
+
+      - name: Test
+        run: dotnet test --no-build -c Release
+        working-directory: apps/windows

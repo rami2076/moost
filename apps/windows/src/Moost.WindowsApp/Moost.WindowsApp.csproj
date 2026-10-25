@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    デスクトップ UI（WPF）。macOS の apps/macos/Sources/MoostApp に対応する。
+    トレイ常駐は WinForms の NotifyIcon を interop で使う（追加 NuGet を避ける・ADR-006）。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!-- 成果物名は Moost.exe（winget の PortableCommandAlias: moost と揃える） -->
+    <AssemblyName>Moost</AssemblyName>
+    <RootNamespace>Moost.WindowsApp</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Moost.Core\Moost.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      WPF と WinForms を併用すると Application / MessageBox などが暗黙 using で衝突する。
+      WinForms の暗黙 using を外し、必要な箇所では using System.Windows.Forms; を明示する。
+    -->
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>

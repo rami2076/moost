@@ -18,7 +18,16 @@
 
 ### Added
 
-_なし_
+- **Zed 復帰先対応**: 復帰先ターミナルに Zed（zed.dev）を選択できるように
+  した（Issue #131）。設定の「復帰先ターミナル」に Zed を追加し、復帰は
+  Zed CLI（`/Applications/Zed.app/Contents/MacOS/cli` など）でプロジェクトの
+  ワークスペースウィンドウを開いたうえで、復帰コマンドをクリップボードへ
+  コピーし、トーストで「Zed で ⌃` を押してターミナルを開き ⌘V でペーストして
+  実行」と案内する。**コマンドの自動実行は行わない** — Zed には外部から
+  統合ターミナルへコマンドを渡す CLI / AppleScript 辞書 / ソケット API が
+  無く（zed-industries/zed Discussion #57026 で機能依頼が進行中）、キー注入は
+  Accessibility 権限が必要で脆いため、Issue の候補 (a) 相当が現状の上限。
+  Zed.app が見つからない場合はトーストでお知らせする。
 
 ## macOS 2.4.0 - 2026-10-23
 

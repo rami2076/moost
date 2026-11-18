@@ -22,8 +22,11 @@
   した（Issue #130）。設定の「復帰先ターミナル」に Herdr を追加し、復帰は
   `herdr-app do tab.new`（focus なし）で現在のスペースの新規タブとして
   復帰ターミナルを開く（ユーザーの前面タブは切り替えない）。Herdr.app が
-  未起動の場合は Moost が `open -a Herdr` で起動を代行し、ソケットが現れるまで
-  再試行する。ターミナル名は `moost:resume`。
+  未起動の場合は Moost が `open -a Herdr` で起動を代行し、起動を待ってから
+  再試行する（最大 8 秒、応答が進まない場合は早めに諦める）。ターミナル名は `moost:resume`。
+  herdr-app は `/Applications/Herdr.app/Contents/MacOS/Herdr` →
+  `~/.local/bin/herdr-app` → PATH の順で探す（`.app` 直バイナリが CLI として
+  動くことを実機検証済み・2026-11-19）。
 
 ## macOS 2.4.0 - 2026-10-23
 

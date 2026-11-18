@@ -446,6 +446,7 @@ final class LaunchTests: XCTestCase {
         herdrBinary: String?,
         workingDirectory: String? = nil,
         openSucceeds: Bool = true,
+        windowLaunchTimeout: TimeInterval? = nil,
         commandProbe: @escaping ([String]) -> (Int32, String, String)
     ) -> TerminalLauncher {
         TerminalLauncher(
@@ -456,7 +457,8 @@ final class LaunchTests: XCTestCase {
                 return commandProbe(command)
             },
             herdrBinaryProvider: { herdrBinary },
-            herdrWorkingDirectoryProvider: { workingDirectory ?? "/fallback/cwd" }
+            herdrWorkingDirectoryProvider: { workingDirectory ?? "/fallback/cwd" },
+            herdrWindowLaunchTimeout: windowLaunchTimeout
         )
     }
 
@@ -575,6 +577,67 @@ final class LaunchTests: XCTestCase {
         XCTAssertEqual(outcome, TerminalLaunchOutcome.background(terminal: "t10"))
         XCTAssertEqual(seen.count, 2, "open 後に do を再試行する")
         XCTAssertEqual(seen[0][1...2], ["do", "tab.new"])
+    }
+
+    func test_herdr_launch_stops_early_on_identical_retry_responses() throws {
+        // 未起動相当（exit 2 同一応答）が続く場合、deadline まで叩かず
+        // 同一応答 3 回連続で打ち切る（初回 1 + リトライ 3）。
+        // 失敗理由は最後のリトライ結果（reason 文が空にならない）。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    windowLaunchTimeout: 8) { _ in
+            probed += 1
+            return (2, "", "could not connect to socket")
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            XCTAssertTrue(error.message.contains("could not connect to socket"), error.message)
+        }
+        XCTAssertEqual(probed, 4, "同一応答 3 回連続で早期打ち切り（初回+リトライ3回）")
+    }
+
+    func test_herdr_launch_stops_early_on_empty_object_spawn_failure() throws {
+        // spawn 失敗が `{}` exit 0 で返るケース: open は走るが、同一応答の
+        // リトライを deadline（約32回）まで繰り返さず早期打ち切りする。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    windowLaunchTimeout: 8) { _ in
+            probed += 1
+            return (0, "{}", "")
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/nope' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            XCTAssertTrue(error.message.contains("Herdr"), error.message)
+            XCTAssertFalse(error.message.hasSuffix("（）"),
+                           "失敗理由が空になっていないこと: \(error.message)")
+        }
+        XCTAssertLessThan(probed, 10, "{} 固定応答で deadline まで叩かない: probed=\(probed)")
+        XCTAssertEqual(probed, 4)
+    }
+
+    func test_herdr_launch_retry_loop_is_cut_by_deadline() throws {
+        // timeout 注入の実使用確認: 応答が毎回変わる（同一応答打ち切り不发動）
+        // でも deadline で打ち切られる。0.6 秒 ⇒ 0.25 秒間隔ならリトライは
+        // 多くて 2 回（総 do 呼び出しは初回+2 以下）。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    windowLaunchTimeout: 0.6) { _ in
+            probed += 1
+            return (2, "", "socket wait \(probed)") // 毎回変わる = 連続同一応答にならない
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            // 最後のリトライ結果が理由に入ること（lastFailure が最終試行であること）。
+            XCTAssertTrue(error.message.contains("socket wait \(probed)"), error.message)
+        }
+        XCTAssertLessThanOrEqual(probed, 3, "deadline で打ち切られる: probed=\(probed)")
+        XCTAssertGreaterThanOrEqual(probed, 2)
     }
 
     func test_herdr_launch_does_not_open_app_on_spawn_error() throws {

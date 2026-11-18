@@ -226,10 +226,11 @@ public final class TerminalLauncher {
         }
         self.herdrBinaryProvider = herdrBinaryProvider ?? { TerminalLauncher.findHerdrAppBinary() }
         // herdr 復帰は復帰コマンドの cd から folder を取るため、cwd プロバイダは
-        // 通常使われない。既定は ProcessInfo（FileManager の cwd は swift test の
-        // バンドル実行で実行不能なパスを返すことがあり、使わない）。
+        // 通常使われない（cd が読めないコマンドだけのフォールバック経路）。
+        // 既定は FileManager の cwd（cwd 取得の意図に合わせる）。ProcessInfo の
+        // PWD は親から継いだ古い値になりうるため主経路にしない。
         self.herdrWorkingDirectoryProvider = herdrWorkingDirectoryProvider
-            ?? { ProcessInfo.processInfo.environment["PWD"] ?? "/" }
+            ?? { FileManager.default.currentDirectoryPath }
         self.herdrWindowLaunchTimeout = herdrWindowLaunchTimeout ?? 8
     }
 
@@ -461,6 +462,15 @@ public final class TerminalLauncher {
         let retryAfterOpen = first.exit != 1
         let opened: (exit: Int32, stdout: String, stderr: String) =
             retryAfterOpen ? runCommand(["/usr/bin/open", "-a", "Herdr"]) : (-1, "", "")
+        // 失敗理由は最後のリトライ結果を基準にする（最低でも初回結果なので空にはならない）。
+        var lastFailure = first
+        // 同一応答の連続で打ち切り: spawn 失敗は `{}` exit 0 のように open と
+        // 無関係な失敗もあり、そのままでは deadline まで約 32 回叩く
+        // （herdrWindowLaunchTimeout 8 秒 / 0.25 秒間隔）。3 回連続で同じ
+        // (exit, stdout, stderr) ならソケット待ちの進歩無しとみなして早期に
+        // 打ち切る（実機の未起動復帰は 1 秒以内に成功するため 3 回は余裕がある）。
+        var previousResponse: (exit: Int32, stdout: String, stderr: String)?
+        var identicalStreak = 0
         if opened.exit == 0 {
             let deadline = Date().addingTimeInterval(herdrWindowLaunchTimeout)
             while Date() < deadline {
@@ -469,10 +479,18 @@ public final class TerminalLauncher {
                 if case let .success(terminal) = Self.herdrDoResult(retry) {
                     return .background(terminal: terminal)
                 }
+                lastFailure = retry
+                if let previous = previousResponse, retry == previous {
+                    identicalStreak += 1
+                    if identicalStreak >= 2 { break } // 同一応答 3 回連続で打ち切り
+                } else {
+                    previousResponse = retry
+                    identicalStreak = 0
+                }
             }
         }
         // 最後の試行の理由をそのまま出す（未起動なら open の失敗理由も添える）。
-        var reason = Self.herdrFailureReason(stdout: first.stdout, stderr: first.stderr)
+        var reason = Self.herdrFailureReason(stdout: lastFailure.stdout, stderr: lastFailure.stderr)
         if opened.exit != 0 {
             let openReason = opened.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             if !openReason.isEmpty {

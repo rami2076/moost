@@ -42,6 +42,7 @@ struct SettingsScreen: View {
                         Text("Terminal.app").tag("Terminal.app")
                         Text("iTerm2").tag("iTerm2")
                         Text("Kitty").tag("kitty")
+                        Text("Zed").tag("zed")
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -289,6 +290,16 @@ struct NotesScreen: View {
                          + "Kitty を再起動してください（listen_on はリロードでは反映されません）:"
                          + "「allow_remote_control yes」と「listen_on unix:/tmp/moost-kitty.sock」"
                          + "（未設定でも新しいウィンドウで開きます。案内は初回のみ表示）。")
+                    note("Zed での復帰",
+                         "Zed を復帰先に選んだ場合、Moost は Zed でプロジェクトの"
+                         + "ワークスペースを開き、復帰コマンドをクリップボードにコピーします。"
+                         + "Zed 側で ⌃`（Control+バッククォート）を押して統合ターミナルを開き、"
+                         + "⌘V でペーストして実行してください（コマンドは自動実行されません）。"
+                         + "Zed は外部からターミナルへコマンドを渡す CLI / AppleScript を"
+                         + "持たないため、これが現在の自動化工線の上限です"
+                         + "（zed-industries/zed Discussion #57026 で機能依頼が進行中）。"
+                         + "Zed.app が見つからない場合はトーストでお知らせするので、"
+                         + "Zed をインストールするか他の復帰先へ切り替えてください。")
                     note("セッションの保持期間",
                          "セッションは Claude Code が cleanupPeriodDays（デフォルト 30 日）に"
                          + "基づいて保持します。メモを登録していても、期限切れのセッションには"

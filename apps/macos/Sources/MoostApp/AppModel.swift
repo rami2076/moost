@@ -477,14 +477,22 @@ final class AppModel: ObservableObject {
 
     /// 起動結果のトースト文言。Kitty は開き方（タブ/新規ウィンドウ）を明示し、
     /// タブにできなかった場合は allow_remote_control の案内を初回に添える。
+    /// Herdr は復帰タブが背面で開く（focus:false）ため、前面タブは変わらない
+    /// ことを伝える（Issue #130）。
     private static func toast(for outcome: TerminalLaunchOutcome, terminalApp: String) -> String {
+        if terminalApp == TerminalApp.herdr.rawValue,
+           case let .background(terminal) = outcome {
+            return "Herdr の新規タブ \(terminal) を開きました（現在のタブはそのままです）"
+        }
         guard terminalApp == TerminalApp.kitty.rawValue else {
             return "ターミナルを開きました"
         }
         switch outcome {
         case .tab:
             return "Kitty のタブを開きました"
-        case .window:
+        case .window, .background:
+            // .background は Herdr 専用の想定（上の herdr 分岐で先に返る）。
+            // 万一 Herdr 以外で .background が来た時も新規ウィンドウ扱いで案内する。
             if UserDefaults.standard.bool(forKey: kittyRemoteHintKey) {
                 return "Kitty を新しいウィンドウで開きました"
             }

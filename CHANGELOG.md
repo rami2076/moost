@@ -18,7 +18,12 @@
 
 ### Added
 
-_なし_
+- **Herdr 復帰先対応**: 復帰先ターミナルに Herdr（herdr.dev）を選択できるように
+  した（Issue #130）。設定の「復帰先ターミナル」に Herdr を追加し、復帰は
+  `herdr-app do tab.new`（focus なし）で現在のスペースの新規タブとして
+  復帰ターミナルを開く（ユーザーの前面タブは切り替えない）。Herdr.app が
+  未起動の場合は Moost が `open -a Herdr` で起動を代行し、ソケットが現れるまで
+  再試行する。ターミナル名は `moost:resume`。
 
 ## macOS 2.4.0 - 2026-10-23
 

@@ -447,9 +447,24 @@ final class LaunchTests: XCTestCase {
         workingDirectory: String? = nil,
         openSucceeds: Bool = true,
         windowLaunchTimeout: TimeInterval? = nil,
+        retryClock: ((TimeInterval) -> Void)? = nil,
         commandProbe: @escaping ([String]) -> (Int32, String, String)
     ) -> TerminalLauncher {
-        TerminalLauncher(
+        // retryClock は仮想時間クロック。渡すと sleep 時にクロックを進める
+        // （realtime に依存せず deadline を決定的にテストできる）。
+        var clock: TimeInterval = 0
+        let now: () -> TimeInterval = { clock }
+        let sleep: (TimeInterval) -> Void
+        if let retryClock {
+            sleep = { interval in
+                retryClock(interval)
+                clock += interval
+            }
+        } else {
+            sleep = { _ in }
+        }
+        _ = now
+        return TerminalLauncher(
             runCommand: { command in
                 if command.first == "/usr/bin/open" {
                     return openSucceeds ? (0, "", "") : (1, "", "Unable to find application")
@@ -458,7 +473,9 @@ final class LaunchTests: XCTestCase {
             },
             herdrBinaryProvider: { herdrBinary },
             herdrWorkingDirectoryProvider: { workingDirectory ?? "/fallback/cwd" },
-            herdrWindowLaunchTimeout: windowLaunchTimeout
+            herdrWindowLaunchTimeout: windowLaunchTimeout,
+            herdrRetrySleep: sleep,
+            herdrRetryNow: retryClock == nil ? nil : now
         )
     }
 
@@ -620,12 +637,17 @@ final class LaunchTests: XCTestCase {
     }
 
     func test_herdr_launch_retry_loop_is_cut_by_deadline() throws {
-        // timeout 注入の実使用確認: 応答が毎回変わる（同一応答打ち切り不发動）
-        // でも deadline で打ち切られる。0.6 秒 ⇒ 0.25 秒間隔ならリトライは
-        // 多くて 2 回（総 do 呼び出しは初回+2 以下）。
+        // 仮想時間クロック（retryNow / retrySleep 注入）で決定的に検証する。
+        // realtime 依存は禁止（GitHub Actions の macOS ランナーでは実行速度で
+        // 試行回数が揺れて flaky になった実績: 0.6 秒 deadline で probed 4 > 3）。
+        // - 応答は毎回変わる = 同一応答打ち切り（3 回）は発動しない。
+        // - 従って打ち切りは仮想 deadline だけで決まる:
+        //   timeout 1.0 秒 / 間隔 0.25 秒 ⇒ リトライは floor(1.0/0.25) = 4 回、
+        //   初回 do を合わせて probed は 5 で厳密に確定する。
         var probed = 0
         let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
-                                    windowLaunchTimeout: 0.6) { _ in
+                                    windowLaunchTimeout: 1.0,
+                                    retryClock: { _ in }) { _ in
             probed += 1
             return (2, "", "socket wait \(probed)") // 毎回変わる = 連続同一応答にならない
         }
@@ -636,8 +658,9 @@ final class LaunchTests: XCTestCase {
             // 最後のリトライ結果が理由に入ること（lastFailure が最終試行であること）。
             XCTAssertTrue(error.message.contains("socket wait \(probed)"), error.message)
         }
-        XCTAssertLessThanOrEqual(probed, 3, "deadline で打ち切られる: probed=\(probed)")
-        XCTAssertGreaterThanOrEqual(probed, 2)
+        let expectedRetries = Int(1.0 / TerminalLauncher.herdrRetryInterval) // = 4
+        XCTAssertEqual(probed, 1 + expectedRetries,
+                       "仮想 deadline で打ち切られる（初回+リトライ\(expectedRetries)回）: probed=\(probed)")
     }
 
     func test_herdr_launch_does_not_open_app_on_spawn_error() throws {

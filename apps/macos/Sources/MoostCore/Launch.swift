@@ -207,8 +207,12 @@ public final class TerminalLauncher {
     /// テストから差し替え可能（init の herdrWindowLaunchTimeout 引数）。
     public let herdrWindowLaunchTimeout: TimeInterval
 
-    /// open -a からの再試行間隔。
-    private static let herdrRetryIntervalMicroseconds: useconds_t = 250_000
+    /// open -a からの再試行間隔（秒）。既定 0.25 秒（ソケット生成は通常 1 秒以内）。
+    public static let herdrRetryInterval: TimeInterval = 0.25
+    /// 再試行ループの待機（テストから仮想時間へ差し替え可能）。
+    private let retrySleep: (TimeInterval) -> Void
+    /// 再試行ループの現在時刻（テストから仮想時間へ差し替え可能）。
+    private let retryNow: () -> TimeInterval
 
     public init(
         runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil,
@@ -216,7 +220,9 @@ public final class TerminalLauncher {
         socketCandidatesProvider: (() -> [String])? = nil,
         herdrBinaryProvider: (() -> String?)? = nil,
         herdrWorkingDirectoryProvider: (() -> String)? = nil,
-        herdrWindowLaunchTimeout: TimeInterval? = nil
+        herdrWindowLaunchTimeout: TimeInterval? = nil,
+        herdrRetrySleep: ((TimeInterval) -> Void)? = nil,
+        herdrRetryNow: (() -> TimeInterval)? = nil
     ) {
         // デフォルト引数のある execute は関数参照にできないためクロージャで包む。
         self.runCommand = runCommand ?? { TerminalLauncher.execute($0) }
@@ -232,6 +238,10 @@ public final class TerminalLauncher {
         self.herdrWorkingDirectoryProvider = herdrWorkingDirectoryProvider
             ?? { FileManager.default.currentDirectoryPath }
         self.herdrWindowLaunchTimeout = herdrWindowLaunchTimeout ?? 8
+        self.retrySleep = herdrRetrySleep ?? { interval in
+            usleep(useconds_t(interval * 1_000_000))
+        }
+        self.retryNow = herdrRetryNow ?? { Date().timeIntervalSince1970 }
     }
 
     @discardableResult
@@ -472,9 +482,10 @@ public final class TerminalLauncher {
         var previousResponse: (exit: Int32, stdout: String, stderr: String)?
         var identicalStreak = 0
         if opened.exit == 0 {
-            let deadline = Date().addingTimeInterval(herdrWindowLaunchTimeout)
-            while Date() < deadline {
-                usleep(Self.herdrRetryIntervalMicroseconds) // 0.25 秒間隔（ソケット生成は通常 1 秒以内）
+            // 仮想時間差し替え可能（retryNow / retrySleep）。本番は実時刻 + usleep。
+            let deadline = retryNow() + herdrWindowLaunchTimeout
+            while retryNow() < deadline {
+                retrySleep(Self.herdrRetryInterval) // 0.25 秒間隔（ソケット生成は通常 1 秒以内）
                 let retry = runCommand([app, "do", "tab.new", payload])
                 if case let .success(terminal) = Self.herdrDoResult(retry) {
                     return .background(terminal: terminal)

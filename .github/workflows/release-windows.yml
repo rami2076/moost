@@ -99,7 +99,22 @@ jobs:
     name: Create GitHub Release (Windows)
     needs: [build-windows]
     runs-on: ubuntu-latest
+    # job-level if で secrets コンテキストは使えない（#135）。判定をここに下ろし、
+    # output 経由で winget job に渡す。トークン値は比較せず in/n の判定のみ。
+    outputs:
+      has-winget-token: ${{ steps.check-token.outputs.has }}
     steps:
+      - id: check-token
+        shell: bash
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if [ -n "$WINGET_TOKEN" ]; then
+            echo 'has=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
@@ -200,7 +215,7 @@ jobs:
   winget:
     name: Update winget manifest (optional)
     needs: [release]
-    if: ${{ secrets.WINGET_TOKEN != '' }}
+    if: ${{ needs.release.outputs.has-winget-token == 'true' }}
     runs-on: windows-latest
     continue-on-error: true
     steps:

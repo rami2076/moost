@@ -17,6 +17,8 @@ struct SettingsScreen: View {
     @State private var mcpClaudeCodeConnected = false
     @State private var mcpCodexConnected = false
     @State private var mcpClaudeDesktopConnected = false
+    @State private var mcpHermesConnected = false
+    @State private var mcpZedConnected = false
     @State private var mcpBusy = false
     @State private var mcpBusyTarget: String?
     @State private var mcpMessage: String?
@@ -116,11 +118,14 @@ struct SettingsScreen: View {
 
                     divider()
 
-                    label("MCP 連携（Claude Code / Codex CLI / Claude Desktop へ登録）")
+                    label("MCP 連携（Claude Code / Codex CLI / Claude Desktop / Hermes / Zed へ登録）")
                     Text("実行中の MoostApp（\(mcpBinaryPath)）を mcp サブコマンド付きで")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     Text("各エージェントの MCP サーバーとして登録します")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Text("Zed の settings.json は JSONC コメント付きですが、登録時にコメントは保持されません（既存の設定キーは保持します）")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                     mcpTargetRow(
@@ -138,6 +143,16 @@ struct SettingsScreen: View {
                         connected: mcpClaudeDesktopConnected,
                         connect: { try mcpService.registerClaudeDesktop(binaryPath: mcpBinaryPath) },
                         disconnect: { try mcpService.unregisterClaudeDesktop() })
+                    mcpTargetRow(
+                        title: "Hermes",
+                        connected: mcpHermesConnected,
+                        connect: { try mcpService.registerHermes(binaryPath: mcpBinaryPath) },
+                        disconnect: { try mcpService.unregisterHermes() })
+                    mcpTargetRow(
+                        title: "Zed",
+                        connected: mcpZedConnected,
+                        connect: { try mcpService.registerZed(binaryPath: mcpBinaryPath) },
+                        disconnect: { try mcpService.unregisterZed() })
                     if let mcpMessage {
                         Text(mcpMessage)
                             .font(.system(size: 11))
@@ -217,15 +232,19 @@ struct SettingsScreen: View {
 
     private func refreshMcpState() {
         Task {
-            let values = await Task.detached(priority: .utility) { () -> (Bool, Bool, Bool) in
+            let values = await Task.detached(priority: .utility) { () -> (Bool, Bool, Bool, Bool, Bool) in
                 let service = McpSetupService()
                 return (service.isClaudeCodeConnected(),
                         service.isCodexConnected(),
-                        service.isClaudeDesktopConnected())
+                        service.isClaudeDesktopConnected(),
+                        service.isHermesConnected(),
+                        service.isZedConnected())
             }.value
             mcpClaudeCodeConnected = values.0
             mcpCodexConnected = values.1
             mcpClaudeDesktopConnected = values.2
+            mcpHermesConnected = values.3
+            mcpZedConnected = values.4
         }
     }
 

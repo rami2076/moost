@@ -18,7 +18,13 @@
 
 ### Added
 
-_なし_
+- MCP 自動登録の対象に **Hermes** と **Zed** を追加（#132）。設定画面の MCP 連携に
+  「Hermes」「Zed」のワンクリック登録/解除行が増える。Hermes は
+  `~/.hermes/config.yaml` の `mcp_servers.moost` を、Zed は
+  `~/.config/zed/settings.json` の `context_servers.moost` を、既存の他サーバー定義・
+  設定キーを保持したまま行単位／キー単位でマージする。Zed の settings.json は
+  JSONC（コメント可）だが、登録時の再シリアライズでコメントは保持されない
+  （既存のコメント行は失われる。設定キー・値自体は保持される）。
 
 ## macOS 2.4.0 - 2026-10-23
 

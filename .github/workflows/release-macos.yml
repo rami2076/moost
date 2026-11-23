@@ -45,9 +45,11 @@ jobs:
           VERSION="${TAG#v}"
           SEMVER="${VERSION%-*}"
           PLATFORM="${VERSION##*-}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "SEMVER=$SEMVER" >> "$GITHUB_ENV"
-          echo "PLATFORM=$PLATFORM" >> "$GITHUB_ENV"
+          {
+            echo "VERSION=$VERSION"
+            echo "SEMVER=$SEMVER"
+            echo "PLATFORM=$PLATFORM"
+          } >> "$GITHUB_ENV"
           echo "tag=$TAG version=$VERSION semver=$SEMVER platform=$PLATFORM"
 
       - name: Swift build (release)

@@ -3,8 +3,8 @@ import Foundation
 
 /// 復帰先ターミナル。settings.json の terminalApp に保存される文字列は
 /// Dart 実装と共通なので、値域も同じまま保つ
-/// （"Terminal.app" / "iTerm2" / "gnome-terminal" / "kitty" / "herdr"）。
-/// "kitty" と "herdr" は Dart 側が未知値として Terminal.app へフォールバックするため、
+/// （"Terminal.app" / "iTerm2" / "gnome-terminal" / "kitty" / "zed" / "herdr"）。
+/// "kitty" と "zed" と "herdr" は Dart 側が未知値として Terminal.app へフォールバックするため、
 /// Flutter 版で選ばれていても壊れない（native のみの拡張値）。
 /// リファレンス実装: packages/core/lib/src/terminal_launcher.dart
 public enum TerminalApp: String {
@@ -12,6 +12,10 @@ public enum TerminalApp: String {
     case iterm2 = "iTerm2"
     case gnomeTerminal = "gnome-terminal"
     case kitty = "kitty"
+    /// Zed（zed.dev）。エディタ同梱の統合ターミナルへ復帰コマンドを流す
+    /// 外部 CLI を持たないため、ワークスペースを開いてコマンドをクリップボードへ
+    /// 預ける導線になる（Issue #131。制約は zedLaunch 参照）。
+    case zed = "zed"
     /// Herdr（herdr.dev）。herdr-core（`hc`）がターミナルを実行し、
     /// デスクトップアプリ herdr-app が表示する構成（Issue #130）。
     case herdr = "herdr"
@@ -40,6 +44,12 @@ public enum TerminalLaunchOutcome: Equatable, Sendable {
     case tab
     /// 新しいウィンドウ（または新規インスタンス）として開いた。
     case window
+    /// Zed の復帰: ワークスペースウィンドウを開き、復帰コマンドを
+    /// クリップボードへコピーした（コマンド自体はユーザーが貼って実行する）。
+    /// Zed には外部から統合ターミナルへコマンドを流す CLI / AppleScript /
+    /// ソケット API が無いため、これが現状の最大自動化工線（Issue #131、
+    /// zedLaunch の方式選定を参照）。
+    case clipboard
     /// Herdr の復帰: herdr-app が現在のスペースの新規タブとして開いた
     /// （focus:false なので前面タブは切り替わらず背面で開く）。
     /// 作成された herdr ターミナル ID を添える（UI がトーストへ出す）。
@@ -196,6 +206,11 @@ public final class TerminalLauncher {
     public let runCommand: ([String]) -> (exit: Int32, stdout: String, stderr: String)
     private let kittenPathProvider: () -> String?
     private let socketCandidatesProvider: () -> [String]
+    private let zedBinaryProvider: () -> String?
+    /// クリップボードへの書き込み（テストから差し替え可能。既定は NSPasteboard）。
+    private let clipboardWriter: (String) -> Void
+    /// cd が読めないコマンドの Zed 起動先フォールバック（既定はFileManager の cwd）。
+    private let zedFallbackDirectoryProvider: () -> String
     private let herdrBinaryProvider: () -> String?
     /// herdr 復帰時に tab.new / terminal.open へ渡す作業ディレクトリ。
     /// テストから差し替え可能（実ファイルシステムに依存しない検証用）。
@@ -218,6 +233,9 @@ public final class TerminalLauncher {
         runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil,
         kittenPathProvider: (() -> String?)? = nil,
         socketCandidatesProvider: (() -> [String])? = nil,
+        zedBinaryProvider: (() -> String?)? = nil,
+        clipboardWriter: ((String) -> Void)? = nil,
+        zedFallbackDirectoryProvider: (() -> String)? = nil,
         herdrBinaryProvider: (() -> String?)? = nil,
         herdrWorkingDirectoryProvider: (() -> String)? = nil,
         herdrWindowLaunchTimeout: TimeInterval? = nil,
@@ -230,6 +248,13 @@ public final class TerminalLauncher {
         self.socketCandidatesProvider = socketCandidatesProvider ?? {
             TerminalLauncher.kittySocketCandidates()
         }
+        self.zedBinaryProvider = zedBinaryProvider ?? { TerminalLauncher.findZedBinary() }
+        // 既定のクリップボード書き込みは AppKit 側（MoostApp）から注入する。
+        // MoostCore は AppKit に依存しないため、注入が無いときは書き込まない
+        // （ワークスペース起動は成功し、トーストでコマンド全文を案内する）。
+        self.clipboardWriter = clipboardWriter ?? { _ in }
+        self.zedFallbackDirectoryProvider = zedFallbackDirectoryProvider
+            ?? { FileManager.default.currentDirectoryPath }
         self.herdrBinaryProvider = herdrBinaryProvider ?? { TerminalLauncher.findHerdrAppBinary() }
         // herdr 復帰は復帰コマンドの cd から folder を取るため、cwd プロバイダは
         // 通常使われない（cd が読めないコマンドだけのフォールバック経路）。
@@ -266,6 +291,8 @@ public final class TerminalLauncher {
             args = ["-e", TerminalLauncher.terminalScript(command)]
         case .kitty:
             return try kittyLaunch(command: command)
+        case .zed:
+            return try zedLaunch(command: command)
         case .herdr:
             return try herdrLaunch(command: command)
         }
@@ -419,6 +446,167 @@ public final class TerminalLauncher {
         let reason = opened.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
         let detail = reason.isEmpty ? "" : "（" + reason + "）"
         throw TerminalLaunchError("Kitty: 起動できませんでした" + detail)
+    }
+
+    // MARK: Zed（ワークスペース起動 + クリップボード案内）
+
+    /// Zed CLI（`cli` バイナリ）の探索先。Zed.app には CLI が同梱されているが
+    /// PATH へはインストールされない（`cli: install cli binary` を実行した
+    /// ユーザーのみ /usr/local/bin/zed に置く）。GUI アプリから起動した場合は
+    /// PATH が狭いため、固定候補を優先する（kitty と同じ方針）。
+    public static let zedBinaryCandidates: [String] = [
+        "/Applications/Zed.app/Contents/MacOS/cli",
+        "/usr/local/bin/zed",
+        "/opt/homebrew/bin/zed",
+    ]
+
+    /// 実行可能な Zed CLI を探す。固定候補 → PATH の順。
+    public static func findZedBinary() -> String? {
+        let fm = FileManager.default
+        for path in zedBinaryCandidates where fm.isExecutableFile(atPath: path) {
+            return path
+        }
+        let pathVar = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for dir in pathVar.split(separator: ":").map(String.init) where !dir.isEmpty {
+            let candidate = dir + "/zed"
+            if fm.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
+    }
+
+    /// Zed が見つからない場合のトースト文言（kitty / herdr と同じ扱い）。
+    public static let zedNotFoundMessage =
+        "Zed: Zed.app が見つかりません。Zed をインストールするか、"
+        + "復帰先を Terminal.app / iTerm2 / Kitty に切り替えてください。"
+
+    /// Zed で復帰コマンドを開く（Issue #131）。
+    ///
+    /// 方式選定（実機検証 2026-11-19、Zed 1.28.1 / Zed-aarch64.dmg、
+    /// /Applications/Zed.app、~/.config/zed 実在を確認）:
+    /// Zed はエディタ同梱の統合ターミナルを持つが、外部からターミナルへ
+    /// コマンドを流す口を何も公開していない:
+    /// - CLI（`zed <path>`）はファイル/ディレクトリ/`zed://` URL を開くのみ。
+    ///   `zed --terminal -e <cmd>` 系は未実装（zed-industries/zed
+    ///   Discussion #57026 で機能依頼がオープンな状態）。実機でも `cli <dir>` は
+    ///   ワークスペースを開くだけでコマンド実行の口は無い。
+    /// - `zed://` スキームは settings / extension / git/clone 等を開けるだけで
+    ///   ターミナル起動の kind を持たない（crates/zed/src/main.rs の
+    ///   OpenRequestKind に terminal 系は無く、未知の kind は no-op）。
+    /// - AppleScript 辞書なし（sdef 無し）。OSascript 自動化権限も要る。
+    /// - cli バイナリとアプリ間の IPC は対外 API でない（CliRequest は
+    ///   Open / SetOpenBehavior / DebugState の 3 種でターミナル起動は無い）。
+    /// - ターミナルへのキー注入（候補 c）は Accessibility 権限が必須で、
+    ///   Zed 側のキーマップ変更で静かに壊れる（実機でも CGEvent 注入が
+    ///   通らないことを確認）。本番の復帰導線にしない。
+    /// - Zed の task システム（tasks.json / task::Spawn アクション）は
+    ///   ワークスペースを開いた Zed の UI / keymap からのみ起動でき、
+    ///   復帰コマンドごとに動的なターミナル起動はできない。
+    /// したがって Issue 方針の (a) を採用する:
+    /// 1) Zed CLI で projectPath をワークスペースとして開く
+    ///    （既存ウィンドウがあれば前面化のみ）。
+    /// 2) 復帰コマンドをクリップボードへコピーし、UI がトーストで
+    ///    「Zed のターミナル（⌃`）でペーストして実行」と案内する。
+    /// コマンド実行はユーザーの 1 ポストに委ねる（自動実行ではない）ことを
+    /// CHANGELOG と設定画面の注意に明記する。
+    ///
+    /// projectPath は ResumeCommand が必ず先頭に付ける `cd '<path>' && ...`
+    /// から取り出す（cd が読めないコマンド — codex の projectPath 空
+    /// セッション等 — は zedFallbackDirectoryProvider へ倒す）。
+    private func zedLaunch(command: String) throws -> TerminalLaunchOutcome {
+        guard let zed = zedBinaryProvider() else {
+            throw TerminalLaunchError(TerminalLauncher.zedNotFoundMessage)
+        }
+        let directory = Self.zedWorkspaceDirectory(for: command,
+                                                   fallback: zedFallbackDirectoryProvider())
+        // -n（新規ワークスペース）にしない: 復帰先はプロジェクトの既存ウィンドウを
+        // 前面化するのが動線上自然（open_behavior の既定挙動に任せる）。
+        let args: [String]
+        if directory.isEmpty {
+            args = [zed]
+        } else {
+            args = [zed, directory]
+        }
+        let opened = runCommand(args)
+        if opened.exit != 0 {
+            let reason = opened.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = reason.isEmpty ? "" : "（" + reason + "）"
+            throw TerminalLaunchError("Zed: ワークスペースを開けませんでした" + detail)
+        }
+        // ワークスペースが開けたらコマンドをクリップボードへ預ける。
+        // 書き込みは呼び出し側（MoostApp の NSPasteboard 実装）に委譲する。
+        clipboardWriter(command)
+        return .clipboard
+    }
+
+    /// 復帰コマンド文字列の先頭 `cd '<projectPath>' && ...` から起動ディレクトリを
+    /// 取り出す。ResumeCommand 系の形式に依存する。引用符の走査は POSIX シェルの
+    /// 引用規則に従う:
+    /// - 引用符内で '\''（閉じ + バックスラッシュ + 引用符 + 開き）が続く場合は
+    ///   shellEscape が ' をエスケープした列なので 4 文字を 1 単位としてコピーし
+    ///   引用符状態を変えない（単純 toggle だと o'\''x で状態が反転して誤抽出に
+    ///   なる。Support.swift の shellEscape の逆変換も同時に適用するため、
+    ///   ここはトークンを正確に切り出すことが目的）。
+    /// - 引用符内の ''（リテラル引用符）は 2 文字で 1 文字としてコピーし、
+    ///   閉じ引用符と区別する。
+    /// - 引用符外で ' && ' が現れたらトークン終わり。
+    /// cd が読めない場合はフォールバックへ倒す。
+    static func zedWorkspaceDirectory(for command: String, fallback: String) -> String {
+        let cdPrefix = "cd "
+        guard command.hasPrefix(cdPrefix) else { return fallback }
+        let rest = command.dropFirst(cdPrefix.count)
+        var token = ""
+        var inQuote = false
+        var index = rest.startIndex
+        while index < rest.endIndex {
+            let ch = rest[index]
+            if inQuote, ch == "'",
+               rest.index(after: index) < rest.endIndex {
+                let nextCh = rest[rest.index(after: index)]
+                if nextCh == "\\" {
+                    // shellEscape が ' を '\''（閉じ引用符 + バックスラッシュ +
+                    // 引用符 + 開き引用符）に展開した列: 4 文字を 1 単位として
+                    // コピーし引用符状態を変えない（単純 toggle だと
+                    // o'\''x で状態が反転して誤抽出になる）。
+                    let end = rest.index(index, offsetBy: 3)
+                    token.append(contentsOf: rest[index...end])
+                    if end == rest.endIndex { break }
+                    index = rest.index(after: end)
+                    continue
+                }
+                if nextCh == "'" {
+                    // 引用符内のリテラル引用符（''）: 2 文字で 1 文字。
+                    token.append(contentsOf: rest[index...rest.index(after: index)])
+                    index = rest.index(after: rest.index(after: index))
+                    continue
+                }
+                // 引用符の閉じ。
+                inQuote = false
+                token.append(ch)
+            } else if !inQuote, ch == "'",
+                      rest.index(after: index) < rest.endIndex,
+                      rest[rest.index(after: index)] == "'" {
+                // 引用符外の一時的な引用（''）: 状態を変えずに 2 文字コピー。
+                token.append(contentsOf: rest[index...rest.index(after: index)])
+                index = rest.index(after: rest.index(after: index))
+                continue
+            } else if ch == "'" {
+                // 開き引用符で状態に入る。
+                inQuote = true
+                token.append(ch)
+            } else if !inQuote, rest[index...].hasPrefix(" && ") {
+                break
+            } else {
+                token.append(ch)
+            }
+            index = rest.index(after: index)
+        }
+        if inQuote || token.isEmpty { return fallback }
+        // shellEscape の単一引用符を戻す（Support.swift の shellEscape の逆変換）。
+        guard token.hasPrefix("'"), token.hasSuffix("'"), token.count >= 2 else {
+            return token
+        }
+        let body = token.dropFirst().dropLast()
+        return body.replacingOccurrences(of: "'\\''", with: "'")
     }
 
     /// Herdr で復帰コマンドを開く（Issue #130）。

@@ -219,6 +219,7 @@ final class LaunchTests: XCTestCase {
     func test_from_setting_falls_back_for_unknown_value() {
         XCTAssertEqual(TerminalApp.fromSetting("iTerm2"), .iterm2)
         XCTAssertEqual(TerminalApp.fromSetting("kitty"), .kitty)
+        XCTAssertEqual(TerminalApp.fromSetting("zed"), .zed)
         XCTAssertEqual(TerminalApp.fromSetting("herdr"), .herdr)
         XCTAssertEqual(TerminalApp.fromSetting("Alacritty"), .terminal)
         XCTAssertEqual(TerminalApp.fromSetting(""), .terminal)
@@ -396,6 +397,138 @@ final class LaunchTests: XCTestCase {
     }
 
     // MARK: 差し替え経路の契約（実行環境に依存しない検査）
+
+    // MARK: Zed（ワークスペース起動 + クリップボード案内。Issue #131）
+
+    /// runCommand / clipboardWriter / zedBinaryProvider を差し替えた Zed 起動の足場。
+    /// received / copied は呼び出し側の NSMutableArray ラッパーではなく、
+    /// クラスボックスで共有する（escaping closure に inout は渡せないため）。
+    private final class Box {
+        var received: [[String]] = []
+        var copied: [String] = []
+    }
+
+    private func zedLauncher(
+        box: Box,
+        exit: Int32 = 0,
+        stderr: String = "",
+        copyToBox: Bool = true
+    ) -> TerminalLauncher {
+        TerminalLauncher(
+            runCommand: { args in
+                box.received.append(args)
+                return (exit, "", stderr)
+            },
+            zedBinaryProvider: { "/fake/zed" },
+            clipboardWriter: copyToBox ? { box.copied.append($0) } : { _ in },
+            zedFallbackDirectoryProvider: { "/fallback/dir" }
+        )
+    }
+
+    func test_zed_opens_workspace_and_copies_command_to_clipboard() throws {
+        // 復帰コマンドの先頭 cd からプロジェクトパスを取り出して Zed を開き、
+        // コマンド全文をクリップボードへ預ける（Issue #131 の (a) 方式）。
+        let box = Box()
+        let command = ResumeCommand.claudeResume(projectPath: "/work/alpha", sessionId: "s-1")
+        let launcher = zedLauncher(box: box)
+        let outcome = try launcher.launch(terminal: .zed, command: command)
+        XCTAssertEqual(outcome, .clipboard)
+        XCTAssertEqual(box.received, [["/fake/zed", "/work/alpha"]])
+        XCTAssertEqual(box.copied, [command])
+    }
+
+    func test_zed_open_uses_command_as_is_for_claude_resume() throws {
+        // クリップボードへ預けるのは ResumeCommand が作ったコマンド文字列そのもの
+        // （env -u + claude --resume の形が壊れていないこと）。
+        let box = Box()
+        let command = ResumeCommand.claudeResume(projectPath: "/w", sessionId: "abc")
+        let launcher = zedLauncher(box: box)
+        _ = try launcher.launch(terminal: .zed, command: command)
+        XCTAssertEqual(box.copied, [command])
+        XCTAssertTrue(box.copied[0].hasPrefix("cd '/w' && env "), box.copied[0])
+        XCTAssertTrue(box.copied[0].contains("claude --resume 'abc'"), box.copied[0])
+    }
+
+    func test_zed_falls_back_to_provider_directory_when_cd_unreadable() throws {
+        // codex の projectPath 空セッションのように cd が読めないコマンドは
+        // フォールバックディレクトリを開く（Zed の起動自体は続ける）。
+        let box = Box()
+        let launcher = zedLauncher(box: box)
+        let outcome = try launcher.launch(terminal: .zed, command: "codex resume 's-1'")
+        XCTAssertEqual(outcome, .clipboard)
+        XCTAssertEqual(box.received, [["/fake/zed", "/fallback/dir"]])
+    }
+
+    func test_zed_throws_not_found_when_binary_missing() {
+        // Zed.app が見つからない場合は案内文言つきの TerminalLaunchError。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                return (0, "", "")
+            },
+            zedBinaryProvider: { nil })
+        XCTAssertThrowsError(try launcher.launch(terminal: .zed, command: "echo hi")) { error in
+            let message = (error as? TerminalLaunchError)?.message ?? ""
+            XCTAssertTrue(message.contains("Zed"), message)
+            XCTAssertTrue(message.contains("Zed.app が見つかりません"), message)
+        }
+        XCTAssertTrue(received.isEmpty, "バイナリ無しでは何も起動しない: \(received)")
+    }
+
+    func test_zed_throws_with_reason_when_open_fails() {
+        // Zed CLI が非 0 で終わる（.app 消失・パス不正等）場合は理由を添えて失敗。
+        // クリップボードへはコピーしない（開けていないのにコマンドを預けない）。
+        let box = Box()
+        let launcher = zedLauncher(box: box, exit: 1, stderr: "app not found\n")
+        XCTAssertThrowsError(try launcher.launch(terminal: .zed, command: "cd '/w' && claude")) { error in
+            let message = (error as? TerminalLaunchError)?.message ?? ""
+            XCTAssertTrue(message.hasPrefix("Zed:"), message)
+            XCTAssertTrue(message.contains("app not found"), message)
+        }
+        XCTAssertTrue(box.copied.isEmpty, "失敗時にクリップボードへ書かない: \(box.copied)")
+    }
+
+    func test_zed_workspace_directory_extracts_cd_path() {
+        // ResumeCommand 系の先頭 cd からパスを抽出する（引用符の中は区切りにしない）。
+        XCTAssertEqual(
+            TerminalLauncher.zedWorkspaceDirectory(for: "cd '/work/alpha' && claude",
+                                                   fallback: "/fb"),
+            "/work/alpha")
+        // 空格入り / 単一引用符入りパス（shellEscape の '\\'' 形式を戻す）
+        XCTAssertEqual(
+            TerminalLauncher.zedWorkspaceDirectory(for: "cd '/a b/c' && claude", fallback: "/fb"),
+            "/a b/c")
+        let escaped = "cd " + shellEscape("/tmp/o'x") + " && claude"
+        XCTAssertEqual(TerminalLauncher.zedWorkspaceDirectory(for: escaped, fallback: "/fb"),
+                       "/tmp/o'x")
+        // cd が無い / 引用符が閉じないコマンドはフォールバック
+        XCTAssertEqual(TerminalLauncher.zedWorkspaceDirectory(for: "echo hi", fallback: "/fb"),
+                       "/fb")
+        XCTAssertEqual(TerminalLauncher.zedWorkspaceDirectory(for: "cd '/unclosed && x",
+                                                              fallback: "/fb"),
+                       "/fb")
+        // codex の projectPath 空（cd 自体が無い）もフォールバック
+        XCTAssertEqual(
+            TerminalLauncher.zedWorkspaceDirectory(for: ResumeCommand.codexResume(projectPath: "",
+                                                                                  sessionId: "s"),
+                                                   fallback: "/fb"),
+            "/fb")
+    }
+
+    func test_zed_launch_with_setting_value_string() throws {
+        // settings.json の "zed" からディスパッチされること（UI 側の経路と同じ入口）。
+        var received: [[String]] = []
+        let launcher = TerminalLauncher(
+            runCommand: { args in
+                received.append(args)
+                return (0, "", "")
+            },
+            zedBinaryProvider: { "/fake/zed" })
+        let outcome = try launcher.launch(settingValue: "zed", command: "cd '/w' && pi")
+        XCTAssertEqual(outcome, .clipboard)
+        XCTAssertEqual(received, [["/fake/zed", "/w"]])
+    }
 
     func test_injected_runner_receives_dash_e_and_single_script() throws {
         // iTerm2 経路の既定実装と同じ受け渡しになっていることを、差し替えた実行で確かめる。

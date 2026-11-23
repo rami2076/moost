@@ -486,10 +486,16 @@ final class AppModel: ObservableObject {
     /// タブにできなかった場合は allow_remote_control の案内を初回に添える。
     /// Zed はワークスペースを開いてコマンドをクリップボードへ預けるため、
     /// ターミナルを開いてペーストする案内を出す（Issue #131）。
+    /// Herdr は復帰タブが背面で開く（focus:false）ため、前面タブは変わらない
+    /// ことを伝える（Issue #130）。
     private static func toast(for outcome: TerminalLaunchOutcome, terminalApp: String) -> String {
         if terminalApp == TerminalApp.zed.rawValue, case .clipboard = outcome {
             return "Zed を開いて復帰コマンドをコピーしました。"
                 + "Zed で ⌃` を押してターミナルを開き、⌘V でペーストして実行してください。"
+        }
+        if terminalApp == TerminalApp.herdr.rawValue,
+           case let .background(terminal) = outcome {
+            return "Herdr の新規タブ \(terminal) を開きました（現在のタブはそのままです）"
         }
         guard terminalApp == TerminalApp.kitty.rawValue else {
             return "ターミナルを開きました"
@@ -497,9 +503,10 @@ final class AppModel: ObservableObject {
         switch outcome {
         case .tab:
             return "Kitty のタブを開きました"
-        case .window, .clipboard:
-            // .clipboard は Zed 専用の想定（上の zed 分岐で先に返る）。
-            // 万一 Kitty 以外で .clipboard が来た時も新規ウィンドウ扱いで案内する。
+        case .window, .clipboard, .background:
+            // .clipboard は Zed 専用、.background は Herdr 専用の想定
+            // （それぞれの分岐で先に返る）。万一 Kitty 以外でこれらの値が来た時も
+            // 新規ウィンドウ扱いで案内する。
             if UserDefaults.standard.bool(forKey: kittyRemoteHintKey) {
                 return "Kitty を新しいウィンドウで開きました"
             }

@@ -3,8 +3,8 @@ import Foundation
 
 /// 復帰先ターミナル。settings.json の terminalApp に保存される文字列は
 /// Dart 実装と共通なので、値域も同じまま保つ
-/// （"Terminal.app" / "iTerm2" / "gnome-terminal" / "kitty" / "zed"）。
-/// "kitty" と "zed" は Dart 側が未知値として Terminal.app へフォールバックするため、
+/// （"Terminal.app" / "iTerm2" / "gnome-terminal" / "kitty" / "zed" / "herdr"）。
+/// "kitty" と "zed" と "herdr" は Dart 側が未知値として Terminal.app へフォールバックするため、
 /// Flutter 版で選ばれていても壊れない（native のみの拡張値）。
 /// リファレンス実装: packages/core/lib/src/terminal_launcher.dart
 public enum TerminalApp: String {
@@ -16,6 +16,9 @@ public enum TerminalApp: String {
     /// 外部 CLI を持たないため、ワークスペースを開いてコマンドをクリップボードへ
     /// 預ける導線になる（Issue #131。制約は zedLaunch 参照）。
     case zed = "zed"
+    /// Herdr（herdr.dev）。herdr-core（`hc`）がターミナルを実行し、
+    /// デスクトップアプリ herdr-app が表示する構成（Issue #130）。
+    case herdr = "herdr"
 
     /// 未知の値（手書き編集・旧バージョン等）は OS の既定へフォールバックする。
     /// macOS native 実装での既定は Terminal.app（Linux 既定の分岐は Dart 側が担う）。
@@ -47,6 +50,10 @@ public enum TerminalLaunchOutcome: Equatable, Sendable {
     /// ソケット API が無いため、これが現状の最大自動化工線（Issue #131、
     /// zedLaunch の方式選定を参照）。
     case clipboard
+    /// Herdr の復帰: herdr-app が現在のスペースの新規タブとして開いた
+    /// （focus:false なので前面タブは切り替わらず背面で開く）。
+    /// 作成された herdr ターミナル ID を添える（UI がトーストへ出す）。
+    case background(terminal: String)
 }
 
 /// claude 由来の環境変数（Issue #52）。Moost 自身のプロセスがこれを持ったまま
@@ -145,6 +152,14 @@ public enum ResumeCommand {
         "cd " + shellEscape(projectPath) + " && hermes chat"
     }
 
+    /// herdr 復帰で tab.new の argv に渡すシェル起動形（Issue #130）。
+    /// herdr-app は argv をプログラムとして直接起動するため、復帰コマンド
+    /// 文字列はシェルに預ける（実機検証 2026-11-19: 復帰後の `hc read` で
+    /// cd / 復帰コマンドの実行を確認済み）。kitty 経路の /bin/zsh -lc と同じ形。
+    public static func herdrShellArgv(command: String) -> [String] {
+        ["/bin/zsh", "-lc", command]
+    }
+
     /// アダプタ識別子（Memo.agent / RecentSession.agentId）から復帰コマンドを組み立てる。
     /// 未知のエージェントは nil を返す（UI 側は「不明な agent」のトーストを出す）。
     public static func resume(agent: String, projectPath: String, sessionId: String,
@@ -196,6 +211,23 @@ public final class TerminalLauncher {
     private let clipboardWriter: (String) -> Void
     /// cd が読めないコマンドの Zed 起動先フォールバック（既定はFileManager の cwd）。
     private let zedFallbackDirectoryProvider: () -> String
+    private let herdrBinaryProvider: () -> String?
+    /// herdr 復帰時に tab.new / terminal.open へ渡す作業ディレクトリ。
+    /// テストから差し替え可能（実ファイルシステムに依存しない検証用）。
+    private let herdrWorkingDirectoryProvider: () -> String
+
+    /// herdr-app が起動してから復帰タブが開けるまでの待ち上限。
+    /// open -a Herdr はバックグラウンド復帰なので、実測 1 秒前後で
+    /// herdr-app.sock ができる（余白を持って 8 秒）。
+    /// テストから差し替え可能（init の herdrWindowLaunchTimeout 引数）。
+    public let herdrWindowLaunchTimeout: TimeInterval
+
+    /// open -a からの再試行間隔（秒）。既定 0.25 秒（ソケット生成は通常 1 秒以内）。
+    public static let herdrRetryInterval: TimeInterval = 0.25
+    /// 再試行ループの待機（テストから仮想時間へ差し替え可能）。
+    private let retrySleep: (TimeInterval) -> Void
+    /// 再試行ループの現在時刻（テストから仮想時間へ差し替え可能）。
+    private let retryNow: () -> TimeInterval
 
     public init(
         runCommand: (([String]) -> (exit: Int32, stdout: String, stderr: String))? = nil,
@@ -203,7 +235,12 @@ public final class TerminalLauncher {
         socketCandidatesProvider: (() -> [String])? = nil,
         zedBinaryProvider: (() -> String?)? = nil,
         clipboardWriter: ((String) -> Void)? = nil,
-        zedFallbackDirectoryProvider: (() -> String)? = nil
+        zedFallbackDirectoryProvider: (() -> String)? = nil,
+        herdrBinaryProvider: (() -> String?)? = nil,
+        herdrWorkingDirectoryProvider: (() -> String)? = nil,
+        herdrWindowLaunchTimeout: TimeInterval? = nil,
+        herdrRetrySleep: ((TimeInterval) -> Void)? = nil,
+        herdrRetryNow: (() -> TimeInterval)? = nil
     ) {
         // デフォルト引数のある execute は関数参照にできないためクロージャで包む。
         self.runCommand = runCommand ?? { TerminalLauncher.execute($0) }
@@ -218,6 +255,18 @@ public final class TerminalLauncher {
         self.clipboardWriter = clipboardWriter ?? { _ in }
         self.zedFallbackDirectoryProvider = zedFallbackDirectoryProvider
             ?? { FileManager.default.currentDirectoryPath }
+        self.herdrBinaryProvider = herdrBinaryProvider ?? { TerminalLauncher.findHerdrAppBinary() }
+        // herdr 復帰は復帰コマンドの cd から folder を取るため、cwd プロバイダは
+        // 通常使われない（cd が読めないコマンドだけのフォールバック経路）。
+        // 既定は FileManager の cwd（cwd 取得の意図に合わせる）。ProcessInfo の
+        // PWD は親から継いだ古い値になりうるため主経路にしない。
+        self.herdrWorkingDirectoryProvider = herdrWorkingDirectoryProvider
+            ?? { FileManager.default.currentDirectoryPath }
+        self.herdrWindowLaunchTimeout = herdrWindowLaunchTimeout ?? 8
+        self.retrySleep = herdrRetrySleep ?? { interval in
+            usleep(useconds_t(interval * 1_000_000))
+        }
+        self.retryNow = herdrRetryNow ?? { Date().timeIntervalSince1970 }
     }
 
     @discardableResult
@@ -244,6 +293,8 @@ public final class TerminalLauncher {
             return try kittyLaunch(command: command)
         case .zed:
             return try zedLaunch(command: command)
+        case .herdr:
+            return try herdrLaunch(command: command)
         }
         let result = runCommand(args)
         if result.exit != 0 {
@@ -556,6 +607,256 @@ public final class TerminalLauncher {
         }
         let body = token.dropFirst().dropLast()
         return body.replacingOccurrences(of: "'\\''", with: "'")
+    }
+
+    /// Herdr で復帰コマンドを開く（Issue #130）。
+    ///
+    /// 方式選定（実機検証 2026-11-19、herdr-app 0.1.16 / hc 0.1.21）:
+    /// herdr は「herdr-core（hc）がターミナルを実行し、デスクトップアプリ
+    /// herdr-app が表示する」構成。復帰動線は **herdr-app の `do tab.new`**:
+    /// - `herdr-app do tab.new '{"folder":"<cwd>","argv":["/bin/zsh","-lc",<command>],"focus":false,"name":"moost:resume"}'`
+    ///   が 0.015 秒で `{"space":..,"tab":..,"terminal":"t.."}` を返し、
+    ///   現在のスペースの新規タブとして復帰ターミナルが開く。
+    ///   `focus:false` は前面タブを切り替えない（実機検証: 復帰前後で
+    ///   `herdr-app status` の tab / focused_pane が不変）。folder は spawn 前
+    ///   検証で、不正 folder は exit 1 + JSON error で確実に取り出せる
+    ///   （herdrFolder が復帰コマンドの cd から抽出）。argv はシェル経由で
+    ///   直接起動されるため復帰コマンドの注入はシェルエスケープ
+    ///   （conformance G1）で担保済み。復帰コマンド自体は cd を含んでいても
+    ///   いなくても動く（folder が cwd を決める）。
+    /// - 却下案 1: `herdr-app do terminal.open` はフォカスターミナルのペインを
+    ///   split するため、復帰のたびにユーザーの画面構成を壊す。
+    /// - 却下案 2: `hc run --bg` はラベル無しターミナルが「hidden」になり
+    ///   （herdr-app ls に現れない。skill の "Unlabeled workers stay hidden" と
+    ///   実機一致）、herdr-app を落とした環境では復帰が見えなくなる。
+    ///   ターミナル生成 + hc send の 2 手構成も同じ理由で不可。
+    /// - herdr-app は接続先ウィンドウのソケット（~/.config/herdr-app/
+    ///   herdr-app.sock）へ接続できる場合のみ成功する。Herdr.app 未起動
+    ///   （= ソケット無し）は exit 2 で失敗するため、その場合は open で
+    ///   Herdr.app を起動してからソケットが現れるまで再試行する
+    ///   （フォールバック）。それでも失敗した場合は TerminalLaunchError を
+    ///   投げ、UI 側が「Herdr の開き方」をトーストへ出す（kitty の window
+    ///   フォールバックと同様の扱い）。
+    private func herdrLaunch(command: String) throws -> TerminalLaunchOutcome {
+        guard let app = herdrBinaryProvider() else {
+            throw TerminalLaunchError(Self.herdrNotRunningMessage)
+        }
+        let argv = ResumeCommand.herdrShellArgv(command: command)
+        let folder = Self.herdrFolder(for: command, fallback: herdrWorkingDirectoryProvider())
+        let payload = Self.herdrTabNewPayload(folder: folder, argv: argv,
+                                              name: Self.herdrResumeTabName)
+        let first = runCommand([app, "do", "tab.new", payload])
+        if case let .success(terminal) = Self.herdrDoResult(first) {
+            return .background(terminal: terminal)
+        }
+        // 1 回目失敗 = Herdr.app 未起動（ソケット待ち）が主因。open で
+        // ウィンドウを起動し、ソケットが現れるまで do を再試行する。
+        // 原因が terminal.run の spawn 失敗（folder 不正など）の場合は
+        // ウィンドウの起動と無関係なので、open せず即失敗にする。
+        // 区別に do の exit code を使う（実機検証 2026-11-19）:
+        //   未起動（ソケット接続エラー）: exit 2 + プレインテキスト
+        //   spawn 失敗:                   exit 1 + JSON error
+        // 成功は exit 0 + 作成物 JSON なので、ここに来る exit は 1 / 2 のどちらか。
+        let retryAfterOpen = first.exit != 1
+        let opened: (exit: Int32, stdout: String, stderr: String) =
+            retryAfterOpen ? runCommand(["/usr/bin/open", "-a", "Herdr"]) : (-1, "", "")
+        // 失敗理由は最後のリトライ結果を基準にする（最低でも初回結果なので空にはならない）。
+        var lastFailure = first
+        // 同一応答の連続で打ち切り: spawn 失敗は `{}` exit 0 のように open と
+        // 無関係な失敗もあり、そのままでは deadline まで約 32 回叩く
+        // （herdrWindowLaunchTimeout 8 秒 / 0.25 秒間隔）。3 回連続で同じ
+        // (exit, stdout, stderr) ならソケット待ちの進歩無しとみなして早期に
+        // 打ち切る（実機の未起動復帰は 1 秒以内に成功するため 3 回は余裕がある）。
+        var previousResponse: (exit: Int32, stdout: String, stderr: String)?
+        var identicalStreak = 0
+        if opened.exit == 0 {
+            // 仮想時間差し替え可能（retryNow / retrySleep）。本番は実時刻 + usleep。
+            let deadline = retryNow() + herdrWindowLaunchTimeout
+            while retryNow() < deadline {
+                retrySleep(Self.herdrRetryInterval) // 0.25 秒間隔（ソケット生成は通常 1 秒以内）
+                let retry = runCommand([app, "do", "tab.new", payload])
+                if case let .success(terminal) = Self.herdrDoResult(retry) {
+                    return .background(terminal: terminal)
+                }
+                lastFailure = retry
+                if let previous = previousResponse, retry == previous {
+                    identicalStreak += 1
+                    if identicalStreak >= 2 { break } // 同一応答 3 回連続で打ち切り
+                } else {
+                    previousResponse = retry
+                    identicalStreak = 0
+                }
+            }
+        }
+        // 最後の試行の理由をそのまま出す（未起動なら open の失敗理由も添える）。
+        var reason = Self.herdrFailureReason(stdout: lastFailure.stdout, stderr: lastFailure.stderr)
+        if opened.exit != 0 {
+            let openReason = opened.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !openReason.isEmpty {
+                reason = reason.isEmpty ? openReason : reason + " / " + openReason
+            }
+        }
+        throw TerminalLaunchError("Herdr: 復帰ターミナルを作成できませんでした"
+            + (reason.isEmpty ? "" : "（" + reason + "）"))
+    }
+
+    /// herdr 復帰の作業ディレクトリ（tab.new の folder）。復帰コマンド文字列は
+    /// ResumeCommand が常に先頭へ `cd '<projectPath>' && ...` を付けるため、
+    /// そのパスを抽出して folder に使う（実機検証 2026-11-19: tab.new の
+    /// folder は spawn 前検証で、不正 folder は exit 1 + JSON error になる。
+    /// argv 内の cd が成功しても folder が不正だとターミナル自体が作られない）。
+    /// cd が読めないコマンド（codex の projectPath 空セッション等）は
+    /// 呼び出し側が渡したフォールバックへ倒す。
+    static func herdrFolder(for command: String, fallback: String) -> String {
+        let cdPrefix = "cd "
+        guard command.hasPrefix(cdPrefix) else { return fallback }
+        let rest = command.dropFirst(cdPrefix.count)
+        // 引用符の中は区切りとして扱わない（パスに " && " を含むケース）。
+        // shellEscape は常に単一引用符で囲むので、閉じ引用符までがトークン。
+        var token = ""
+        var inQuote = false
+        var index = rest.startIndex
+        while index < rest.endIndex {
+            let ch = rest[index]
+            if ch == "'" {
+                inQuote.toggle()
+                token.append(ch)
+            } else if !inQuote, rest[index...].hasPrefix(" && ") {
+                break
+            } else {
+                token.append(ch)
+            }
+            index = rest.index(after: index)
+        }
+        if inQuote || token.isEmpty { return fallback }
+        return unquote(token)
+    }
+
+    /// shellEscape（Support.swift）で作った単一引用符トークンを元に戻す。
+    /// 引用符で囲まれていないトークンはそのまま返す。
+    /// 中身の '\\'' 復元は shellEscape の逆変換（閉じ・駆け抜け・開きの 3 文字を
+    /// ' へ戻す）に一致する（Issue #130 の実装時に確認済み）。
+    static func unquote(_ token: String) -> String {
+        guard token.count >= 2, token.hasPrefix("'"), token.hasSuffix("'") else {
+            return token
+        }
+        let body = token.dropFirst().dropLast()
+        // shellEscape は ' を '\''（閉じ・駆け抜け・開き）でエスケープするため、
+        // 逆変換は '\'' → ' の置換で復元できる。
+        return body.replacingOccurrences(of: "'\\''", with: "'")
+    }
+
+    /// tab.new に渡す JSON を組み立てる。
+    /// argv / name は JSON 値なので JSONSerialization で作る（エスケープ事故を
+    /// 防ぐ。Support.swift の MoostJSON と同じ趣旨）。name はタブ名に反映され、
+    /// プログラム終了後も残る（実機検証 2026-11-19: tab.new --name は即座に
+    /// herdr-app ls のタブ名へ反映、復帰後のシェルに残っても不変。
+    /// tab.rename は不要）。
+    static func herdrTabNewPayload(folder: String, argv: [String], name: String) -> String {
+        var payload: [String: Any] = ["focus": false, "argv": argv, "name": name]
+        if !folder.isEmpty { payload["folder"] = folder }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload,
+                                                     options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            // JSONSerialization が失敗する入力はありえないが、その場は
+            // folder なしの最小構成に倒す（復帰コマンドの実行は続ける）。
+            return "{\"focus\":false,\"argv\":[\"/bin/zsh\",\"-lc\",\"echo moost\"]}"
+        }
+        return json
+    }
+
+    /// 復帰タブの名前。herdr-app のタブ名になり、復帰タブを後から探せる
+    /// （skill の "Pick an explicit, useful name" に従う）。
+    public static let herdrResumeTabName = "moost:resume"
+
+    /// `herdr-app do` の結果。tab.new は作成物の JSON
+    /// （`{"space":..,"tab":..,"terminal":"t.."}`）を返し、失敗時は exit!=0 か
+    /// `{"error": ...}` を返す（実機検証済み）。
+    /// 判定の要点（実機検証 2026-11-19）:
+    /// - tab.new は spawn 失敗でも `{}`（空オブジェクト、exit 0）で返すことが
+    ///   ある。terminal キーの有無が生死の分け目なので、これがない場合は
+    ///   理由が空でも失敗扱いにする（herdrLaunch が open 再試行へ進み、
+    ///   結果的にトーストで失敗を知らせる）。
+    /// - 成功時はターミナル ID を返す（UI がトーストで「タブ t..」と示せる）。
+    enum HerdrDoResult: Equatable {
+        case success(terminal: String)
+        case failure(reason: String)
+    }
+
+    static func herdrDoResult(_ result: (exit: Int32, stdout: String, stderr: String))
+        -> HerdrDoResult {
+        func fail() -> HerdrDoResult {
+            .failure(reason: Self.herdrFailureReason(stdout: result.stdout,
+                                                     stderr: result.stderr))
+        }
+        guard result.exit == 0 else { return fail() }
+        let stdout = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 成功応答は必ず JSON オブジェクト。空・非 JSON・{"error":...} は失敗。
+        guard let data = stdout.data(using: .utf8),
+              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              json["error"] == nil,
+              let terminal = json["terminal"] as? String,
+              !terminal.isEmpty
+        else {
+            return fail()
+        }
+        return .success(terminal: terminal)
+    }
+
+    /// herdr 未起動（Herdr.app が見つからない）時のトースト文言。
+    /// UI 側のトーストでも同じ文言を使い、設定画面の「注意」にも記載する。
+    public static let herdrNotRunningMessage =
+        "Herdr: Herdr.app が見つかりません。Herdr をインストールするか、"
+        + "復帰先を Terminal.app / iTerm2 / Kitty に切り替えてください。"
+
+    /// hc / herdr-app の失敗理由を JSON から読み出す。JSON でない出力
+    /// （usage 文字列や素のテキスト）はそのまま 1 行に圧縮して返す。
+    static func herdrFailureReason(stdout: String, stderr: String) -> String {
+        for raw in [stdout, stderr] {
+            let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, let data = text.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+            if let error = json["error"] as? [String: Any],
+               let message = error["message"] as? String {
+                return message
+            }
+            if let message = json["error"] as? String {
+                return message
+            }
+        }
+        for raw in [stderr, stdout] {
+            let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                return text.components(separatedBy: .newlines).first ?? text
+            }
+        }
+        return ""
+    }
+
+    /// herdr-app（デスクトップアプリ CLI）の実行ファイル探索（Issue #130）。
+    /// 実機検証（2026-11-19）: インストーラは /Applications/Herdr.app を置き、
+    /// ~/.local/bin/herdr-app はそのバイナリへのシンボリックリンク。
+    /// herdr-core はターミナルのホストで、herdr-app の起動に随伴して起動する
+    /// （フォールバックの /usr/bin/open -a Herdr が担う）。
+    /// GUI アプリから起動した場合は PATH が狭いため、固定候補を優先する。
+    public static let herdrAppCandidates: [String] = [
+        "/Applications/Herdr.app/Contents/MacOS/Herdr",
+        NSString(string: "~/.local/bin/herdr-app").expandingTildeInPath,
+    ]
+
+    /// 実行可能な herdr-app を探す。固定候補 → PATH の順。
+    public static func findHerdrAppBinary() -> String? {
+        let fm = FileManager.default
+        for path in herdrAppCandidates where fm.isExecutableFile(atPath: path) {
+            return path
+        }
+        let pathVar = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for dir in pathVar.split(separator: ":").map(String.init) where !dir.isEmpty {
+            let candidate = dir + "/herdr-app"
+            if fm.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
     }
 
     /// .command 実行ファイルを一時ディレクトリに書き出す（Terminal.app 用）。

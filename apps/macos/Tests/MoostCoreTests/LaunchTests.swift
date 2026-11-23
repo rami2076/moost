@@ -220,6 +220,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertEqual(TerminalApp.fromSetting("iTerm2"), .iterm2)
         XCTAssertEqual(TerminalApp.fromSetting("kitty"), .kitty)
         XCTAssertEqual(TerminalApp.fromSetting("zed"), .zed)
+        XCTAssertEqual(TerminalApp.fromSetting("herdr"), .herdr)
         XCTAssertEqual(TerminalApp.fromSetting("Alacritty"), .terminal)
         XCTAssertEqual(TerminalApp.fromSetting(""), .terminal)
     }
@@ -556,7 +557,8 @@ final class LaunchTests: XCTestCase {
     // MARK: 既定実装（execute）のタイムアウト
 
     func test_execute_times_out_and_reports_reason() {
-        // osascript の delay 5 を 1 秒で打ち切り、exit 124 + タイムアウト文言を返す。
+        // 既定の execute 実装（osascript 相当）を 1 秒で打ち切り、
+        // exit 124 + タイムアウト文言を返すことを確認する。
         let (exit, stdout, stderr) = TerminalLauncher.execute(["-e", "delay 5"], timeout: 1)
         XCTAssertEqual(exit, 124, stderr)
         XCTAssertTrue(stderr.contains("タイムアウト"), stderr)
@@ -567,4 +569,306 @@ final class LaunchTests: XCTestCase {
         let (exit, _, stderr) = TerminalLauncher.execute(["-e", "return 0"], timeout: 5)
         XCTAssertEqual(exit, 0, stderr)
     }
+
+    // MARK: herdr（Issue #130）
+
+    /// herdr の do / open 呼び出しを差し替えるファクトリ。
+    /// - commandProbe: 起動コマンド（[herdr-app, do, tab.new, payload] の形式）を
+    ///   受け取り、(exit, stdout, stderr) を返す。
+    private func makeLauncher(
+        herdrBinary: String?,
+        workingDirectory: String? = nil,
+        openSucceeds: Bool = true,
+        windowLaunchTimeout: TimeInterval? = nil,
+        retryClock: ((TimeInterval) -> Void)? = nil,
+        commandProbe: @escaping ([String]) -> (Int32, String, String)
+    ) -> TerminalLauncher {
+        // retryClock は仮想時間クロック。渡すと sleep 時にクロックを進める
+        // （realtime に依存せず deadline を決定的にテストできる）。
+        var clock: TimeInterval = 0
+        let now: () -> TimeInterval = { clock }
+        let sleep: (TimeInterval) -> Void
+        if let retryClock {
+            sleep = { interval in
+                retryClock(interval)
+                clock += interval
+            }
+        } else {
+            sleep = { _ in }
+        }
+        _ = now
+        return TerminalLauncher(
+            runCommand: { command in
+                if command.first == "/usr/bin/open" {
+                    return openSucceeds ? (0, "", "") : (1, "", "Unable to find application")
+                }
+                return commandProbe(command)
+            },
+            herdrBinaryProvider: { herdrBinary },
+            herdrWorkingDirectoryProvider: { workingDirectory ?? "/fallback/cwd" },
+            herdrWindowLaunchTimeout: windowLaunchTimeout,
+            herdrRetrySleep: sleep,
+            herdrRetryNow: retryClock == nil ? nil : now
+        )
+    }
+
+    func test_herdr_shell_argv_wraps_command_in_login_shell() {
+        let argv = ResumeCommand.herdrShellArgv(command: "cd '/tmp' && moost resume s1")
+        XCTAssertEqual(argv, ["/bin/zsh", "-lc", "cd '/tmp' && moost resume s1"])
+    }
+
+    func test_herdr_folder_extracts_cd_path() {
+        let cmd = "cd '/Users/dev/my app' && moost resume s1 --agent claude"
+        XCTAssertEqual(TerminalLauncher.herdrFolder(for: cmd, fallback: "/fb"),
+                       "/Users/dev/my app")
+    }
+
+    func test_herdr_folder_keeps_separator_inside_quotes() {
+        // 名前に " && " を含むパスは閉じ引用符までがトークン。
+        let cmd = "cd '/tmp/a && b' && moost resume s1"
+        XCTAssertEqual(TerminalLauncher.herdrFolder(for: cmd, fallback: "/fb"), "/tmp/a && b")
+    }
+
+    func test_herdr_folder_falls_back_when_no_cd() {
+        XCTAssertEqual(TerminalLauncher.herdrFolder(for: "moost resume s1", fallback: "/fb"), "/fb")
+        // 引用符が閉じていない壊れたコマンドもフォールバック。
+        XCTAssertEqual(TerminalLauncher.herdrFolder(for: "cd '/oops && x", fallback: "/fb"), "/fb")
+    }
+
+    func test_unquote_roundtrips_shell_escaped_path() {
+        // shellEscape の '\'' 形式を復元できる（Support.swift の shellEscape と対）。
+        XCTAssertEqual(TerminalLauncher.unquote("'it'\\''s here'"), "it's here")
+        XCTAssertEqual(TerminalLauncher.unquote("/plain"), "/plain")
+    }
+
+    func test_herdr_tab_new_payload_shape() {
+        let json = TerminalLauncher.herdrTabNewPayload(
+            folder: "/tmp dir",
+            argv: ["/bin/zsh", "-lc", "cd '/tmp dir' && echo \"hi\""],
+            name: "moost:resume"
+        )
+        // herdr-app do に渡す単一 JSON 文字列（focus:false / folder / argv / name）。
+        // 文字列一致は引用符まで含む完全一致で確認する（エスケープ事故を
+        // 緩い contains で見過ごさない）。
+        XCTAssertTrue(json.hasPrefix("{"), json)
+        XCTAssertTrue(json.contains("\"focus\":false"), json)
+        XCTAssertTrue(json.contains("\"folder\":"), json) // 値の完全一致は下の JSON 往査で検証
+        XCTAssertTrue(json.contains("\"name\":\"moost:resume\""), json)
+        XCTAssertTrue(json.contains("echo \\\"hi\\\""), json) // 参照先の引用符は JSON で \" にエスケープ
+        // 必ず JSON として読めること（エスケープ事故防止の担保）。
+        let data = json.data(using: .utf8)!
+        let obj = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(obj["focus"] as? Bool, false)
+        XCTAssertEqual(obj["folder"] as? String, "/tmp dir")
+        XCTAssertEqual(obj["name"] as? String, "moost:resume")
+        XCTAssertEqual(obj["argv"] as? [String], ["/bin/zsh", "-lc", "cd '/tmp dir' && echo \"hi\""])
+    }
+
+    func test_herdr_do_result_parses_success_terminal_id() {
+        let ok: (Int32, String, String) =
+            (0, "{\"space\":\"s1\",\"tab\":\"tb1\",\"terminal\":\"t9\"}", "")
+        XCTAssertEqual(TerminalLauncher.herdrDoResult(ok), .success(terminal: "t9"))
+    }
+
+    func test_herdr_do_result_failure_shapes() {
+        // 未起動は exit 2 + プレインテキスト。
+        let sock: (Int32, String, String) = (2, "", "could not connect to socket")
+        if case .failure = TerminalLauncher.herdrDoResult(sock) {} else {
+            XCTFail("exit 2 must be failure")
+        }
+        // spawn 失敗は exit 1 + JSON error。
+        let spawn: (Int32, String, String) =
+            (1, "{\"error\":\"failed to spawn process: No such file or directory (os error 2)\"}", "")
+        if case .failure = TerminalLauncher.herdrDoResult(spawn) {} else {
+            XCTFail("spawn error must be failure")
+        }
+        // exit 0 でも terminal キーが無ければ失敗（空オブジェクト対策）。
+        let empty: (Int32, String, String) = (0, "{}", "")
+        if case .failure = TerminalLauncher.herdrDoResult(empty) {} else {
+            XCTFail("empty object must be failure")
+        }
+        // 空 stdout / 非 JSON も失敗。
+        let blank: (Int32, String, String) = (0, "", "")
+        if case .failure = TerminalLauncher.herdrDoResult(blank) {} else {
+            XCTFail("blank stdout must be failure")
+        }
+    }
+
+    func test_herdr_launch_uses_do_tab_new_with_payload() throws {
+        var seen: [[String]] = []
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app") { command in
+            seen.append(command)
+            return (0, "{\"space\":\"s1\",\"tab\":\"tb1\",\"terminal\":\"t9\"}", "")
+        }
+        let outcome = try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/Users/dev/my app' && moost resume s1 --agent claude")
+        XCTAssertEqual(outcome, TerminalLaunchOutcome.background(terminal: "t9"))
+        XCTAssertEqual(seen.count, 1)
+        XCTAssertEqual(seen[0][0], "/usr/local/bin/herdr-app")
+        XCTAssertEqual(seen[0][1], "do")
+        XCTAssertEqual(seen[0][2], "tab.new")
+        let payload = try XCTUnwrap(seen[0].last)
+        let obj = try JSONSerialization.jsonObject(with: payload.data(using: .utf8)!)
+            as! [String: Any]
+        XCTAssertEqual(obj["focus"] as? Bool, false)
+        XCTAssertEqual(obj["folder"] as? String, "/Users/dev/my app")
+        XCTAssertEqual(obj["name"] as? String, TerminalLauncher.herdrResumeTabName)
+        XCTAssertEqual(obj["argv"] as? [String],
+                       ["/bin/zsh", "-lc", "cd '/Users/dev/my app' && moost resume s1 --agent claude"])
+    }
+
+    func test_herdr_launch_opens_app_and_retries_on_socket_error() throws {
+        var seen: [[String]] = []
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app") { command in
+            seen.append(command)
+            if seen.count == 1 { return (2, "", "could not connect to socket") }
+            return (0, "{\"space\":\"s1\",\"tab\":\"tb1\",\"terminal\":\"t10\"}", "")
+        }
+        let outcome = try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")
+        XCTAssertEqual(outcome, TerminalLaunchOutcome.background(terminal: "t10"))
+        XCTAssertEqual(seen.count, 2, "open 後に do を再試行する")
+        XCTAssertEqual(seen[0][1...2], ["do", "tab.new"])
+    }
+
+    func test_herdr_launch_stops_early_on_identical_retry_responses() throws {
+        // 未起動相当（exit 2 同一応答）が続く場合、deadline まで叩かず
+        // 同一応答 3 回連続で打ち切る（初回 1 + リトライ 3）。
+        // 失敗理由は最後のリトライ結果（reason 文が空にならない）。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    windowLaunchTimeout: 8) { _ in
+            probed += 1
+            return (2, "", "could not connect to socket")
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            XCTAssertTrue(error.message.contains("could not connect to socket"), error.message)
+        }
+        XCTAssertEqual(probed, 4, "同一応答 3 回連続で早期打ち切り（初回+リトライ3回）")
+    }
+
+    func test_herdr_launch_stops_early_on_empty_object_spawn_failure() throws {
+        // spawn 失敗が `{}` exit 0 で返るケース: open は走るが、同一応答の
+        // リトライを deadline（約32回）まで繰り返さず早期打ち切りする。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    windowLaunchTimeout: 8) { _ in
+            probed += 1
+            return (0, "{}", "")
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/nope' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            XCTAssertTrue(error.message.contains("Herdr"), error.message)
+            XCTAssertFalse(error.message.hasSuffix("（）"),
+                           "失敗理由が空になっていないこと: \(error.message)")
+        }
+        XCTAssertLessThan(probed, 10, "{} 固定応答で deadline まで叩かない: probed=\(probed)")
+        XCTAssertEqual(probed, 4)
+    }
+
+    func test_herdr_launch_retry_loop_is_cut_by_deadline() throws {
+        // 仮想時間クロック（retryNow / retrySleep 注入）で決定的に検証する。
+        // realtime 依存は禁止（GitHub Actions の macOS ランナーでは実行速度で
+        // 試行回数が揺れて flaky になった実績: 0.6 秒 deadline で probed 4 > 3）。
+        // - 応答は毎回変わる = 同一応答打ち切り（3 回）は発動しない。
+        // - 従って打ち切りは仮想 deadline だけで決まる:
+        //   timeout 1.0 秒 / 間隔 0.25 秒 ⇒ リトライは floor(1.0/0.25) = 4 回、
+        //   初回 do を合わせて probed は 5 で厳密に確定する。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    windowLaunchTimeout: 1.0,
+                                    retryClock: { _ in }) { _ in
+            probed += 1
+            return (2, "", "socket wait \(probed)") // 毎回変わる = 連続同一応答にならない
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            // 最後のリトライ結果が理由に入ること（lastFailure が最終試行であること）。
+            XCTAssertTrue(error.message.contains("socket wait \(probed)"), error.message)
+        }
+        let expectedRetries = Int(1.0 / TerminalLauncher.herdrRetryInterval) // = 4
+        XCTAssertEqual(probed, 1 + expectedRetries,
+                       "仮想 deadline で打ち切られる（初回+リトライ\(expectedRetries)回）: probed=\(probed)")
+    }
+
+    func test_herdr_launch_does_not_open_app_on_spawn_error() throws {
+        // exit 1 + JSON error（folder 不正等の spawn 失敗）は open せず即失敗。
+        var probed = 0
+        var opened = false
+        let launcher = TerminalLauncher(
+            runCommand: { command in
+                if command.first == "/usr/bin/open" {
+                    opened = true
+                    return (0, "", "")
+                }
+                probed += 1
+                return (1, "{\"error\":\"failed to spawn process: boom\"}", "")
+            },
+            herdrBinaryProvider: { "/usr/local/bin/herdr-app" },
+            herdrWorkingDirectoryProvider: { "/fallback/cwd" }
+        )
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/nope' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            let message = error.message
+            XCTAssertTrue(message.contains("Herdr"), message)
+            XCTAssertTrue(message.contains("boom"), message)
+        }
+        XCTAssertEqual(probed, 1, "spawn 失敗で do を繰り返さない")
+        XCTAssertFalse(opened, "spawn 失敗では open しない")
+    }
+
+    func test_herdr_launch_throws_when_binary_missing() {
+        let launcher = makeLauncher(herdrBinary: nil) { _ in (0, "{}", "") }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            let message = error.message
+            // 開き方を教える文言（UI がそのままトーストへ出す）。
+            XCTAssertTrue(message.contains("Herdr"), message)
+        }
+    }
+
+    func test_herdr_launch_gives_up_when_open_fails() {
+        // 初回 do 失敗（未起動）→ open 失敗 → 再試行せず例外（open の理由も含む）。
+        var probed = 0
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    openSucceeds: false) { _ in
+            probed += 1
+            return (2, "", "could not connect to socket")
+        }
+        XCTAssertThrowsError(try launcher.launch(terminal: TerminalApp.herdr, command: "cd '/tmp' && moost resume s1")) { error in
+            guard let error = error as? TerminalLaunchError else {
+                return XCTFail("unexpected error: \(error)")
+            }
+            let message = error.message
+            XCTAssertTrue(message.contains("could not connect to socket"), message)
+            XCTAssertTrue(message.contains("Unable to find application"), message)
+        }
+        XCTAssertEqual(probed, 1, "open 失敗後は do を再試行しない")
+    }
+
+    func test_herdr_launch_falls_back_to_working_directory_without_cd() throws {
+        // codex の projectPath 空セッションのように cd が読めないコマンドは
+        // 注入した workingDirectory を folder に使う。
+        var seen: [[String]] = []
+        let launcher = makeLauncher(herdrBinary: "/usr/local/bin/herdr-app",
+                                    workingDirectory: "/Users/dev/work") { command in
+            seen.append(command)
+            return (0, "{\"space\":\"s1\",\"tab\":\"tb1\",\"terminal\":\"t11\"}", "")
+        }
+        _ = try launcher.launch(terminal: TerminalApp.herdr, command: "moost resume s1")
+        let payload = try XCTUnwrap(seen.last?.last)
+        let obj = try JSONSerialization.jsonObject(with: payload.data(using: .utf8)!)
+            as! [String: Any]
+        XCTAssertEqual(obj["folder"] as? String, "/Users/dev/work")
+    }
+
 }

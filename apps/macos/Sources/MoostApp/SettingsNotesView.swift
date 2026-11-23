@@ -43,6 +43,7 @@ struct SettingsScreen: View {
                         Text("iTerm2").tag("iTerm2")
                         Text("Kitty").tag("kitty")
                         Text("Zed").tag("zed")
+                        Text("Herdr").tag("herdr")
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -300,6 +301,15 @@ struct NotesScreen: View {
                          + "（zed-industries/zed Discussion #57026 で機能依頼が進行中）。"
                          + "Zed.app が見つからない場合はトーストでお知らせするので、"
                          + "Zed をインストールするか他の復帰先へ切り替えてください。")
+                    note("Herdr での復帰",
+                         "Herdr（herdr.dev: herdr-core がターミナルを実行し、Herdr.app が"
+                         + "表示する構成）を復帰先に選んだ場合、Moost は現在のスペースの"
+                         + "新規タブとして復帰ターミナルを開きます（タブ名 moost:resume。"
+                         + "前面のタブは切り替わりません）。"
+                         + "Herdr.app が未起動の場合は Moost が起動を代行し、起動を待ってから"
+                         + "タブを開きます。Herdr.app が見つからない場合はトーストで"
+                         + "「Herdr.app が見つかりません」とお知らせするので、Herdr を"
+                         + "インストールするか他の復帰先へ切り替えてください。")
                     note("セッションの保持期間",
                          "セッションは Claude Code が cleanupPeriodDays（デフォルト 30 日）に"
                          + "基づいて保持します。メモを登録していても、期限切れのセッションには"

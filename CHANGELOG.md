@@ -14,7 +14,7 @@
 - Windows native 版（フェーズ D）の実装を進行中（C#/.NET 10 + WPF・コード共有なし・ADR-006）。
   進捗は EPIC #110 を参照。
 
-## macOS Unreleased
+## macOS 2.5.0 - 2026-11-23
 
 ### Added
 
